@@ -1,0 +1,91 @@
+# ================================
+# ORCA - Git Ignore
+# ================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# FastAPI / Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / React
+node_modules/
+dist/
+build/
+.vite/
+
+# Frontend environment files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Backend environment files
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# IDE / Editors
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python packaging
+*.egg-info/
+.eggs/
+*.whl
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Large / downloaded data
+data/raw/*
+data/processed/*
+data/cached/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/cached/.gitkeep
+
+# Local generated outputs
+outputs/
+reports/generated/
+
+# Secrets / credentials
+*.pem
+*.key
+credentials.json
+service-account*.json
