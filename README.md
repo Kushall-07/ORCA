@@ -51,13 +51,19 @@ network and no randomness. What exists today:
   NO_SAFE_RECOMMENDATION` with fixed rule precedence; result is final for safety.
 - **`decision/`** — Decision Engine: fixed map onto `PROCEED /
   PROCEED_WITH_CAUTION / DO_NOT_PROCEED / NO_SAFE_RECOMMENDATION`.
-- **`routing/`** — deterministic A* on a numpy grid, hard geofences rasterised
-  conservatively, independent post-hoc route validation. **A route can never
-  cross a hard geofence** (raster + A* + validator). Destination inside a hard
-  geofence is rejected *before* A* runs. `NO_ROUTE` is an explicit status.
+- **`routing/`** — deterministic A* on a numpy grid; hard geofences rasterised
+  conservatively; independent post-hoc route validator (bounds, navigability,
+  contiguity, no corner-cut, endpoint match, geometry vs original polygons).
+  **A route can never cross a hard geofence** (raster + A* + validator).
+  `plan_route` is a fixed 10-step pipeline; origin **and** destination inside a
+  hard geofence are rejected *before* A* runs. Explicit `RouteStatus`:
+  `ROUTE_FOUND / NO_ROUTE / DESTINATION_BLOCKED / ORIGIN_BLOCKED /
+  INVALID_REQUEST / ROUTE_VALIDATION_FAILED`. `origin == destination` →
+  single-point `ROUTE_FOUND`. Reports `grid_path_cost` (A* step cost) separately
+  from the approximate `total_distance_m`.
 - **`suitability/`** — foundation only; kept strictly separate from safety, PFZ
   reference evidence never folded into the derived score.
-- **165 tests** (`backend/tests/`), all passing.
+- **215 tests** (`backend/tests/`), all passing.
 
 Everything below marked _(planned)_ is **not implemented yet**.
 
@@ -221,7 +227,7 @@ npm run build          # type-check + production build
 cd backend && pytest
 ```
 
-**165 tests**, all offline and deterministic (no DB/Redis/network):
+**215 tests**, all offline and deterministic (no DB/Redis/network):
 
 - Phase 1 — `GET /`, `GET /health`, `GET /health/ready` (ok + degraded paths),
   datastore probes monkeypatched.
@@ -229,10 +235,16 @@ cd backend && pytest
   each risk factor, Risk Engine combination / banding / missing-data /
   determinism, GIS primitives, geofencing, Safety Guard (all four statuses +
   precedence), Decision Engine mapping, A* (straight / obstacle / blocked
-  endpoint / no-path / no corner-cutting / determinism), route planner
-  (`ROUTE_FOUND` / `DESTINATION_BLOCKED` / `ORIGIN_BLOCKED` / `NO_ROUTE` /
-  `INVALID_REQUEST`), independent route validation, suitability foundation,
-  and `test_invariants.py` asserting the nine architecture invariants.
+  endpoint / no-path / no corner-cutting / determinism), route planner statuses,
+  independent route validation, suitability foundation, and `test_invariants.py`
+  asserting the nine architecture invariants.
+- Phase 3 — `test_grid.py` (transform correctness, half-open axes, OOB = blocked,
+  negative-index no-wrap, malformed-`GridSpec` rejection), A* search budget +
+  `path_cost`, expanded route-validator checks, and `test_routing_invariants.py`
+  — the twelve named route-safety scenarios (dest/origin blocked before A*,
+  valid detour, `NO_ROUTE`, `ROUTE_VALIDATION_FAILED`, invalid request,
+  out-of-grid, blocked destination cell, disconnected grid, determinism,
+  `origin == destination`, no diagonal corner-cut).
 
 ---
 
@@ -241,8 +253,8 @@ cd backend && pytest
 | Phase | Scope |
 |---|---|
 | **1 — done** | Docker, PostGIS, Redis, FastAPI, health endpoints, frontend + map shell |
-| **2 — done** | Deterministic core: domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation, 165 tests |
-| 3 _(planned)_ | Routing depth: dynamic grid build from GIS layers, richer no-route diagnostics, route re-planning |
+| **2 — done** | Deterministic core: domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation |
+| **3 — done** | Routing hardening: 10-step `plan_route` pipeline, origin **and** destination hard-geofence rejection before A*, grid safety (OOB = blocked, malformed-config rejection), A* search budget, expanded independent route validator (bounds / navigability / contiguity / corner-cut / endpoint match), `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, `grid_path_cost` vs approximate `total_distance_m`. 215 tests |
 | 4 _(planned)_ | Data agents: Weather, Oceanographic, GIS & Geofencing (live → cache → fallback) |
 | 5 _(planned)_ | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
 | 6 _(planned)_ | Provenance graph, evidence records, grounding validation, explanation, alerts |

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.routing.astar import a_star
+import math
+
+import pytest
+
+from app.routing.astar import a_star, path_cost
 from tests.factories import blank_grid, grid_with_blocks
 
 
@@ -84,3 +88,34 @@ def test_determinism() -> None:
     first = a_star(grid, (0, 0), (4, 4), allow_diagonal=True)
     for _ in range(25):
         assert a_star(grid, (0, 0), (4, 4), allow_diagonal=True) == first
+
+
+def test_max_expanded_budget_stops_the_search() -> None:
+    grid = blank_grid(20, 20)
+    path, expanded = a_star(grid, (0, 0), (19, 19), max_expanded=5)
+    assert path is None
+    assert expanded == 5
+
+
+def test_generous_budget_does_not_change_result() -> None:
+    grid = grid_with_blocks({(1, 1), (2, 1), (3, 1)})
+    unlimited = a_star(grid, (0, 0), (4, 4), allow_diagonal=True)
+    budgeted = a_star(grid, (0, 0), (4, 4), allow_diagonal=True, max_expanded=10_000)
+    assert budgeted == unlimited
+    assert budgeted[0] is not None
+
+
+def test_path_cost_orthogonal() -> None:
+    assert path_cost([(0, 0), (0, 1), (0, 2), (0, 3)]) == 3.0
+
+
+def test_path_cost_diagonal() -> None:
+    assert path_cost([(0, 0), (1, 1), (2, 2)]) == pytest.approx(2 * math.sqrt(2))
+
+
+def test_path_cost_ignores_stationary_step() -> None:
+    assert path_cost([(0, 0), (0, 0), (0, 1)]) == 1.0
+
+
+def test_path_cost_single_cell_is_zero() -> None:
+    assert path_cost([(3, 3)]) == 0.0

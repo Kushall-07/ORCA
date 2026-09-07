@@ -2,6 +2,16 @@
 
 A ``GridSpec`` maps a rectangular lat/lon area onto integer (row, col) cells.
 Row 0 is the southernmost band (min_lat); col 0 is the westernmost (min_lon).
+Each axis is half-open: a point exactly on ``max_lat`` / ``max_lon`` is *outside*
+the grid.
+
+Cost vocabulary (kept deliberately distinct):
+
+* ``grid_path_cost`` - the A* path cost in grid steps (1.0 orthogonal,
+  sqrt(2) diagonal). A pure graph quantity.
+* ``total_distance_m`` - an *approximate* great-circle length of the waypoint
+  polyline. Intermediate waypoints are grid cell centres, so this is an
+  estimate, not a surveyed navigational track distance.
 """
 
 from __future__ import annotations
@@ -14,7 +24,7 @@ from app.gis.validation import CoordinateError, validate_coordinate
 from app.models.common import Coordinate
 
 ROUTING_ALGORITHM = "astar"
-ROUTING_VERSION = "astar-1.0.0"
+ROUTING_VERSION = "astar-1.1.0"
 
 
 class RouteStatus(str, Enum):
@@ -23,9 +33,20 @@ class RouteStatus(str, Enum):
     DESTINATION_BLOCKED = "DESTINATION_BLOCKED"
     ORIGIN_BLOCKED = "ORIGIN_BLOCKED"
     INVALID_REQUEST = "INVALID_REQUEST"
+    # A* produced a path but the independent Layer-3 validator rejected it.
+    # This is a defence-in-depth failure signal, distinct from "no path exists".
+    ROUTE_VALIDATION_FAILED = "ROUTE_VALIDATION_FAILED"
+
+    @property
+    def is_success(self) -> bool:
+        return self is RouteStatus.ROUTE_FOUND
 
 
 class GridSpec(BaseModel):
+    """Rectangular lat/lon grid. All fields are validated; a zero or negative
+    dimension, a non-positive cell size, or an extent that leaves the valid
+    WGS84 range is rejected at construction."""
+
     model_config = ConfigDict(frozen=True)
 
     min_lat: float
@@ -51,14 +72,33 @@ class GridSpec(BaseModel):
     def max_lon(self) -> float:
         return self.min_lon + self.cell_size_deg * self.n_cols
 
+    @property
+    def cell_count(self) -> int:
+        return self.n_rows * self.n_cols
+
+    def contains(self, coordinate: Coordinate) -> bool:
+        """Whether ``coordinate`` falls inside the half-open grid extent."""
+        lat, lon = coordinate.as_latlon()
+        return (
+            self.min_lat <= lat < self.max_lat
+            and self.min_lon <= lon < self.max_lon
+        )
+
 
 class RouteRequest(BaseModel):
+    """The strongly-typed routing API. Coordinates are validated by the
+    :class:`Coordinate` model; there is no dict-based entry point."""
+
     model_config = ConfigDict(frozen=True)
 
     origin: Coordinate
     destination: Coordinate
     grid: GridSpec
     allow_diagonal: bool = True
+    # Optional A* search budget. When the number of expanded nodes reaches this
+    # value the search stops and the planner returns NO_ROUTE with a
+    # "search budget" reason. ``None`` means unlimited.
+    max_expanded_nodes: int | None = Field(default=None, gt=0)
 
 
 class RoutePoint(BaseModel):
@@ -70,6 +110,9 @@ class RoutePoint(BaseModel):
 
 
 class RouteValidation(BaseModel):
+    """Outcome of the independent route validator. ``valid`` is true only when
+    ``violations`` is empty."""
+
     model_config = ConfigDict(frozen=True)
 
     valid: bool
@@ -84,6 +127,8 @@ class RouteResult(BaseModel):
     origin: Coordinate
     destination: Coordinate
     path: tuple[RoutePoint, ...] = ()
+    node_count: int | None = None
+    grid_path_cost: float | None = None
     total_distance_m: float | None = None
     expanded_nodes: int | None = None
     blocked_cell_count: int | None = None

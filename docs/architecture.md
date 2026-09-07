@@ -259,17 +259,47 @@ final for safety — no later node may override it.
 `NO_SAFE_RECOMMENDATION→NO_SAFE_RECOMMENDATION`; `routing_allowed` only for the
 two proceed states.
 
-**Routing** (`backend/app/routing/`): `grid` (numpy occupancy grid +
-`GridSpec` lat/lon↔cell mapping; `rasterize_geofences` blocks a cell if its
-square *intersects* a hard polygon — conservative, no corner clipping); `astar`
-(8-connectivity, octile heuristic, deterministic tie-break, **no diagonal
-corner-cutting** past blocked cells, returns `(path | None, expanded)`);
-`validation` (independent re-check of the final polyline against the original
-polygons); `planner.plan_route` runs coords → grid bounds → point-in-hard-
-geofence → dest/origin cell free → A* → independent validation, returning a
-`RouteStatus` of `ROUTE_FOUND / NO_ROUTE / DESTINATION_BLOCKED / ORIGIN_BLOCKED
-/ INVALID_REQUEST`. **Hard-geofence defence in depth = raster + A* + post-hoc
-validation.**
+**Routing** (`backend/app/routing/`) — hardened in Phase 3:
+
+- **`grid`** — numpy occupancy grid + `GridSpec` lat/lon↔cell mapping (row = lat,
+  col = lon; each axis half-open). `GridSpec` rejects a zero/negative/oversized
+  dimension, a non-positive cell size, and an extent that leaves the WGS84 range;
+  a bad blocked mask raises `GridError`. `Grid.is_blocked` returns `True` for any
+  **out-of-bounds** cell, so a blocked cell can never accidentally become
+  traversable and a negative index can never wrap. `rasterize_geofences` blocks a
+  cell if its square *intersects* a hard polygon (conservative — a mere edge
+  touch blocks it).
+- **`astar`** — 8-connectivity, octile heuristic (admissible + consistent),
+  costs 1.0 / √2, total-order tie-break `(f, h, insertion-counter)`, **no
+  diagonal corner-cutting** past blocked cells, optional `max_expanded` search
+  budget. Returns `(path | None, expanded)`; identical inputs ⇒ identical output.
+  `path_cost` reports the grid-step cost of a cell path.
+- **`validation.validate_route`** — the independent Layer-3 check. Verifies route
+  non-emptiness, coordinate validity, origin/destination correspondence, and —
+  when the grid and cell path are supplied — cell bounds, navigability,
+  contiguity and no diagonal corner-cut; then tests the actual geometry against
+  the **original** hard-geofence polygons (endpoints not inside, no segment
+  crossing). A single-point route is accepted only for `origin == destination`.
+- **`planner.plan_route`** — fixed pipeline: (1) validate origin coords →
+  (2) validate destination coords → (3) build + validate grid → (4) origin vs
+  hard geofences → (5) destination vs hard geofences → (6) origin/destination
+  grid cells → (7) `origin == destination` cell short-circuit → (8) A* →
+  (9) reconstruct path + costs → (10) independent validation. **Destination /
+  origin inside a hard geofence is rejected before A* runs.**
+
+`RouteResult` carries a `RouteStatus` of `ROUTE_FOUND / NO_ROUTE /
+DESTINATION_BLOCKED / ORIGIN_BLOCKED / INVALID_REQUEST /
+ROUTE_VALIDATION_FAILED` (the last: A* produced a path the independent validator
+rejected — a defence-in-depth signal, distinct from "no path exists"), plus
+`node_count`, `grid_path_cost` (pure A* step cost) and `total_distance_m` (an
+*approximate* great-circle length of the waypoint polyline — the intermediate
+waypoints are cell centres, so it is an estimate, not a surveyed track).
+`origin == destination` ⇒ `ROUTE_FOUND` with a single-point path,
+`grid_path_cost = 0.0`, `total_distance_m = 0.0`; the hard-geofence rule still
+takes precedence over it.
+
+**Hard-geofence defence in depth = raster block + A* traversal + independent
+post-hoc geometry validation.** No layer may be removed.
 
 **Fishing Suitability** (`backend/app/suitability/engine.py`): Phase 2
 foundation only — deterministic scaffold, returns `UNKNOWN/INSUFFICIENT` without
@@ -289,12 +319,12 @@ orchestration, evidence arbitration, explanation, provenance graph.
 |---|---|
 | 1 | ✅ Infrastructure + data foundation (Docker, PostGIS, Redis, FastAPI, `/health`, frontend + map shell) |
 | 2 | ✅ Deterministic core (domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation) with unit tests |
-| 3 | Routing (destination validation, hard geofence checks, grid, A*, no-route result) |
+| 3 | ✅ Routing hardening (strongly-typed `RouteRequest`, fixed 10-step validation pipeline, origin+destination hard-geofence rejection before A*, grid safety, `max_expanded` budget, expanded independent route validator, `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, grid-cost vs approximate-distance) with regression tests |
 | 4 | Data agents (Weather, Oceanographic, GIS & Geofencing) with live → cache → fallback |
 | 5 | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
 | 6 | Provenance graph, evidence records, grounding validation, explanation, alerts |
 | 7 | Frontend (chat, map, risk heatmap, geofences, route, evidence/provenance/explanation panels, agent activity) |
 | 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
 
-Current status: **Phase 2 complete** (deterministic core). Next: Phase 3 routing
-refinements, then Phase 4 data agents.
+Current status: **Phase 3 complete** (deterministic routing subsystem hardened).
+Next: Phase 4 data agents.

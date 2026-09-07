@@ -5,6 +5,10 @@ holds the boolean ``blocked`` mask. Hard geofences are rasterised conservatively
 a cell is blocked if its square *intersects* a hard geofence polygon, not merely
 if the cell centre is inside. This prevents A* from clipping a corner of a
 restricted zone.
+
+Out-of-bounds cells are treated as blocked: :meth:`Grid.is_blocked` returns
+``True`` for any cell outside the grid, so a blocked cell can never accidentally
+become traversable (and a negative index can never wrap into a valid row).
 """
 
 from __future__ import annotations
@@ -23,6 +27,10 @@ from app.models.routing import GridSpec
 Cell = tuple[int, int]
 
 
+class GridError(ValueError):
+    """Raised when a grid / blocked-mask configuration is malformed."""
+
+
 @dataclass(frozen=True)
 class Grid:
     spec: GridSpec
@@ -30,17 +38,19 @@ class Grid:
 
     def __post_init__(self) -> None:
         expected = (self.spec.n_rows, self.spec.n_cols)
+        if not isinstance(self.blocked, np.ndarray):
+            raise GridError("blocked mask must be a numpy array")
         if self.blocked.shape != expected:
-            raise ValueError(
+            raise GridError(
                 f"blocked mask shape {self.blocked.shape} != grid {expected}"
             )
         if self.blocked.dtype != np.bool_:
-            raise ValueError("blocked mask must be boolean")
+            raise GridError(
+                f"blocked mask dtype {self.blocked.dtype} is not bool"
+            )
 
     @classmethod
-    def from_spec(
-        cls, spec: GridSpec, blocked: np.ndarray | None = None
-    ) -> "Grid":
+    def from_spec(cls, spec: GridSpec, blocked: np.ndarray | None = None) -> "Grid":
         if blocked is None:
             blocked = np.zeros((spec.n_rows, spec.n_cols), dtype=np.bool_)
         return cls(spec=spec, blocked=blocked)
@@ -54,7 +64,14 @@ class Grid:
         return 0 <= row < self.spec.n_rows and 0 <= col < self.spec.n_cols
 
     def is_blocked(self, cell: Cell) -> bool:
+        """True if the cell is impassable. Out-of-bounds counts as blocked."""
+        if not self.in_bounds(cell):
+            return True
         return bool(self.blocked[cell[0], cell[1]])
+
+    def is_navigable(self, cell: Cell) -> bool:
+        """In-bounds and not blocked."""
+        return self.in_bounds(cell) and not bool(self.blocked[cell[0], cell[1]])
 
     def cell_center(self, cell: Cell) -> Coordinate:
         row, col = cell
@@ -63,7 +80,11 @@ class Grid:
         return Coordinate(latitude=lat, longitude=lon)
 
     def coordinate_to_cell(self, coordinate: Coordinate) -> Cell | None:
-        """Cell containing ``coordinate`` or ``None`` if outside the grid."""
+        """Cell containing ``coordinate``, or ``None`` if outside the grid.
+
+        Each axis is half-open: a point exactly on ``max_lat`` / ``max_lon`` is
+        outside; a point exactly on ``min_lat`` / ``min_lon`` is in row/col 0.
+        """
         lat, lon = coordinate.as_latlon()
         row = int(np.floor((lat - self.spec.min_lat) / self.spec.cell_size_deg))
         col = int(np.floor((lon - self.spec.min_lon) / self.spec.cell_size_deg))
@@ -88,12 +109,14 @@ def rasterize_geofences(
     *,
     hard_only: bool = True,
 ) -> np.ndarray:
-    """Return a boolean blocked mask for ``spec`` covering the given geofences."""
+    """Return a boolean blocked mask for ``spec`` covering the given geofences.
+
+    A cell is blocked when its square intersects the union of the selected
+    geofence polygons (conservative - a mere edge touch blocks the cell).
+    """
     mask = np.zeros((spec.n_rows, spec.n_cols), dtype=np.bool_)
     selected = [
-        fence.geometry()
-        for fence in geofences
-        if (fence.is_hard or not hard_only)
+        fence.geometry() for fence in geofences if (fence.is_hard or not hard_only)
     ]
     if not selected:
         return mask
