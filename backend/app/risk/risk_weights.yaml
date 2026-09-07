@@ -1,18 +1,114 @@
 # ============================================================
 # ORCA Risk Engine - configurable weights & thresholds
 # ============================================================
-# POPULATED IN PHASE 2 (deterministic core).
+# version:      2026.02-mvp
+# calculation:  risk-1.0.0  (see app/risk/engine.py CALCULATION_VERSION)
 #
-# This file will hold the configurable factor weights and thresholds used by the
-# deterministic Risk Engine (wave risk, wind risk, advisory risk,
-# thunderstorm/lightning proxy, cyclone proxy, geofence distance).
+# ------------------------------------------------------------
+# IMPORTANT - THESE ARE ORCA ENGINEERING / MVP THRESHOLDS.
+# They are NOT official IMD / ISRO / INCOIS marine-safety limits.
+# They are a defensible starting configuration for a decision-support
+# prototype and are expected to be reviewed against authoritative
+# guidance before any operational use. Every value here is data, not
+# code: the engine loads and validates this file and fails loudly if it
+# is malformed - it never silently falls back to built-in numbers.
+# ------------------------------------------------------------
 #
-# Rules for whoever fills this in:
-#   * The LLM never reads or writes these values.
-#   * Any threshold that is an engineering/demo choice rather than an
-#     authoritative marine-safety standard MUST be labelled as such inline.
-#   * Weights are configuration, not code - they must not be duplicated as
-#     literals elsewhere in the codebase.
-#
-# Intentionally left without values in Phase 1 so that no unsupported numeric
-# threshold is implied before the engine exists.
+# How a factor score is computed:
+#   * `breakpoints` is a piecewise-linear map from the factor's input value
+#     (in `unit`) to a 0..1 sub-score. Points are [input, score], ascending
+#     by input. Values below the first / above the last point clamp.
+#   * contribution (points on the 0..100 scale) = weight * sub_score * 100
+#   * overall_score = sum of contributions of the factors that were evaluated
+#   * factor weights sum to 1.0
+#   * a factor with `required_for_safety: true` that has no input makes the
+#     whole result data_sufficiency = insufficient (never "low risk").
+
+version: "2026.02-mvp"
+disclaimer: >-
+  ORCA engineering / MVP thresholds. Not official IMD/ISRO/INCOIS safety limits.
+  Review against authoritative marine guidance before operational use.
+
+severity_bands:          # overall score (0..100) -> RiskLevel
+  moderate: 25.0         # [0, 25)   -> low
+  high: 50.0             # [25, 50)  -> moderate
+  severe: 75.0           # [50, 75)  -> high ; [75, 100] -> severe
+
+factors:
+
+  wave:
+    weight: 0.30
+    unit: "m"            # significant wave height
+    required_for_safety: true
+    signal_kind: observed
+    breakpoints:
+      - [0.0, 0.00]
+      - [1.0, 0.15]
+      - [2.0, 0.40]
+      - [3.0, 0.70]
+      - [4.0, 0.90]
+      - [6.0, 1.00]
+
+  wind:
+    weight: 0.25
+    unit: "m/s"          # sustained wind speed
+    required_for_safety: true
+    signal_kind: observed
+    breakpoints:
+      - [0.0, 0.00]
+      - [5.0, 0.10]
+      - [10.0, 0.35]
+      - [15.0, 0.65]
+      - [20.0, 0.90]
+      - [25.0, 1.00]
+
+  advisory:
+    weight: 0.10
+    unit: "index"        # upstream-normalised advisory severity, 0..1
+    required_for_safety: false
+    signal_kind: reference
+    breakpoints:
+      - [0.0, 0.00]
+      - [1.0, 1.00]
+
+  lightning_proxy:
+    weight: 0.10
+    unit: "bool"         # thunderstorm / lightning PROXY (WMO codes 95-99)
+    required_for_safety: false
+    signal_kind: proxy
+    breakpoints:
+      - [0.0, 0.00]
+      - [1.0, 1.00]
+
+  cyclone_proxy:
+    weight: 0.20
+    unit: "index"        # model-derived cyclone PROXY, 0..1 (worst of pressure / gust)
+    required_for_safety: false
+    signal_kind: model_derived
+    breakpoints:
+      - [0.0, 0.00]
+      - [1.0, 1.00]
+    # Sub-signal maps used to derive the 0..1 index (see app/risk/factors.py):
+    pressure_hpa_breakpoints:     # lower pressure -> higher proxy
+      - [940.0, 1.00]
+      - [980.0, 0.70]
+      - [1000.0, 0.30]
+      - [1008.0, 0.05]
+      - [1015.0, 0.00]
+    gust_ms_breakpoints:          # stronger gust -> higher proxy
+      - [15.0, 0.00]
+      - [25.0, 0.30]
+      - [33.0, 0.70]
+      - [45.0, 1.00]
+
+  geofence:
+    weight: 0.05
+    unit: "m"            # distance to nearest HARD geofence (0 == inside)
+    required_for_safety: false   # hard geofences are enforced by the Safety Guard
+    signal_kind: model_derived
+    breakpoints:
+      - [0.0, 1.00]
+      - [500.0, 0.80]
+      - [2000.0, 0.40]
+      - [5000.0, 0.10]
+      - [10000.0, 0.00]

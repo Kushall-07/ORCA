@@ -206,12 +206,89 @@ database.
 
 ---
 
+## 6a. Deterministic core — Phase 2 (implemented)
+
+All of this runs with **no LLM, no network, no randomness**. Same input + same
+config ⇒ same output.
+
+**Domain models** (`backend/app/models/`): `common` (`Coordinate` with strict
+WGS84 validation — NaN/inf/out-of-range rejected, never clamped — `Location`,
+`TimeWindow`, `SourceTier`, `SignalKind`); `observations`
+(`MarineObservation`, `Evidence` — the Marine Data Fabric seed); `risk`
+(`RiskFactor`, `RiskResult`, `RiskLevel`, `FactorStatus`, `DataSufficiency`);
+`geo` (`Geofence` with WKT geometry + `HARD`/`SOFT` severity, `GeofenceResult`);
+`safety` (`SafetyStatus`, `SafetyGuardInput/Result`); `decision`
+(`DecisionStatus`, `DecisionResult`); `routing` (`GridSpec`, `RouteRequest`,
+`RouteResult`, `RouteStatus`, `RouteValidation`); `suitability`
+(`SuitabilityResult` etc.). Value objects are frozen.
+
+**GIS** (`backend/app/gis/`): `validation` (coordinate + geometry), `operations`
+(point-in-polygon, intersection, geodesic distance via pyproj WGS84,
+segment/geometry intersection), `geofencing` (`check_geofences` → `inside_hard`
+plus nearest-hard distance). `validation`/`operations` never import `app.models`
+(keeps `models.common` → `gis.validation` acyclic).
+
+**Risk Engine** (`backend/app/risk/`): `config` loads and validates
+`risk_weights.yaml` (raises `RiskConfigError`, never a silent fallback);
+`factors` has one pure function per factor (wave, wind, advisory, lightning
+proxy, cyclone proxy, geofence distance); `engine` combines them.
+Factor sub-score = piecewise-linear interpolation over YAML breakpoints;
+`contribution = weight × sub_score × 100`; `overall_score` = sum of evaluated
+contributions on a 0–100 scale; bands `LOW/MODERATE/HIGH/SEVERE` at `25/50/75`.
+**Missing data is `FactorStatus.MISSING_DATA`, never a zero score.** A missing
+`required_for_safety` factor (wave, wind) sets `data_sufficiency = INSUFFICIENT`
+and there is **no weight renormalisation** — a partial score is an explicit lower
+bound. `risk_weights.yaml` values are **ORCA engineering / MVP thresholds, not
+official IMD/ISRO/INCOIS limits** (stated in the file and in every result's
+`config_version`).
+
+**Proxy signals:** lightning from WMO codes 95–99 or an explicit flag →
+`SignalKind.PROXY`, note "not strike-level detection". Cyclone from model-derived
+pressure/gust sub-signals or an explicit flag → `SignalKind.MODEL_DERIVED`, note
+"not certified real-time detection".
+
+**Policy & Safety Guard** (`backend/app/policy/safety_guard.py`): deterministic
+function, fixed rule precedence — (1) point inside a HARD geofence → `BLOCKED`;
+(2) no risk result / required evidence missing / risk data-insufficient →
+`NO_SAFE_RECOMMENDATION`; (3) `SEVERE` → `BLOCKED`; (4) `HIGH`/`MODERATE` →
+`CAUTION`; (5) else `ALLOWED`. A hard geofence outranks missing data. Result is
+final for safety — no later node may override it.
+
+**Decision Engine** (`backend/app/decision/engine.py`): fixed map
+`ALLOWED→PROCEED`, `CAUTION→PROCEED_WITH_CAUTION`, `BLOCKED→DO_NOT_PROCEED`,
+`NO_SAFE_RECOMMENDATION→NO_SAFE_RECOMMENDATION`; `routing_allowed` only for the
+two proceed states.
+
+**Routing** (`backend/app/routing/`): `grid` (numpy occupancy grid +
+`GridSpec` lat/lon↔cell mapping; `rasterize_geofences` blocks a cell if its
+square *intersects* a hard polygon — conservative, no corner clipping); `astar`
+(8-connectivity, octile heuristic, deterministic tie-break, **no diagonal
+corner-cutting** past blocked cells, returns `(path | None, expanded)`);
+`validation` (independent re-check of the final polyline against the original
+polygons); `planner.plan_route` runs coords → grid bounds → point-in-hard-
+geofence → dest/origin cell free → A* → independent validation, returning a
+`RouteStatus` of `ROUTE_FOUND / NO_ROUTE / DESTINATION_BLOCKED / ORIGIN_BLOCKED
+/ INVALID_REQUEST`. **Hard-geofence defence in depth = raster + A* + post-hoc
+validation.**
+
+**Fishing Suitability** (`backend/app/suitability/engine.py`): Phase 2
+foundation only — deterministic scaffold, returns `UNKNOWN/INSUFFICIENT` without
+observations. Imports nothing from `app.policy`; carries an explicit `disclaimer`
+that suitability ≠ safety; official/reference PFZ evidence is reported via
+`pfz_reference_present`, never folded into the score.
+
+Not in Phase 2: any data agent, Open-Meteo/MOSDAC/Copernicus client, Redis
+caching of data, Query Understanding, Groq, LangGraph, Marine Data Fabric
+orchestration, evidence arbitration, explanation, provenance graph.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
 |---|---|
-| 1 | Infrastructure + data foundation (Docker, PostGIS, Redis, FastAPI, `/health`, frontend + map shell) |
-| 2 | Deterministic core (Risk Engine, GIS ops, Safety Guard, A*, validation) with tests |
+| 1 | ✅ Infrastructure + data foundation (Docker, PostGIS, Redis, FastAPI, `/health`, frontend + map shell) |
+| 2 | ✅ Deterministic core (domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation) with unit tests |
 | 3 | Routing (destination validation, hard geofence checks, grid, A*, no-route result) |
 | 4 | Data agents (Weather, Oceanographic, GIS & Geofencing) with live → cache → fallback |
 | 5 | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
@@ -219,4 +296,5 @@ database.
 | 7 | Frontend (chat, map, risk heatmap, geofences, route, evidence/provenance/explanation panels, agent activity) |
 | 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
 
-Current status: **Phase 1**.
+Current status: **Phase 2 complete** (deterministic core). Next: Phase 3 routing
+refinements, then Phase 4 data agents.

@@ -20,8 +20,10 @@ safety thresholds, or the final decision).
 
 ## Status
 
-**Phase 1 — infrastructure & data foundation.** What exists today:
+**Phase 2 complete — deterministic core.** All of it runs with no LLM, no
+network and no randomness. What exists today:
 
+*Phase 1 — infrastructure:*
 - FastAPI backend with `GET /`, `GET /health` (liveness) and `GET /health/ready`
   (PostgreSQL + PostGIS + Redis readiness, structured per-dependency status).
 - Async PostgreSQL/PostGIS engine and async Redis client with lazy connectivity.
@@ -31,6 +33,31 @@ safety thresholds, or the final decision).
 - React + TypeScript + Vite frontend shell with a Leaflet / OpenStreetMap map
   centred on the Mangalore / Arabian Sea region and a live backend health badge.
 - `docker-compose.yml` for `frontend` / `backend` / `postgres` (PostGIS) / `redis`.
+
+*Phase 2 — deterministic core (`backend/app/`):*
+- **`models/`** — Pydantic domain models: `Coordinate` (strict WGS84 validation,
+  NaN/inf/out-of-range rejected, never clamped), `MarineObservation`/`Evidence`
+  (Marine Data Fabric seed), `RiskResult`, `Geofence`/`GeofenceResult`,
+  `SafetyGuardResult`, `DecisionResult`, `RouteRequest`/`RouteResult`,
+  `SuitabilityResult`.
+- **`gis/`** — coordinate + geometry validation, point-in-polygon, intersection,
+  WGS84 geodesic distance, `check_geofences` (hard-inside + nearest-hard distance).
+- **`risk/`** — deterministic Risk Engine (wave, wind, advisory, thunderstorm /
+  lightning **proxy**, cyclone **proxy**, geofence distance) with configurable
+  `risk_weights.yaml` (validated on load; **ORCA engineering / MVP thresholds,
+  not official standards**). Missing safety-critical data ⇒ `data_sufficiency =
+  INSUFFICIENT`, never a zero score.
+- **`policy/`** — Safety Guard: deterministic `ALLOWED / CAUTION / BLOCKED /
+  NO_SAFE_RECOMMENDATION` with fixed rule precedence; result is final for safety.
+- **`decision/`** — Decision Engine: fixed map onto `PROCEED /
+  PROCEED_WITH_CAUTION / DO_NOT_PROCEED / NO_SAFE_RECOMMENDATION`.
+- **`routing/`** — deterministic A* on a numpy grid, hard geofences rasterised
+  conservatively, independent post-hoc route validation. **A route can never
+  cross a hard geofence** (raster + A* + validator). Destination inside a hard
+  geofence is rejected *before* A* runs. `NO_ROUTE` is an explicit status.
+- **`suitability/`** — foundation only; kept strictly separate from safety, PFZ
+  reference evidence never folded into the derived score.
+- **165 tests** (`backend/tests/`), all passing.
 
 Everything below marked _(planned)_ is **not implemented yet**.
 
@@ -76,6 +103,7 @@ lightning / cyclone / PFZ terminology rules are in
 | Layer | Choice |
 |---|---|
 | Backend | Python 3.11, FastAPI, Pydantic, LangGraph _(Phase 5)_, httpx, async SQLAlchemy + psycopg |
+| Deterministic core | numpy, Shapely, pyproj (offline geometry / grid math — no network) |
 | LLM | **Groq** — the sole provider _(Phase 5)_ |
 | Datastores | PostgreSQL + **PostGIS**, **Redis** |
 | Frontend | React 18, TypeScript, Vite, **Leaflet / react-leaflet** + OpenStreetMap tiles |
@@ -193,9 +221,18 @@ npm run build          # type-check + production build
 cd backend && pytest
 ```
 
-Phase 1 covers `GET /`, `GET /health`, and `GET /health/ready` (all-ok, and
-degraded when Redis / PostGIS / PostgreSQL are down). Datastore probes are
-monkeypatched, so no external services are required.
+**165 tests**, all offline and deterministic (no DB/Redis/network):
+
+- Phase 1 — `GET /`, `GET /health`, `GET /health/ready` (ok + degraded paths),
+  datastore probes monkeypatched.
+- Phase 2 — coordinate validation, risk config loader (valid + malformed),
+  each risk factor, Risk Engine combination / banding / missing-data /
+  determinism, GIS primitives, geofencing, Safety Guard (all four statuses +
+  precedence), Decision Engine mapping, A* (straight / obstacle / blocked
+  endpoint / no-path / no corner-cutting / determinism), route planner
+  (`ROUTE_FOUND` / `DESTINATION_BLOCKED` / `ORIGIN_BLOCKED` / `NO_ROUTE` /
+  `INVALID_REQUEST`), independent route validation, suitability foundation,
+  and `test_invariants.py` asserting the nine architecture invariants.
 
 ---
 
@@ -204,8 +241,8 @@ monkeypatched, so no external services are required.
 | Phase | Scope |
 |---|---|
 | **1 — done** | Docker, PostGIS, Redis, FastAPI, health endpoints, frontend + map shell |
-| 2 _(planned)_ | Deterministic core: Risk Engine, GIS ops, Safety Guard, A*, validation + tests |
-| 3 _(planned)_ | Routing: destination validation, hard geofence checks, grid, A*, no-route result |
+| **2 — done** | Deterministic core: domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation, 165 tests |
+| 3 _(planned)_ | Routing depth: dynamic grid build from GIS layers, richer no-route diagnostics, route re-planning |
 | 4 _(planned)_ | Data agents: Weather, Oceanographic, GIS & Geofencing (live → cache → fallback) |
 | 5 _(planned)_ | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
 | 6 _(planned)_ | Provenance graph, evidence records, grounding validation, explanation, alerts |

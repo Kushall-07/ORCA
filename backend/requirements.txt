@@ -34,3 +34,9 @@ redis>=5.0,<6.0
 
 # ---- Serialization ----
 pyyaml>=6.0,<7.0
+
+# ---- Deterministic core: GIS + numerics (Phase 2) ----
+# Used only for offline geometry / grid math. No network access.
+numpy>=1.26,<3.0
+shapely>=2.0,<3.0
+pyproj>=3.6,<4.0
