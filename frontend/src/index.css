@@ -1,0 +1,126 @@
+:root {
+  --orca-bg: #0f172a;
+  --orca-panel: #111c33;
+  --orca-border: #1e2d4a;
+  --orca-text: #e2e8f0;
+  --orca-muted: #94a3b8;
+  --orca-accent: #0b7285;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--orca-bg);
+  color: var(--orca-text);
+}
+
+.orca-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.orca-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--orca-panel);
+  border-bottom: 1px solid var(--orca-border);
+}
+
+.orca-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.orca-title strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+.orca-title span {
+  font-size: 0.78rem;
+  color: var(--orca-muted);
+}
+
+.orca-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.orca-map {
+  position: absolute;
+  inset: 0;
+}
+
+.orca-map-note {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 500;
+  max-width: 22rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--orca-muted);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--orca-border);
+  border-radius: 6px;
+}
+
+/* ---- Health badge ---- */
+.health-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--orca-bg);
+  border: 1px solid var(--orca-border);
+  border-radius: 999px;
+}
+
+.health-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.health-deps {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.health-deps .dep {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--orca-border);
+}
+
+.health-deps .dep.ok {
+  color: #40c057;
+  border-color: #2b8a3e;
+}
+
+.health-deps .dep.down {
+  color: #ff8787;
+  border-color: #c92a2a;
+}

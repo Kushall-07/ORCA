@@ -1,0 +1,83 @@
+# ============================================================
+# ORCA - local development stack
+#   docker compose up --build
+#
+#   frontend  -> http://localhost:3000   (Vite dev server, hot reload)
+#   backend   -> http://localhost:8000   (FastAPI)
+#   postgres  -> localhost:5432          (PostGIS)
+#   redis     -> localhost:6379
+#
+# Values are read from a root .env file (see .env.example). Every variable has a
+# sensible non-secret default so the stack also comes up with no .env present.
+# ============================================================
+name: orca
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orca}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orca}
+      POSTGRES_DB: ${POSTGRES_DB:-orca}
+    volumes:
+      - orca_pgdata:/var/lib/postgresql/data
+      - ./docker/postgis/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orca} -d ${POSTGRES_DB:-orca}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://orca:orca@postgres:5432/orca}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MOSDAC_USERNAME: ${MOSDAC_USERNAME:-}
+      MOSDAC_PASSWORD: ${MOSDAC_PASSWORD:-}
+      COPERNICUS_USERNAME: ${COPERNICUS_USERNAME:-}
+      COPERNICUS_PASSWORD: ${COPERNICUS_PASSWORD:-}
+      WDPA_API_TOKEN: ${WDPA_API_TOKEN:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    volumes:
+      # Live source for hot reload; keep the image's node_modules.
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  orca_pgdata:

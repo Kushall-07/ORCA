@@ -1,0 +1,18 @@
+# ============================================================
+# ORCA Risk Engine - configurable weights & thresholds
+# ============================================================
+# POPULATED IN PHASE 2 (deterministic core).
+#
+# This file will hold the configurable factor weights and thresholds used by the
+# deterministic Risk Engine (wave risk, wind risk, advisory risk,
+# thunderstorm/lightning proxy, cyclone proxy, geofence distance).
+#
+# Rules for whoever fills this in:
+#   * The LLM never reads or writes these values.
+#   * Any threshold that is an engineering/demo choice rather than an
+#     authoritative marine-safety standard MUST be labelled as such inline.
+#   * Weights are configuration, not code - they must not be duplicated as
+#     literals elsewhere in the codebase.
+#
+# Intentionally left without values in Phase 1 so that no unsupported numeric
+# threshold is implied before the engine exists.

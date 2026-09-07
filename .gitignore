@@ -26,7 +26,9 @@ ENV/
 
 # Node / React
 node_modules/
+frontend/node_modules/
 dist/
+frontend/dist/
 build/
 .vite/
 
@@ -73,12 +75,11 @@ logs/
 # Large / downloaded data
 data/raw/*
 data/processed/*
-data/cached/*
 
 # Keep directory structure
 !data/raw/.gitkeep
 !data/processed/.gitkeep
-!data/cached/.gitkeep
+!data/demo/.gitkeep
 
 # Local generated outputs
 outputs/
