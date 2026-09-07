@@ -1,0 +1,19 @@
+{
+  "_note": "ORCA DEMO weather data. NOT live, NOT observed. Used only when agent_demo_fallback is explicitly enabled (scenario / offline demos). Calm-conditions profile.",
+  "values": {
+    "wind_speed": 4.5,
+    "wind_direction": 245.0,
+    "weather_code": 2.0,
+    "precipitation": 0.0,
+    "surface_pressure": 1009.0,
+    "mean_sea_level_pressure": 1010.0
+  },
+  "units": {
+    "wind_speed": "m/s",
+    "wind_direction": "deg",
+    "weather_code": "wmo",
+    "precipitation": "mm",
+    "surface_pressure": "hPa",
+    "mean_sea_level_pressure": "hPa"
+  }
+}

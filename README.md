@@ -20,8 +20,9 @@ safety thresholds, or the final decision).
 
 ## Status
 
-**Phase 2 complete — deterministic core.** All of it runs with no LLM, no
-network and no randomness. What exists today:
+**Phase 4 complete — data ingestion + deterministic fusion.** No LLM anywhere.
+Phases 1–3 run with no network; Phase 4 adds real Open-Meteo ingestion (all
+tests mocked). What exists today:
 
 *Phase 1 — infrastructure:*
 - FastAPI backend with `GET /`, `GET /health` (liveness) and `GET /health/ready`
@@ -63,7 +64,36 @@ network and no randomness. What exists today:
   from the approximate `total_distance_m`.
 - **`suitability/`** — foundation only; kept strictly separate from safety, PFZ
   reference evidence never folded into the derived score.
-- **215 tests** (`backend/tests/`), all passing.
+
+*Phase 4 — data agents + fusion (`backend/app/`):*
+- **`services/`** — `http` (bounded-retry JSON client, typed errors), `cache`
+  (Redis / in-memory / null backends; a Redis outage degrades to a miss, never
+  raises; bucketed keys `weather:{lat}:{lon}:{YYYY-MM-DDTHH}`), `openmeteo`
+  (weather + marine callers + strict response schema), `mosdac` (structure only,
+  strictly non-blocking).
+- **`agents/weather.py`, `agents/oceanographic.py`** — Open-Meteo, three-tier
+  fallback **LIVE → CACHE → DEMO/MISSING**, each result stamped with its
+  `SourceStatus.tier`. WMO codes 95–99 preserved verbatim (thunderstorm /
+  lightning **proxy**, never "detection"). Null variables skipped, never zeroed.
+  No tier fabricates a live value.
+- **`agents/gis_geofencing.py`** + **`gis/spatial_backend.py`** — EEZ
+  membership + boundary distance, protected-area hits, coastline distance, depth,
+  hard/soft geofence status. PostGIS backend (final architecture) + offline
+  Shapely backend over `data/static/`. Explicit `HARD` / `SOFT` / `REFERENCE`
+  layer classification.
+- **`fabric/`** — `build_fabric` normalises all agent outputs into
+  `FabricRecord`s and runs the Temporal Validity Gate; PFZ / RSMC references
+  carried alongside, never merged.
+- **`reasoning/`** — Temporal Validity Gate (`VALID/STALE/INVALID/MISSING`,
+  configurable windows, never upgrades STALE), Spatial-Temporal Fusion
+  (candidates aligned by space + time + variable; conflicts **preserved**, no
+  averaging, no winner selection), Evidence Arbitration **interface** only.
+- **`scripts/ingest_static_gis.py`** — deterministic ingest of NE coastline,
+  Marine Regions EEZ v12, GEBCO GeoTIFF → git-tracked `data/static/*` (via
+  pyshp / tifffile, no GDAL). `scripts/load_postgis.py` loads them into `gis.*`.
+- **303 tests** (`backend/tests/`), all passing, all external APIs mocked.
+
+Data provenance & attribution: [`docs/data-sources.md`](docs/data-sources.md).
 
 Everything below marked _(planned)_ is **not implemented yet**.
 
@@ -227,7 +257,7 @@ npm run build          # type-check + production build
 cd backend && pytest
 ```
 
-**215 tests**, all offline and deterministic (no DB/Redis/network):
+**303 tests**, all deterministic; external APIs mocked (`respx`), no live network:
 
 - Phase 1 — `GET /`, `GET /health`, `GET /health/ready` (ok + degraded paths),
   datastore probes monkeypatched.
@@ -245,17 +275,22 @@ cd backend && pytest
   valid detour, `NO_ROUTE`, `ROUTE_VALIDATION_FAILED`, invalid request,
   out-of-grid, blocked destination cell, disconnected grid, determinism,
   `origin == destination`, no diagonal corner-cut).
-
----
-
-## Roadmap
+- Phase 4 — `test_services_http.py` (retry / timeout / transport / decode),
+  `test_services_cache.py` (TTL, Redis-failure tolerance, key bucketing),
+  `test_openmeteo_schema.py` (malformed / null / length-mismatch rejection),
+  `test_agent_weather.py` + `test_agent_oceanographic.py` (LIVE → CACHE →
+  DEMO/MISSING, WMO 95–99 preservation, Redis-outage non-fatal),
+  `test_agent_gis.py` (inside/outside EEZ, protected-area intersection, depth,
+  hard/soft/reference classification — against the real `data/static/` layers),
+  `test_temporal_gate.py`, `test_fusion.py` (conflict preserved, no averaging),
+  `test_fabric.py`, `test_reference_registry.py`, `test_mosdac.py` (non-blocking).
 
 | Phase | Scope |
 |---|---|
 | **1 — done** | Docker, PostGIS, Redis, FastAPI, health endpoints, frontend + map shell |
 | **2 — done** | Deterministic core: domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation |
 | **3 — done** | Routing hardening: 10-step `plan_route` pipeline, origin **and** destination hard-geofence rejection before A*, grid safety (OOB = blocked, malformed-config rejection), A* search budget, expanded independent route validator (bounds / navigability / contiguity / corner-cut / endpoint match), `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, `grid_path_cost` vs approximate `total_distance_m`. 215 tests |
-| 4 _(planned)_ | Data agents: Weather, Oceanographic, GIS & Geofencing (live → cache → fallback) |
+| **4 — done** | Data agents (Weather / Oceanographic / GIS & Geofencing), LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry. 303 tests |
 | 5 _(planned)_ | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
 | 6 _(planned)_ | Provenance graph, evidence records, grounding validation, explanation, alerts |
 | 7 _(planned)_ | Frontend: chat, risk heatmap, geofences, route, evidence / provenance / explanation panels |

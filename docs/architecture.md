@@ -313,6 +313,85 @@ orchestration, evidence arbitration, explanation, provenance graph.
 
 ---
 
+## 6b. Data ingestion & fusion — Phase 4 (implemented)
+
+Still **no LLM**. Adds the real data layer between the external world and the
+deterministic core. Full attribution + tier definitions are in
+[`data-sources.md`](data-sources.md).
+
+**HTTP + cache (`app/services/`)** — `http.get_json` (bounded retry on
+timeout / transport / 429 / 5xx; typed errors). `cache` — `CacheBackend` with
+`RedisCache` (every op wrapped: a Redis outage degrades to a miss, never
+raises), `InMemoryCache`, `NullCache`, and `JsonCache`. Bucketed keys:
+`weather:{lat}:{lon}:{YYYY-MM-DDTHH}` (lat/lon rounded to 2 dp). `openmeteo` —
+weather + marine callers plus a strict `OpenMeteoResponse` schema (coordinate
+range, ISO timestamps, array-length alignment, numeric/null handling); a bad
+response raises `SchemaValidationError` and never reaches the Fabric.
+
+**Weather / Oceanographic Agents (`app/agents/{weather,oceanographic}.py`)** —
+same three-tier fallback, each result stamped with the tier that produced it:
+
+| Tier | Source | Behaviour |
+|---|---|---|
+| **LIVE** | Open-Meteo | fetch → validate → normalise to `MarineObservation`s → write cache |
+| **CACHE** | Redis | recent LIVE payload (flagged `stale` past the TTL) |
+| **DEMO** | `data/demo/*.json` | only if `agent_demo_fallback` is explicitly on; `SourceTier.DEMO` |
+| **MISSING** | — | structured missing-data result; **no fabricated values** |
+
+WMO codes 95–99 are passed through verbatim as `weather_code`; the agent never
+calls that "lightning detection". Null variables are skipped, never zeroed.
+
+**GIS & Geofencing Agent (`app/agents/gis_geofencing.py`)** — resolves EEZ
+membership + boundary distance, protected-area hits, coastline distance, water
+depth + on-land proxy, and hard/soft geofence status for a coordinate. Backends
+(`app/gis/spatial_backend.py`): `PostGisSpatialBackend` (`ST_Contains` /
+`ST_Distance`, the final architecture) and `OfflineSpatialBackend` (Shapely over
+the git-tracked `data/static/` layers + downsampled GEBCO grid). Layer
+classification is explicit — `HARD` (operator-configured exclusion geofences, or
+a protected area whose WDPA id the operator promoted), `SOFT` (advisory
+geofences), `REFERENCE` (EEZ / coastline / bathymetry / WDPA by default). **Not
+every layer is a restriction; the Policy / Safety Guard stays authoritative.**
+
+**Static ingestion (`scripts/ingest_static_gis.py`)** — reads raw NE coastline,
+Marine Regions EEZ v12, GEBCO GeoTIFF (via pyshp / tifffile, no GDAL), validates
++ repairs (`make_valid`) + clips to the Indian AOI + simplifies, and writes small
+git-tracked layers to `data/static/`. `scripts/load_postgis.py` loads them into
+`gis.*`. WDPA full ingest is scripted but not run (1.7 GB raw); a small
+`wdpa_india_demo.geojson` covers demos/tests.
+
+**Marine Data Fabric (`app/fabric/`)** — `build_fabric` normalises every agent
+output into `FabricRecord`s (`MarineObservation` + `SourceStatus` +
+`ValidityState`), converts GIS scalars (depth, coastline distance) into
+`REFERENCE` observations, runs the Temporal Validity Gate on every record, and
+carries PFZ / RSMC `ReferenceArtifact`s alongside **without merging them into any
+value**.
+
+**Temporal Validity Gate (`app/reasoning/temporal.py` + `temporal_config.yaml`)**
+— deterministic `VALID / STALE / INVALID / MISSING` per record, using
+configurable per-variable windows. Considers observation vs forecast timestamps,
+retrieval age, and the requested decision time. **Never upgrades STALE to VALID.**
+
+**Spatial-Temporal Fusion (`app/reasoning/fusion.py`)** — groups candidates by
+variable, marks each `spatial_ok` (geodesic distance ≤ 25 km) and `temporal_ok`
+(gap ≤ 3 h), and classifies per variable: `single_source`, `source_disagreement`
+(aligned values spread > 25 %), `spatial_mismatch`, `temporal_mismatch`,
+`no_aligned_candidate`. **No averaging, no winner selection** — every candidate
+and every conflict is preserved for Evidence Arbitration.
+
+**Evidence Arbitration (`app/reasoning/arbitration.py`)** — **interface only**.
+`NoOpArbitrator` forwards every candidate and conflict unresolved. The real
+arbitrator is Phase 5/6.
+
+**MOSDAC (`app/services/mosdac.py`)** — structure only, strictly non-blocking. No
+verified endpoint is integrated; any pull raises a typed error the pipeline
+skips. `mosdac_status()["blocking"] is False`.
+
+Not in Phase 4: LangGraph, Query Understanding, Groq, Evidence & Explanation
+agent, full provenance graph, conversational session, frontend, alert
+orchestration.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
@@ -320,11 +399,11 @@ orchestration, evidence arbitration, explanation, provenance graph.
 | 1 | ✅ Infrastructure + data foundation (Docker, PostGIS, Redis, FastAPI, `/health`, frontend + map shell) |
 | 2 | ✅ Deterministic core (domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation) with unit tests |
 | 3 | ✅ Routing hardening (strongly-typed `RouteRequest`, fixed 10-step validation pipeline, origin+destination hard-geofence rejection before A*, grid safety, `max_expanded` budget, expanded independent route validator, `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, grid-cost vs approximate-distance) with regression tests |
-| 4 | Data agents (Weather, Oceanographic, GIS & Geofencing) with live → cache → fallback |
+| 4 | ✅ Data agents (Weather, Oceanographic, GIS & Geofencing) with LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / Marine Regions EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
 | 5 | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
 | 6 | Provenance graph, evidence records, grounding validation, explanation, alerts |
 | 7 | Frontend (chat, map, risk heatmap, geofences, route, evidence/provenance/explanation panels, agent activity) |
 | 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
 
-Current status: **Phase 3 complete** (deterministic routing subsystem hardened).
-Next: Phase 4 data agents.
+Current status: **Phase 4 complete** (data ingestion + deterministic fusion
+layer). Next: Phase 5 LangGraph orchestration + Query Understanding.

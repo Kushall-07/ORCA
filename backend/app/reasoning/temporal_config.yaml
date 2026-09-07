@@ -1,0 +1,54 @@
+# ============================================================
+# ORCA Temporal Validity Gate - configurable validity windows
+# ============================================================
+# version:  2026.02-mvp
+#
+# These are ORCA engineering / MVP validity windows, NOT authoritative
+# meteorological guidance. The gate is deterministic: given the same inputs and
+# this config it always returns the same VALID / STALE / INVALID / MISSING
+# verdict. It never upgrades STALE data to VALID.
+#
+# Semantics:
+#   * For a FORECAST record (has valid_from/valid_until):
+#       - the requested decision time must fall within [valid_from, valid_until]
+#       - AND the record must have been retrieved within
+#         forecast.max_retrieval_seconds of "now"
+#       -> VALID; otherwise INVALID (window missed) or STALE (retrieval age
+#          between fresh and max).
+#   * For an OBSERVATION record (has observed_at):
+#       - age = |decision_time - observed_at|
+#       - age <= fresh_seconds  -> VALID
+#       - age <= stale_seconds  -> STALE
+#       - otherwise             -> INVALID
+#   * No usable timestamp        -> INVALID
+#   * No value                   -> MISSING
+
+version: "2026.02-mvp"
+disclaimer: >-
+  ORCA engineering / MVP validity windows. Not authoritative meteorological
+  guidance. Review before operational use.
+
+default:
+  fresh_seconds: 3600        # 1 h
+  stale_seconds: 21600       # 6 h
+
+forecast:
+  max_retrieval_seconds: 43200   # 12 h - a forecast fetched longer ago than this is not trusted
+  stale_retrieval_seconds: 10800 # 3 h - fetched between this and max -> STALE
+
+by_variable:
+  wave_height:
+    fresh_seconds: 3600
+    stale_seconds: 21600
+  swell_wave_height:
+    fresh_seconds: 3600
+    stale_seconds: 21600
+  wind_speed:
+    fresh_seconds: 3600
+    stale_seconds: 10800
+  weather_code:
+    fresh_seconds: 3600
+    stale_seconds: 10800
+  mean_sea_level_pressure:
+    fresh_seconds: 7200
+    stale_seconds: 21600

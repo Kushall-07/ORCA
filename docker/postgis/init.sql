@@ -79,3 +79,27 @@ CREATE INDEX IF NOT EXISTS eez_geom_gix            ON gis.eez            USING G
 CREATE INDEX IF NOT EXISTS geofence_geom_gix       ON gis.geofence       USING GIST (geom);
 CREATE INDEX IF NOT EXISTS protected_area_geom_gix ON gis.protected_area USING GIST (geom);
 CREATE INDEX IF NOT EXISTS bathymetry_geom_gix     ON gis.bathymetry     USING GIST (geom);
+
+-- ------------------------------------------------------------
+-- Phase 4: attribute columns used by scripts/load_postgis.py and a sampled
+-- bathymetry point table (a full PostGIS raster would use raster2pgsql).
+-- ------------------------------------------------------------
+ALTER TABLE gis.eez            ADD COLUMN IF NOT EXISTS iso_sov     text;
+ALTER TABLE gis.eez            ADD COLUMN IF NOT EXISTS mrgid       text;
+ALTER TABLE gis.protected_area ADD COLUMN IF NOT EXISTS designation text;
+ALTER TABLE gis.protected_area ADD COLUMN IF NOT EXISTS iucn_cat    text;
+ALTER TABLE gis.protected_area ADD COLUMN IF NOT EXISTS marine      text;
+-- Natural Earth coastline clips can be LineString or MultiLineString.
+ALTER TABLE gis.coastline      ALTER COLUMN geom TYPE geometry(Geometry, 4326);
+
+CREATE TABLE IF NOT EXISTS gis.bathymetry_sample (
+    id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    lat      double precision NOT NULL,
+    lon      double precision NOT NULL,
+    depth_m  double precision NOT NULL,   -- negative == below sea level (GEBCO 2026)
+    source   text NOT NULL DEFAULT 'gebco-2026'
+);
+CREATE INDEX IF NOT EXISTS bathymetry_sample_lonlat_ix
+    ON gis.bathymetry_sample (lon, lat);
+COMMENT ON TABLE gis.bathymetry_sample IS
+    'GEBCO 2026 downsampled to a 0.05-degree grid. Supporting environmental layer only - not authoritative navigation data.';

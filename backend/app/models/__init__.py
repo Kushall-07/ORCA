@@ -12,6 +12,13 @@ from app.models.common import (
     TimeWindow,
 )
 from app.models.decision import DecisionResult, DecisionStatus
+from app.models.fabric import (
+    DataTier,
+    FabricRecord,
+    MarineDataFabric,
+    SourceStatus,
+    ValidityState,
+)
 from app.models.geo import (
     Geofence,
     GeofenceHit,
@@ -20,6 +27,14 @@ from app.models.geo import (
     GeofenceType,
     LayerAuthority,
 )
+from app.models.gis_agent import (
+    EezResult,
+    GisLayer,
+    GisQueryResult,
+    LayerKind,
+    ProtectedAreaHit,
+)
+from app.models.reference import ReferenceArtifact, ReferenceKind
 from app.models.health import (
     DependencyStatus,
     LivenessResponse,
@@ -59,6 +74,18 @@ __all__ = [
     "TimeWindow",
     "SourceTier",
     "SignalKind",
+    "DataTier",
+    "ValidityState",
+    "SourceStatus",
+    "FabricRecord",
+    "MarineDataFabric",
+    "LayerKind",
+    "GisLayer",
+    "EezResult",
+    "ProtectedAreaHit",
+    "GisQueryResult",
+    "ReferenceArtifact",
+    "ReferenceKind",
     "MarineObservation",
     "ObservationStatus",
     "Evidence",

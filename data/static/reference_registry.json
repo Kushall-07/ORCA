@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-09-07T17:52:22.901442+00:00",
+  "entries": [
+    {
+      "kind": "PFZ",
+      "title": "Potential Fishing Zone (PFZ) Advisory",
+      "source": "Indian National Centre for Ocean Information Services (INCOIS)",
+      "source_url": "https://www.incois.gov.in/MarineFisheries/TextDataHome?mfid=1&request_locale=en",
+      "issued_at": "7 September 2026",
+      "valid_until": "8 September 2026",
+      "files": [
+        "data/reference/pfz/pfz_advisory_2026-09-07_english.jpg"
+      ],
+      "media_type": "image/jpeg",
+      "machine_readable": false,
+      "disclaimer": "Official INCOIS PFZ advisory reference snapshot. This is NOT an ORCA-derived fishing-suitability prediction and must never be merged into ORCA's computed suitability score."
+    },
+    {
+      "kind": "RSMC",
+      "title": "Tropical Weather Outlook",
+      "source": "Regional Specialized Meteorological Centre (RSMC), New Delhi India Meteorological Department (IMD)",
+      "source_url": "https://rsmcnewdelhi.imd.gov.in/uploads/archive/2/2_7df4f2_Tropical_Weather_Outlook_based_on_0300_UTC_of_07.09.2026.pdf",
+      "issued_at": "7 September 2026",
+      "observation_time": "0300 UTC",
+      "valid_until": null,
+      "files": [
+        "data/reference/rsmc/rsmc_tropical_weather_outlook_2026-09-07.pdf"
+      ],
+      "media_type": "application/pdf",
+      "machine_readable": false,
+      "disclaimer": "Official RSMC/IMD reference bulletin snapshot. ORCA's cyclone signal remains a model / proxy signal; there is no live authoritative RSMC cyclone API integrated."
+    }
+  ]
+}

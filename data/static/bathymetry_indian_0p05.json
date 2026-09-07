@@ -1,0 +1,22 @@
+{
+  "layer": "bathymetry",
+  "layer_kind": "REFERENCE",
+  "authority": "reference",
+  "source": "GEBCO 2026 Grid (GeoTIFF, 15 arc-second)",
+  "source_url": "https://www.gebco.net/",
+  "licence": "GEBCO Grid terms of use (see raw GEBCO_Grid_terms_of_use.pdf)",
+  "crs": "EPSG:4326",
+  "representation": "Block-mean downsample of the Indian-subset GeoTIFF to a 0.05-degree cell-centre grid stored as a compressed NumPy .npz (lat[500], lon[700], depth_m int16, negative = below sea level). A full-resolution PostGIS raster would use raster2pgsql; this MVP uses the sampled grid.",
+  "native_pixel_deg": 0.004166666666666664,
+  "downsample_step_px": 12,
+  "grid_shape": [
+    500,
+    700
+  ],
+  "depth_range_m": [
+    -5327,
+    3021
+  ],
+  "generated_at": "2026-09-07T17:36:19.221650+00:00",
+  "disclaimer": "Supporting environmental layer only. NOT authoritative navigation / hydrographic data; do not use GEBCO alone for navigation-safety claims."
+}

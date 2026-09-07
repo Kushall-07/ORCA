@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "orca_meta": {
+    "layer": "protected_area",
+    "layer_kind": "REFERENCE",
+    "authority": "demo",
+    "source": "ORCA demo subset - approximate extents of real Indian marine protected areas",
+    "licence": "Hand-digitised approximate bounding extents for ORCA demonstration only; NOT the official WDPA geometry.",
+    "crs": "EPSG:4326",
+    "disclaimer": "DEMO data. Approximate rectangular extents, not authoritative boundaries. A protected area becomes a HARD routing constraint only when the operator explicitly configures it; the Policy / Safety Guard remains authoritative.",
+    "note": "Run scripts/ingest_static_gis.py wdpa against the extracted WDPA shapefile to replace this with the real WDPA India geometry (wdpa_india.geojson)."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "wdpa_id": "DEMO-GOM",
+        "name": "Gulf of Mannar Marine National Park (approx.)",
+        "designation": "Marine National Park",
+        "iucn_category": "II",
+        "marine": true,
+        "source": "orca-demo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[78.10, 8.80], [79.30, 8.80], [79.30, 9.30], [78.10, 9.30], [78.10, 8.80]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "wdpa_id": "DEMO-MALVAN",
+        "name": "Malvan (Marine) Wildlife Sanctuary (approx.)",
+        "designation": "Wildlife Sanctuary",
+        "iucn_category": "IV",
+        "marine": true,
+        "source": "orca-demo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[73.40, 15.98], [73.52, 15.98], [73.52, 16.10], [73.40, 16.10], [73.40, 15.98]]]
+      }
+    }
+  ]
+}
