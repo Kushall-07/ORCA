@@ -102,7 +102,11 @@ class QueryUnderstandingAgent:
         self.max_retries = max_retries
 
     async def understand(
-        self, message: str, *, session: SessionContext | None = None
+        self,
+        message: str,
+        *,
+        session: SessionContext | None = None,
+        language_hint: str | None = None,
     ) -> QueryUnderstanding:
         message = (message or "").strip()
         if not message:
@@ -118,6 +122,12 @@ class QueryUnderstandingAgent:
             understanding = await self._understand_with_llm(message)
         else:
             understanding = self._understand_with_rules(message)
+
+        # Message-script detection wins; the hint only fills an UNKNOWN.
+        if understanding.language is Language.UNKNOWN and language_hint in {"en", "hi", "kn"}:
+            understanding = understanding.model_copy(
+                update={"language": Language(language_hint)}
+            )
 
         return self._merge_session(understanding, session)
 

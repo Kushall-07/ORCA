@@ -45,6 +45,8 @@ class OrcaGraphState(TypedDict, total=False):
     now: datetime
     coordinate_override: Coordinate | None
     date_hint_override: str | None
+    stakeholder: str | None
+    language_hint: str | None
 
     # ---- understanding / normalisation ----
     session: SessionContext

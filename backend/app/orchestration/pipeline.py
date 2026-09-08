@@ -14,7 +14,11 @@ from app.models.api import (
     DataQualityInfo,
     DecisionInfo,
     EvidenceItem,
+    GisSummary,
+    LocationInfo,
+    ProtectedAreaInfo,
     QueryResponse,
+    ReferenceInfo,
     RiskInfo,
     RouteInfo,
     SuitabilityInfo,
@@ -41,6 +45,8 @@ class OrcaPipeline:
         session_id: str | None = None,
         coordinate: Coordinate | None = None,
         date_hint: str | None = None,
+        stakeholder: str | None = None,
+        language: str | None = None,
         now: datetime | None = None,
     ) -> QueryResponse:
         session_id = session_id or f"sess-{uuid.uuid4().hex[:12]}"
@@ -50,6 +56,8 @@ class OrcaPipeline:
             "now": now or datetime.now(timezone.utc),
             "coordinate_override": coordinate,
             "date_hint_override": date_hint,
+            "stakeholder": stakeholder,
+            "language_hint": language,
             "agent_trace": [],
             "errors": [],
         }
@@ -127,6 +135,14 @@ def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
 
     route_info = None
     if route is not None:
+        waypoints = [
+            [p.coordinate.latitude, p.coordinate.longitude] for p in route.path
+        ]
+        violations = None
+        if route.validation is not None:
+            violations = sum(
+                1 for v in route.validation.violations if "hard geofence" in v.lower()
+            )
         route_info = RouteInfo(
             status=route.status.value,
             waypoint_count=route.node_count,
@@ -134,7 +150,74 @@ def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
             grid_path_cost=route.grid_path_cost,
             validation_passed=(route.validation.valid if route.validation else None),
             reasons=list(route.reasons),
+            waypoints=waypoints,
+            origin=[route.origin.latitude, route.origin.longitude],
+            destination=[route.destination.latitude, route.destination.longitude],
+            hard_geofence_violations=violations,
         )
+
+    origin_coord = state.get("resolved_origin")
+    dest_coord = state.get("resolved_destination")
+    location_info = (
+        LocationInfo(
+            latitude=origin_coord.latitude,
+            longitude=origin_coord.longitude,
+            name=(u.origin.name if u and u.origin else None),
+        )
+        if origin_coord is not None
+        else None
+    )
+    destination_info = (
+        LocationInfo(
+            latitude=dest_coord.latitude,
+            longitude=dest_coord.longitude,
+            name=(u.destination.name if u and u.destination else None),
+        )
+        if dest_coord is not None
+        else None
+    )
+
+    gis_result = state.get("gis_result")
+    gis_summary = None
+    if gis_result is not None:
+        gis_summary = GisSummary(
+            backend=gis_result.backend,
+            eez_inside=(gis_result.eez.inside if gis_result.eez else None),
+            eez_zones=list(gis_result.eez.zones) if gis_result.eez else [],
+            depth_m=gis_result.depth_m,
+            coastline_distance_m=gis_result.coastline_distance_m,
+            on_land=gis_result.on_land,
+            inside_hard_geofence=gis_result.inside_hard_geofence,
+            hard_geofence_ids=list(gis_result.hard_geofence_ids),
+            soft_geofence_ids=list(gis_result.soft_geofence_ids),
+            protected_areas=[
+                ProtectedAreaInfo(
+                    name=p.name,
+                    designation=p.designation,
+                    inside=p.inside,
+                    distance_m=p.distance_m,
+                    layer_kind=p.layer_kind.value,
+                    source=p.source,
+                    wdpa_id=p.wdpa_id,
+                )
+                for p in gis_result.protected_areas
+            ],
+        )
+
+    references = [
+        ReferenceInfo(
+            kind=ref.kind.value,
+            title=ref.title,
+            source=ref.source,
+            source_url=ref.source_url,
+            issued_at=ref.issued_at,
+            valid_until=ref.valid_until,
+            media_type=ref.media_type,
+            machine_readable=ref.machine_readable,
+            disclaimer=ref.disclaimer,
+        )
+        for ref in deps.references
+    ]
 
     evidence = []
     if fabric is not None:
@@ -184,13 +267,18 @@ def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
         status=status,
         language=language,
         intent=intent,
+        stakeholder=state.get("stakeholder"),
         answer=answer,
         needs_clarification=needs_clarification,
         clarification_question=clarification_question,
+        location=location_info,
+        destination=destination_info,
         decision=decision_info,
         risk=risk_info,
         suitability=suit_info,
         route=route_info,
+        gis=gis_summary,
+        reference=references,
         alerts=alerts,
         conflicts=conflicts,
         evidence=evidence,

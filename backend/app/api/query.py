@@ -58,6 +58,8 @@ async def query(request: QueryRequest) -> QueryResponse:
             session_id=request.session_id,
             coordinate=coordinate,
             date_hint=request.date_hint,
+            stakeholder=request.stakeholder,
+            language=request.language,
         )
     except Exception as exc:  # noqa: BLE001 - defence in depth
         logger.exception("query endpoint error")

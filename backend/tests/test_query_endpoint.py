@@ -71,3 +71,42 @@ def test_multi_turn_over_the_api(client) -> None:
     body = r2.json()
     assert body["turn"] == 2
     assert body["route"] is not None
+
+
+def test_query_response_exposes_map_and_reference_fields(client) -> None:
+    from tests.orchestration_fakes import make_pipeline
+    from app.models.reference import ReferenceArtifact, ReferenceKind
+
+    pfz = ReferenceArtifact(
+        reference_id="pfz-0", kind=ReferenceKind.PFZ, title="INCOIS PFZ advisory",
+        source="INCOIS", issued_at="7 September 2026", valid_until="8 September 2026",
+        media_type="image/jpeg", machine_readable=False,
+        disclaimer="Official INCOIS PFZ advisory; NOT ORCA-derived suitability.",
+    )
+    query_api.set_pipeline(make_pipeline(references=[pfz]))
+    body = client.post("/query", json={
+        "session_id": "api-map", "message": "Is fishing safe near Mangalore now?",
+        "stakeholder": "fisherman", "language": "en",
+    }).json()
+    assert body["stakeholder"] == "fisherman"          # echoed, not reasoning
+    assert body["location"] is not None
+    assert body["location"]["latitude"] == pytest.approx(12.87, abs=0.2)
+    assert body["gis"] is not None and body["gis"]["backend"]
+    kinds = {r["kind"] for r in body["reference"]}
+    assert "PFZ" in kinds
+
+
+def test_route_query_returns_waypoint_geometry(client) -> None:
+    from tests.orchestration_fakes import make_pipeline
+
+    query_api.set_pipeline(make_pipeline())
+    body = client.post("/query", json={
+        "session_id": "api-route", "message": "route from Mangalore to Kochi",
+    }).json()
+    assert body["route"] is not None
+    if body["route"]["status"] == "ROUTE_FOUND":
+        assert len(body["route"]["waypoints"]) >= 2
+        assert body["route"]["waypoints"][0] == pytest.approx(
+            [body["route"]["origin"][0], body["route"]["origin"][1]], abs=0.5
+        )
+        assert body["route"]["hard_geofence_violations"] == 0

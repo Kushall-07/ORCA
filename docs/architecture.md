@@ -490,6 +490,58 @@ stack trace ever reaches the client.
 
 ---
 
+## 6d. Operator frontend — Phase 6 (implemented)
+
+**Boundary.** The frontend is a presentation / interaction layer only. It does
+**not** compute safety, risk, geofence enforcement or routes, cannot override the
+Safety Guard / Decision Engine / Risk Engine / route validator, and never
+fabricates values for response fields the backend omits (missing → an explicit
+"unavailable" state). Backend and model text is rendered as plain text, never as
+HTML.
+
+**Additive backend changes (backward-compatible).** `QueryRequest` gained
+optional `stakeholder` (UX context, echoed back, never changes reasoning) and
+`language` (only fills `UNKNOWN` detection — message-script detection still
+wins). `QueryResponse` gained `stakeholder`, `location`, `destination`, `gis`
+summary and `reference` (PFZ / RSMC); `route` gained `waypoints` (`[lat, lon]`),
+`origin`, `destination` and `hard_geofence_violations`. New read-only router
+`app/api/gis.py`: `GET /gis/layers`, `GET /gis/layers/{id}` (EPSG:4326 GeoJSON
+with `orca_meta`), `GET /reference/registry`, `GET /reference/pfz`,
+`GET /reference/rsmc`. The LangGraph pipeline is unchanged apart from threading
+`stakeholder` / `language_hint` through and projecting the new fields.
+
+**Structure (`frontend/src/`).**
+
+| Path | Responsibility |
+|---|---|
+| `services/apiClient.ts` | The only module that calls `fetch`. Typed wrappers, `AbortController` timeouts, structured `ApiError` (`network` / `timeout` / `http` / `parse`). |
+| `types/api.ts` | Hand-written mirror of the Pydantic response contract. |
+| `hooks/` | `useOrcaQuery` (chat state + send/retry/clear), `useHealth` (readiness poll), `useGisLayers` (lazy layer manifest + GeoJSON cache). |
+| `i18n/` | `en` / `hi` / `kn` string tables + enum-label maps; `useI18n()`; `localStorage`-persisted. UI chrome follows the selector; backend answer text stays in `response.language`. |
+| `stakeholders/` | Five UX contexts — suggested questions, default map layers, emphasised tab. Echoed to `/query`; never affects reasoning. |
+| `maps/MarineMap.tsx` | Leaflet map: coastline / EEZ / protected-area GeoJSON, route polyline, origin/destination + risk markers, fit-to-bounds. |
+| `components/` | `decision/` (decision card + `NO_SAFE_RECOMMENDATION` layout, risk panel, suitability), `evidence/` (evidence table, conflict panel, reference cards), `provenance/` (interactive graph from `response.provenance`), `intel/` (alerts, explanation, agent activity from `agent_trace`), `route/`, `report/` (print/export), `map/` (data-only layer toggles + provenance legend). |
+| `pages/WorkspacePage.tsx` | Three rails — chat, map, tabbed intelligence panel. |
+
+**Risk visualisation** reads per-factor detail from the provenance `risk_factor`
+nodes and shows a bar **plus** text labels (`LOW` / `MODERATE` / `HIGH` /
+`SEVERE`); it never recomputes a score. **Conflicts** are shown, including
+"PFZ reference vs ORCA suitability" as preserved disagreement — never hidden.
+**Alerts** keep proxy wording ("thunderstorm proxy", "model-derived cyclone
+proxy"). **Agent activity** maps `agent_trace` tokens onto the frozen stage list
+(done / skipped / error / pending) with no invented timings.
+
+**SST / chlorophyll.** Not ingested. Disabled layer toggles + a documented
+placeholder only; no values shown or implied.
+
+**Tests.** `frontend/src/test/` (Vitest + Testing Library, API client mocked) —
+15 component tests covering shell load, query round-trip, every panel,
+`NO_SAFE_RECOMMENDATION`, structured no-route reason, error / loading states,
+language + stakeholder switching, and "no fabricated data when a field is
+missing". Backend: `test_gis_endpoints.py` + `test_query_endpoint.py` additions.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
@@ -499,11 +551,10 @@ stack trace ever reaches the client.
 | 3 | ✅ Routing hardening (strongly-typed `RouteRequest`, fixed 10-step validation pipeline, origin+destination hard-geofence rejection before A*, grid safety, `max_expanded` budget, expanded independent route validator, `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, grid-cost vs approximate-distance) with regression tests |
 | 4 | ✅ Data agents (Weather, Oceanographic, GIS & Geofencing) with LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / Marine Regions EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
 | 5 | ✅ LangGraph orchestration (19-node typed graph), Query Understanding Agent (Groq + rule fallback, schema-validated, one retry), Evidence Arbitration (`HierarchyArbitrator`), Conflict Detection, Route Agent (conditional + guard re-check), Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query` |
-| 6 | (rolled into Phase 5) Provenance graph + grounding + explanation + alerts done; deeper provenance UI/exports remain |
-| 7 | Frontend (chat, map, risk heatmap, geofences, route, evidence/provenance/explanation panels, agent activity) |
+| 6 | ✅ Operator frontend (chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers via read-only `/gis/*` + `/reference/*`, data-provenance legend, en/hi/kn UI, stakeholder context, print/export). Additive backward-compatible response fields. Provenance graph + grounding + explanation + alerts were delivered in Phase 5. |
+| 7 | Demo hardening, deeper provenance / exports, satellite SST + chlorophyll ingestion |
 | 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
 
-Current status: **Phase 5 complete** (agentic reasoning pipeline: LangGraph
-orchestration, Query Understanding, arbitration, conflicts, provenance,
-grounding, explanation, multilingual, multi-turn, `POST /query`). Next: Phase 7
-frontend.
+Current status: **Phase 6 complete** (operator frontend against the real
+`POST /query`; 394 backend tests + 15 frontend tests passing). Next: Phase 7
+demo hardening and satellite EO ingestion.

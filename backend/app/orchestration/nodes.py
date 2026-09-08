@@ -62,7 +62,9 @@ def _now(state: OrcaGraphState) -> datetime:
 async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     session = deps.session_store.get(state["session_id"])
     try:
-        u = await deps.qu_agent.understand(state["message"], session=session)
+        u = await deps.qu_agent.understand(
+            state["message"], session=session, language_hint=state.get("language_hint")
+        )
     except Exception as exc:  # noqa: BLE001 - LLM/agent failure -> structured
         logger.warning("query understanding node error: %s", exc)
         from app.models.query import QueryUnderstanding
