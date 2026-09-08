@@ -120,11 +120,51 @@ def protected(name="Gulf of Mannar MNP", inside=True) -> ProtectedAreaHit:
     )
 
 
+class FakeEnvironmentalAgent:
+    """Deterministic chlorophyll-a agent for the graph tests.
+
+    ``chlorophyll`` None -> MISSING (non-blocking). ``fail=True`` raises inside
+    fetch to prove the node still does not break the graph.
+    """
+
+    def __init__(self, chlorophyll: float | None = 0.32, *, days_old: int = 1,
+                 tier: DataTier = DataTier.LIVE, fail: bool = False) -> None:
+        self._value = chlorophyll
+        self._days_old = days_old
+        self._tier = tier
+        self._fail = fail
+
+    async def fetch(self, coordinate, when, **_):
+        if self._fail:
+            raise RuntimeError("environmental agent blew up")
+        if self._value is None:
+            from app.agents.base import missing_result
+
+            return missing_result("environmental", coordinate, when, "no chlorophyll pixel")
+        obs = MarineObservation(
+            variable="chlorophyll_a", value=float(self._value), unit="mg m-3",
+            coordinate=coordinate,
+            observed_at=when - timedelta(days=self._days_old),
+            retrieved_at=when,
+            source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+            source_tier=SourceTier.MODEL, signal_kind=SignalKind.MODEL_DERIVED,
+        )
+        return AgentResult(
+            kind="environmental", coordinate=coordinate, query_time=when,
+            observations=(obs,),
+            source_status=SourceStatus(
+                tier=self._tier, source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+                retrieved_at=when,
+            ),
+        )
+
+
 def make_pipeline(
     *,
     weather=None,
     ocean=None,
     gis=None,
+    environment=None,
     qu_llm=None,
     explain_llm=None,
     hard_geofences=(),
@@ -145,5 +185,6 @@ def make_pipeline(
         session_store=InMemorySessionStore(settings.session_max_turns),
         references=tuple(references),
         hard_geofences=tuple(hard_geofences),
+        environment_agent=environment,
     )
     return OrcaPipeline(deps)

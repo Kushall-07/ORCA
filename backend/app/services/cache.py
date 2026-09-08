@@ -148,3 +148,15 @@ def marine_cache_key(
     lat: float, lon: float, when: datetime, *, decimals: int = 2, granularity: str = "hour"
 ) -> str:
     return f"marine:{_round(lat, decimals)}:{_round(lon, decimals)}:{time_bucket(when, granularity)}"
+
+
+def oceancolor_cache_key(
+    lat: float, lon: float, day: datetime, *, decimals: int = 2
+) -> str:
+    """Day-bucketed key for satellite ocean-colour (chlorophyll) results.
+
+    Chlorophyll is a daily composite, so the time bucket is the calendar day
+    (UTC), never the hour. A cache hit is still age-checked before use and is
+    never labelled LIVE.
+    """
+    return f"oceancolor:{_round(lat, decimals)}:{_round(lon, decimals)}:{time_bucket(day, 'day')}"

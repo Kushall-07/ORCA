@@ -118,3 +118,66 @@ def test_reference_ids_carried_without_merging() -> None:
     # the PFZ is not an observation
     assert all(r.variable != "pfz" for r in fabric.records)
     assert "pfz_advisory" not in fabric.variables()
+
+
+# ---- Phase 9: environmental AgentResult folds in like weather / ocean ----
+def _chl_obs(days_old: int):
+    return MarineObservation(
+        variable="chlorophyll_a", value=0.36, unit="mg m-3", coordinate=COORD,
+        observed_at=T - timedelta(days=days_old), retrieved_at=T,
+        source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+        source_tier=SourceTier.MODEL, signal_kind=SignalKind.MODEL_DERIVED,
+    )
+
+
+def test_environment_agent_result_is_folded_into_the_fabric() -> None:
+    weather = _agent_result("weather", [_obs("wind_speed", 6.0, "m/s")])
+    ocean = _agent_result("oceanographic", [
+        _obs("wave_height", 1.8, "m"),
+        _obs("sea_surface_temperature", 29.3, "°C"),
+    ])
+    env = _agent_result("environmental", [_chl_obs(1)],
+                        source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily")
+    fabric = build_fabric(
+        query_coordinate=COORD, query_time=T,
+        weather=weather, ocean=ocean, environment=env, now=T,
+    )
+    by_var = {r.variable: r for r in fabric.records}
+    assert "sea_surface_temperature" in by_var
+    assert by_var["sea_surface_temperature"].validity is ValidityState.VALID
+    assert "chlorophyll_a" in by_var
+    chl = by_var["chlorophyll_a"]
+    assert chl.observation.value == pytest.approx(0.36)
+    assert chl.observation.unit == "mg m-3"
+    assert chl.source_status.tier is DataTier.LIVE
+    assert chl.validity is ValidityState.VALID          # 1 day old, fresh window is 48 h
+
+
+def test_missing_environment_agent_does_not_crash_or_add_records() -> None:
+    weather = _agent_result("weather", [_obs("wind_speed", 6.0, "m/s")])
+    fabric = build_fabric(
+        query_coordinate=COORD, query_time=T, weather=weather, environment=None, now=T
+    )
+    assert "chlorophyll_a" not in fabric.variables()
+
+
+def test_environment_agent_with_no_data_is_a_warning_not_a_fabricated_value() -> None:
+    weather = _agent_result("weather", [_obs("wind_speed", 6.0, "m/s")])
+    env = AgentResult(
+        kind="environmental", coordinate=COORD, query_time=T, observations=(),
+        source_status=SourceStatus(tier=DataTier.MISSING, source="none", note="cloud gap"),
+    )
+    fabric = build_fabric(
+        query_coordinate=COORD, query_time=T, weather=weather, environment=env, now=T
+    )
+    assert "chlorophyll_a" not in fabric.variables()
+    assert any("environment" in w for w in fabric.warnings)
+
+
+def test_stale_chlorophyll_composite_is_flagged_stale_by_the_gate() -> None:
+    env = _agent_result("environmental", [_chl_obs(6)])   # 6 days old
+    fabric = build_fabric(
+        query_coordinate=COORD, query_time=T, environment=env, now=T
+    )
+    chl = next(r for r in fabric.records if r.variable == "chlorophyll_a")
+    assert chl.validity is ValidityState.STALE

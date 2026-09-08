@@ -176,6 +176,29 @@ async def collect_gis(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
     return {"gis_result": res, "agent_trace": ["gis"]}
 
 
+async def collect_environment(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9: chlorophyll-a from the satellite ocean-colour agent.
+
+    Strictly non-blocking. No environment agent, a short-circuited pipeline, an
+    unresolved location, or any agent failure all resolve to a skipped/missing
+    result - never a graph failure. Environmental data never feeds Risk / Safety
+    / Decision / routing.
+    """
+    coord = state.get("resolved_origin")
+    agent = getattr(deps, "environment_agent", None)
+    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None or agent is None:
+        return {"environment_result": None, "agent_trace": ["environment:skip"]}
+    try:
+        res = await agent.fetch(coord, state["decision_time"])
+    except Exception as exc:  # noqa: BLE001 - the agent should not raise, but be defensive
+        res = missing_result(
+            "environmental", coord, state["decision_time"], f"environmental agent error: {exc}"
+        )
+        return {"environment_result": res, "agent_trace": ["environment:skip"]}
+    token = "environment" if res.has_data else "environment:skip"
+    return {"environment_result": res, "agent_trace": [token]}
+
+
 # ---- fabric / reasoning -------------------------------------------------
 async def fabric_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     if state.get("pipeline_status") in _SHORT_CIRCUIT:
@@ -188,6 +211,7 @@ async def fabric_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         weather=state.get("weather_result"),
         ocean=state.get("ocean_result"),
         gis=state.get("gis_result"),
+        environment=state.get("environment_result"),
         references=refs,
         now=_now(state),
     )

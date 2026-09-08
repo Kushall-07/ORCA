@@ -31,9 +31,35 @@ The `SourceStatus` on every `FabricRecord` / agent result carries `tier`,
 ### Open-Meteo — Marine API (`marine-api.open-meteo.com/v1/marine`)
 - **Role:** MVP **LIVE** source for oceanographic data.
 - **Variables used:** `wave_height`, `wave_direction`, `wave_period`,
-  `swell_wave_height`, `swell_wave_direction`, `swell_wave_period`. Only
-  variables the API actually returns are emitted — nothing is invented.
+  `swell_wave_height`, `swell_wave_direction`, `swell_wave_period`, and
+  (Phase 9) **`sea_surface_temperature`** (~8 km, 6-hourly Météo-France model
+  field → `MarineObservation` `sea_surface_temperature`, unit `°C`,
+  `source_tier` MODEL, `signal_kind` MODEL_DERIVED). Only variables the API
+  actually returns are emitted — nothing is invented.
 - **Licence:** as above.
+
+### NOAA CoastWatch ERDDAP — VIIRS S-NPP chlorophyll-a *(Phase 9)*
+- **Endpoint:** `https://coastwatch.noaa.gov/erddap` · **Dataset:**
+  `noaacwNPPVIIRSchlaDaily` · **Variable:** `chlor_a` (mg m-3).
+- **Role:** **LIVE** source for satellite chlorophyll-a. Fetched via ERDDAP
+  **griddap** `.json` over the existing `httpx` stack (`services/oceancolor.py`).
+  No authentication.
+- **Coverage / resolution:** global, ~4 km (0.04°), **daily** L3 composite,
+  2017-present.
+- **Acceptance:** ORCA re-validates the returned pixel — spatial ≤ 25 km,
+  temporal ≤ `OCEANCOLOR_CHL_MAX_AGE_SECONDS` (10 d default). NaN / null /
+  ≤ 0 → **unavailable**, never 0.
+- **Caveat:** chlorophyll-a is a **phytoplankton-biomass proxy**. It is **NOT**
+  a measure of fish presence and ORCA never claims "high chlorophyll = more
+  fish". Optical retrievals are frequently unavailable over the Indian coast in
+  the SW monsoon (cloud) — reported as MISSING, non-blocking.
+
+### INCOIS ERDDAP — chlorophyll-a *(optional secondary, Phase 9)*
+- **Endpoint:** `https://erddap.incois.gov.in/erddap` (dataset id unverified).
+- **Role:** optional secondary only — tried **only** when both a URL and a
+  dataset id are configured, always with normal TLS verification (`verify=True`,
+  or `verify=<OCEANCOLOR_INCOIS_CA_BUNDLE>`). Never a required dependency; a TLS
+  or connection failure is non-blocking. Disabled by default.
 
 ---
 
@@ -118,7 +144,21 @@ The `SourceStatus` on every `FabricRecord` / agent result carries `tier`,
 
 ### Copernicus Marine
 - Placeholder credentials only (`COPERNICUS_USERNAME` / `COPERNICUS_PASSWORD`).
-  Not integrated in Phase 4.
+  Not integrated. Its legacy OPeNDAP/ERDDAP/WMS access was retired in April 2024;
+  the current Data Store needs the `copernicusmarine` toolbox (a new dependency)
+  + a registered account, so it is deferred past Phase 9 Step 2. See
+  [`phase9-environmental-feasibility.md`](phase9-environmental-feasibility.md).
+
+### Environmental data — SST + chlorophyll-a (Phase 9)
+- **SST:** Open-Meteo Marine (`sea_surface_temperature`) — see the Live sources
+  section above.
+- **Chlorophyll-a:** NOAA CoastWatch ERDDAP `noaacwNPPVIIRSchlaDaily` (primary,
+  no auth); INCOIS ERDDAP optional secondary. See the Live sources section and
+  [`phase9-environmental-feasibility.md`](phase9-environmental-feasibility.md).
+- **Introspection:** `oceancolor_status(settings)` (mirrors `mosdac_status()`) —
+  role `environmental / non-blocking`.
+- **Rule:** chlorophyll-a ≠ fish presence. Productivity interpretation is
+  Phase 9 Step 3.
 
 ---
 

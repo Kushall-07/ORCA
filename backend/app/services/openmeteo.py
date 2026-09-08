@@ -8,7 +8,8 @@ consume:
     surface_pressure, pressure_msl
   marine  (marine-api.open-meteo.com/v1/marine):
     wave_height, wave_direction, wave_period,
-    swell_wave_height, swell_wave_direction, swell_wave_period
+    swell_wave_height, swell_wave_direction, swell_wave_period,
+    sea_surface_temperature   (Phase 9: ~8 km, 6-hourly model field)
 
 Every raw response is validated by :func:`parse_response` before anything from it
 reaches the Marine Data Fabric.
@@ -40,6 +41,7 @@ MARINE_HOURLY: Final[tuple[str, ...]] = (
     "swell_wave_height",
     "swell_wave_direction",
     "swell_wave_period",
+    "sea_surface_temperature",
 )
 
 

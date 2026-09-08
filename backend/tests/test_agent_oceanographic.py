@@ -95,3 +95,25 @@ async def test_only_api_provided_variables_are_emitted() -> None:
     variables = {o.variable for o in result.observations}
     assert "wave_period" not in variables      # not invented
     assert "wave_height" in variables
+
+
+@respx.mock
+async def test_sea_surface_temperature_is_emitted_when_present() -> None:
+    respx.get(MARINE_URL).respond(
+        json=marine_response(start=WHEN, sea_surface_temperature=28.7)
+    )
+    result = await _agent().fetch(COORD, WHEN)
+    sst = next(o for o in result.observations if o.variable == "sea_surface_temperature")
+    assert sst.value == pytest.approx(28.7)
+    assert sst.unit == "°C"
+    assert sst.source_tier.name == "MODEL"
+    assert sst.signal_kind.value == "model_derived"
+
+
+@respx.mock
+async def test_sea_surface_temperature_is_not_invented_when_absent() -> None:
+    respx.get(MARINE_URL).respond(
+        json=marine_response(start=WHEN, sea_surface_temperature=None)
+    )
+    result = await _agent().fetch(COORD, WHEN)
+    assert all(o.variable != "sea_surface_temperature" for o in result.observations)

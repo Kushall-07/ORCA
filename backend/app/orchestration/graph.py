@@ -5,7 +5,7 @@
       -> (short-circuit) --------------------------> explain
       -> normalize
       -> (needs clarification) -------------------> explain
-      -> [collect_weather | collect_ocean | collect_gis]   (parallel)
+      -> [collect_weather | collect_ocean | collect_gis | collect_environment]  (parallel)
       -> fabric -> temporal -> fusion -> arbitration -> conflicts
       -> suitability (conditional) -> risk -> policy -> decision
       -> (route requested & allowed) -> route
@@ -38,7 +38,7 @@ def _after_normalize(state: OrcaGraphState):  # type: ignore[no-untyped-def]
         return "explain"
     if state.get("resolved_origin") is None:
         return "explain"
-    return ["collect_weather", "collect_ocean", "collect_gis"]
+    return ["collect_weather", "collect_ocean", "collect_gis", "collect_environment"]
 
 
 def _after_decision(state: OrcaGraphState) -> str:
@@ -71,6 +71,7 @@ def build_orca_graph(deps: OrcaDeps):
     add("collect_weather", nodes.collect_weather)
     add("collect_ocean", nodes.collect_ocean)
     add("collect_gis", nodes.collect_gis)
+    add("collect_environment", nodes.collect_environment)
     add("fabric", nodes.fabric_node)
     add("temporal", nodes.temporal_node)
     add("fusion", nodes.fusion_node)
@@ -91,9 +92,9 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_conditional_edges(
         "normalize",
         _after_normalize,
-        ["collect_weather", "collect_ocean", "collect_gis", "explain"],
+        ["collect_weather", "collect_ocean", "collect_gis", "collect_environment", "explain"],
     )
-    for src in ("collect_weather", "collect_ocean", "collect_gis"):
+    for src in ("collect_weather", "collect_ocean", "collect_gis", "collect_environment"):
         g.add_edge(src, "fabric")
     g.add_edge("fabric", "temporal")
     g.add_edge("temporal", "fusion")

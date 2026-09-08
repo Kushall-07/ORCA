@@ -214,3 +214,48 @@ def test_deterministic() -> None:
     first = classify(rec, decision_time=NOW, now=NOW, config=CFG)
     for _ in range(20):
         assert classify(rec, decision_time=NOW, now=NOW, config=CFG) == first
+
+
+# ---- Phase 9: per-variable windows for the environmental observations ----
+def test_sst_and_chlorophyll_windows_are_loaded() -> None:
+    sst = CFG.window("sea_surface_temperature")
+    chl = CFG.window("chlorophyll_a")
+    assert (sst.fresh_seconds, sst.stale_seconds) == (43200, 172800)
+    assert (chl.fresh_seconds, chl.stale_seconds) == (172800, 864000)
+
+
+@pytest.mark.parametrize(
+    "hours, expected",
+    [(6, ValidityState.VALID), (11, ValidityState.VALID),
+     (24, ValidityState.STALE), (47, ValidityState.STALE),
+     (60, ValidityState.INVALID)],
+)
+def test_sea_surface_temperature_observation_windows(hours, expected) -> None:
+    rec = _record(
+        variable="sea_surface_temperature", value=29.0,
+        observed_at=NOW - timedelta(hours=hours),
+    )
+    assert _verdict(rec) is expected
+
+
+@pytest.mark.parametrize(
+    "days, expected",
+    [(1, ValidityState.VALID), (2, ValidityState.VALID),
+     (3, ValidityState.STALE), (9, ValidityState.STALE),
+     (11, ValidityState.INVALID)],
+)
+def test_chlorophyll_observation_windows(days, expected) -> None:
+    rec = _record(
+        variable="chlorophyll_a", value=0.3,
+        observed_at=NOW - timedelta(days=days),
+    )
+    assert _verdict(rec) is expected
+
+
+def test_existing_variable_windows_are_unchanged_by_phase9() -> None:
+    assert (CFG.window("wave_height").fresh_seconds,
+            CFG.window("wave_height").stale_seconds) == (3600, 21600)
+    assert (CFG.window("wind_speed").fresh_seconds,
+            CFG.window("wind_speed").stale_seconds) == (3600, 10800)
+    # a variable with no explicit entry still falls back to the default
+    assert CFG.window("something_new") == CFG.default

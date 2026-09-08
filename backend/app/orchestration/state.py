@@ -62,6 +62,7 @@ class OrcaGraphState(TypedDict, total=False):
     weather_result: AgentResult | None
     ocean_result: AgentResult | None
     gis_result: GisQueryResult | None
+    environment_result: AgentResult | None
 
     # ---- reasoning ----
     fabric: MarineDataFabric | None

@@ -59,3 +59,14 @@ by_variable:
   mean_sea_level_pressure:
     fresh_seconds: 7200
     stale_seconds: 21600
+  # Phase 9 environmental variables. These reflect the real cadence of the
+  # products (a 6-hourly SST model field; a daily, cloud-gapped satellite
+  # chlorophyll composite) - they are NOT a loosening of the gate. They apply
+  # only to observation-style records (observed_at set); they do not change the
+  # forecast branch that the existing wave/wind/pressure fields use.
+  sea_surface_temperature:
+    fresh_seconds: 43200        # 12 h
+    stale_seconds: 172800       # 48 h
+  chlorophyll_a:
+    fresh_seconds: 172800       # 48 h  - a daily composite is "fresh" ~2 days
+    stale_seconds: 864000       # 10 d  - an older cloud-free pixel is aged but usable

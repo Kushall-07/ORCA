@@ -117,6 +117,33 @@ class Settings(BaseSettings):
     marine_cache_ttl_seconds: int = Field(default=3600, gt=0)
     marine_cache_max_age_seconds: int = Field(default=21600, gt=0)
 
+    # ---- Phase 9: environmental data (SST + chlorophyll-a) ----
+    # SST rides the existing Open-Meteo Marine call - no settings needed.
+    # Chlorophyll-a is fetched from NOAA CoastWatch ERDDAP (primary, no auth).
+    # INCOIS ERDDAP is an OPTIONAL secondary: it is only tried when BOTH a URL
+    # and a dataset id are configured, and always with normal TLS verification
+    # (verify=True, or verify=<oceancolor_incois_ca_bundle> if a chain file is
+    # supplied). It is never a required dependency. All settings are non-secret.
+    oceancolor_enabled: bool = Field(default=True)
+    oceancolor_noaa_erddap_url: str = Field(
+        default="https://coastwatch.noaa.gov/erddap"
+    )
+    oceancolor_noaa_chl_dataset: str = Field(default="noaacwNPPVIIRSchlaDaily")
+    oceancolor_noaa_chl_variable: str = Field(default="chlor_a")
+    # Blank unless a real INCOIS ERDDAP dataset id has been verified.
+    oceancolor_incois_erddap_url: str = Field(default="")
+    oceancolor_incois_chl_dataset: str = Field(default="")
+    oceancolor_incois_chl_variable: str = Field(default="chlor_a")
+    # Optional PEM file completing the INCOIS TLS chain. Empty -> plain verify=True.
+    oceancolor_incois_ca_bundle: str = Field(default="")
+    oceancolor_timeout_seconds: float = Field(default=15.0, gt=0)
+    oceancolor_cache_ttl_seconds: int = Field(default=32400, gt=0)      # 9 h
+    oceancolor_cache_max_age_seconds: int = Field(default=86400, gt=0)  # 24 h
+    # A chlorophyll composite older than this (relative to the decision time) is
+    # not an acceptable observation. Kept consistent with the Temporal Validity
+    # Gate's chlorophyll_a stale window.
+    oceancolor_chl_max_age_seconds: int = Field(default=864000, gt=0)   # 10 d
+
     # ---- Phase 4: data locations + GIS backend ----
     data_static_dir: str = Field(default="data/static")
     data_demo_dir: str = Field(default="data/demo")

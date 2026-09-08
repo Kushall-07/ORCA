@@ -87,6 +87,7 @@ def build_fabric(
     weather: AgentResult | None = None,
     ocean: AgentResult | None = None,
     gis: GisQueryResult | None = None,
+    environment: AgentResult | None = None,
     references: tuple[ReferenceArtifact, ...] = (),
     temporal_config: TemporalConfig | None = None,
     now: datetime | None = None,
@@ -96,7 +97,13 @@ def build_fabric(
     warnings: list[str] = []
 
     records: list[FabricRecord] = []
-    for label, result in (("weather", weather), ("ocean", ocean)):
+    # ``environment`` (Phase 9: chlorophyll-a) is folded in exactly like weather
+    # and ocean - a normal AgentResult of MarineObservations, gated the same way.
+    for label, result in (
+        ("weather", weather),
+        ("ocean", ocean),
+        ("environment", environment),
+    ):
         if result is None:
             continue
         if not result.has_data:

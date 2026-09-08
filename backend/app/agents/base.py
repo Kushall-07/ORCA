@@ -34,6 +34,10 @@ VARIABLE_MAP: dict[str, tuple[str, str]] = {
     "swell_wave_height": ("swell_wave_height", "m"),
     "swell_wave_direction": ("swell_wave_direction", "deg"),
     "swell_wave_period": ("swell_wave_period", "s"),
+    # Phase 9: environmental. SST rides the existing Open-Meteo Marine path and
+    # becomes a normal MarineObservation (source_tier MODEL, signal_kind
+    # MODEL_DERIVED). It never enters the Risk Engine.
+    "sea_surface_temperature": ("sea_surface_temperature", "°C"),
 }
 
 

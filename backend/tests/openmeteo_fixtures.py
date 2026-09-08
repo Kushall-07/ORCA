@@ -58,26 +58,28 @@ def marine_response(
     start: datetime | None = None,
     hours: int = 6,
     wave_height: float = 1.6,
+    sea_surface_temperature: float | None = 29.4,
 ) -> dict:
     start = start or datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     times = _hours(start, hours)
+    hourly = {
+        "time": times,
+        "wave_height": [wave_height] * hours,
+        "wave_direction": [225.0] * hours,
+        "wave_period": [7.0] * hours,
+        "swell_wave_height": [wave_height * 0.6] * hours,
+        "swell_wave_direction": [220.0] * hours,
+        "swell_wave_period": [9.0] * hours,
+    }
+    units = {"wave_height": "m", "wave_direction": "°", "wave_period": "s"}
+    if sea_surface_temperature is not None:
+        hourly["sea_surface_temperature"] = [sea_surface_temperature] * hours
+        units["sea_surface_temperature"] = "°C"
     return {
         "latitude": lat,
         "longitude": lon,
         "timezone": "GMT",
         "utc_offset_seconds": 0,
-        "hourly_units": {
-            "wave_height": "m",
-            "wave_direction": "°",
-            "wave_period": "s",
-        },
-        "hourly": {
-            "time": times,
-            "wave_height": [wave_height] * hours,
-            "wave_direction": [225.0] * hours,
-            "wave_period": [7.0] * hours,
-            "swell_wave_height": [wave_height * 0.6] * hours,
-            "swell_wave_direction": [220.0] * hours,
-            "swell_wave_period": [9.0] * hours,
-        },
+        "hourly_units": units,
+        "hourly": hourly,
     }

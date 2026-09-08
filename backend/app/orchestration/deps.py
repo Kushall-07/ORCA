@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from app.agents.environmental import EnvironmentalAgent
 from app.agents.evidence_explanation import ExplanationAgent
 from app.agents.gis_geofencing import GisGeofencingAgent
 from app.agents.oceanographic import OceanographicAgent
@@ -47,6 +48,9 @@ class OrcaDeps:
     hard_geofences: tuple[Geofence, ...] = ()
     soft_geofences: tuple[Geofence, ...] = ()
     protected_area_hard_ids: tuple[str, ...] = ()
+    # Phase 9: environmental (chlorophyll-a) agent. Optional / non-blocking; when
+    # absent the collect_environment node simply skips.
+    environment_agent: object = None  # EnvironmentalAgent-like: async fetch(coord, when)
 
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
@@ -65,4 +69,5 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         arbitrator=HierarchyArbitrator(),
         session_store=InMemorySessionStore(settings.session_max_turns),
         references=load_reference_registry(),
+        environment_agent=EnvironmentalAgent(settings=settings),
     )

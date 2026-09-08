@@ -1,0 +1,5 @@
+{
+  "_note": "ORCA DEMO environmental data. NOT live, NOT observed satellite data. Chlorophyll-a is a phytoplankton-biomass proxy, never a measure of fish presence. Used ONLY when agent_demo_fallback is explicitly enabled (scenario / offline demos); it is always tagged DataTier.DEMO and never returned as LIVE.",
+  "chlorophyll_a": 0.35,
+  "unit": "mg m-3"
+}
