@@ -112,6 +112,30 @@ class OpenMeteoResponse(BaseModel):
                 best_i, best_gap = i, gap
         return best_i
 
+    def index_for(self, when: datetime) -> int:
+        """Index of the hourly bucket that *contains* ``when``.
+
+        Open-Meteo hourly values use interval-start labelling: the value stamped
+        ``T`` describes the interval ``[T, T + 1h)``. The bucket covering
+        ``when`` is therefore the last timestamp ``<= when`` - not the numerically
+        nearest one (for ``when`` at :46 past the hour the nearest *timestamp* is
+        the next hour, but the covering *bucket* is the current hour).
+
+        If ``when`` precedes the whole series - a "right now" query issued a few
+        minutes before the first published hour - fall back to the first bucket.
+        The Temporal Validity Gate then applies its bounded one-step lead
+        tolerance so a genuinely current query is not rejected, while anything
+        further out of alignment still fails.
+        """
+        target = when if when.tzinfo is None else when.replace(tzinfo=None)
+        chosen, found = 0, False
+        for i, ts in enumerate(self.hourly.time):
+            if datetime.fromisoformat(ts) <= target:
+                chosen, found = i, True
+            else:
+                break
+        return chosen if found else 0
+
 
 def parse_response(raw: dict[str, Any]) -> OpenMeteoResponse:
     try:

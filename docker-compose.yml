@@ -56,6 +56,13 @@ services:
       COPERNICUS_USERNAME: ${COPERNICUS_USERNAME:-}
       COPERNICUS_PASSWORD: ${COPERNICUS_PASSWORD:-}
       WDPA_API_TOKEN: ${WDPA_API_TOKEN:-}
+    volumes:
+      # Git-tracked static GIS layers (Natural Earth coastline, Marine Regions
+      # EEZ, WDPA subset, GEBCO bathymetry) + the PFZ/RSMC reference snapshots.
+      # The image only copies `app/`; this makes the offline spatial backend and
+      # the /gis/layers + /reference/* endpoints work inside the container.
+      # Read-only, mirroring the postgres service's init.sql mount.
+      - ./data:/app/data:ro
     ports:
       - "8000:8000"
     depends_on:

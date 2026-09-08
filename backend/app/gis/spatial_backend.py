@@ -64,6 +64,9 @@ def _load_bathy(path_str: str):
 class OfflineSpatialBackend:
     name = "offline"
 
+    # The layer files the backend needs to answer any spatial question.
+    _CORE_LAYER_FILES = ("eez_india.geojson", "coastline_indian.geojson")
+
     def __init__(self, static_dir: str | Path | None = None) -> None:
         self.static_dir = (
             Path(static_dir) if static_dir is not None else get_settings().static_path
@@ -71,6 +74,15 @@ class OfflineSpatialBackend:
         self._eez_geoms: list[tuple[dict, object]] | None = None
         self._coast_geoms: list[object] | None = None
         self._pa_geoms: list[tuple[dict, object]] | None = None
+
+    @property
+    def data_available(self) -> bool:
+        """True when the core static layer files exist on disk. False means the
+        backend will answer every query with 'no data' - the GIS agent turns
+        this into an explicit warning rather than a silent all-false result."""
+        return all(
+            (self.static_dir / name).is_file() for name in self._CORE_LAYER_FILES
+        )
 
     # ---- lazy geometry loaders -------------------------------------
     def _eez(self) -> list[tuple[dict, object]]:

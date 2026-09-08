@@ -56,6 +56,15 @@ class GisGeofencingAgent:
         warnings: list[str] = []
         backend_name = self.backend.name
         eez = pas = coast = depth = None
+        # Offline backend with no layer files on disk -> make the gap explicit
+        # instead of returning a silent "outside every zone" result.
+        if getattr(self.backend, "data_available", True) is False:
+            static_dir = getattr(self.backend, "static_dir", "?")
+            warnings.append(
+                f"static GIS layers not found at {static_dir}; "
+                "EEZ / coastline / depth / protected-area evidence is unavailable"
+            )
+            logger.warning("offline spatial backend has no layer files", extra={"source": f"static-gis:{backend_name}"})
         try:
             eez = self.backend.eez_query(coordinate)
             pas = self.backend.protected_area_query(coordinate, radius_m=self.pa_radius_m)

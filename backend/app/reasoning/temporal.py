@@ -7,7 +7,7 @@ windows from ``temporal_config.yaml``. It never turns stale data into valid data
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final
 
@@ -33,6 +33,13 @@ class _ForecastRule(BaseModel):
     model_config = ConfigDict(frozen=True)
     max_retrieval_seconds: int = Field(gt=0)
     stale_retrieval_seconds: int = Field(gt=0)
+    # The decision time may fall up to this many seconds BEFORE ``valid_from``
+    # (the forecast provider's publish boundary) and still be served by that
+    # window - an hourly forecast has one-hour native resolution, so a query a
+    # few minutes before the first published hour is genuinely "now".
+    # ``valid_until`` stays a hard upper bound; a decision time past it, or more
+    # than one step before ``valid_from``, is still INVALID.
+    alignment_seconds: int = Field(default=3600, gt=0)
 
 
 class TemporalConfig(BaseModel):
@@ -93,12 +100,17 @@ def classify(
 
     # ---- forecast record --------------------------------------------
     if valid_from is not None and valid_until is not None:
-        if not (valid_from <= decision_time <= valid_until):
+        # One-step lead tolerance on the lower bound only (see _ForecastRule):
+        # a "right now" query issued minutes before the first published hourly
+        # window is still that window's; the upper bound is not relaxed.
+        lead = timedelta(seconds=cfg.forecast.alignment_seconds)
+        if not (valid_from - lead <= decision_time <= valid_until):
             return GateVerdict(
                 state=ValidityState.INVALID,
                 reason=(
                     f"decision time {decision_time.isoformat()} outside forecast "
-                    f"window [{valid_from.isoformat()}, {valid_until.isoformat()}]"
+                    f"window [{valid_from.isoformat()}, {valid_until.isoformat()}] "
+                    f"(lead tolerance {cfg.forecast.alignment_seconds}s)"
                 ),
             )
         if retrieved_at is None:

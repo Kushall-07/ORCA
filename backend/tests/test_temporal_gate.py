@@ -92,6 +92,86 @@ def test_forecast_without_retrieval_timestamp_is_invalid() -> None:
     assert _verdict(rec) is ValidityState.INVALID
 
 
+# ---- forecast lower-bound lead tolerance (Phase 8 alignment fix) ----------
+# The gate config allows the decision time to lead valid_from by up to one
+# hourly step (forecast.alignment_seconds), so a "right now" query issued a few
+# minutes before the first published Open-Meteo hour is still served.
+
+
+def test_forecast_alignment_seconds_is_loaded_from_config() -> None:
+    assert CFG.forecast.alignment_seconds == 3600
+
+
+def test_current_hour_forecast_window_covering_now_is_valid() -> None:
+    # Open-Meteo bucket stamped this hour, decision time :46 past it.
+    rec = _record(
+        valid_from=NOW - timedelta(minutes=46),
+        valid_until=NOW + timedelta(minutes=14),
+        retrieved_at=NOW - timedelta(minutes=2),
+    )
+    assert _verdict(rec) is ValidityState.VALID
+
+
+def test_next_hour_forecast_within_one_step_lead_is_valid() -> None:
+    # The reported live failure: series begins 14 min after the decision time.
+    rec = _record(
+        valid_from=NOW + timedelta(minutes=14),
+        valid_until=NOW + timedelta(minutes=74),
+        retrieved_at=NOW - timedelta(minutes=1),
+    )
+    assert _verdict(rec) is ValidityState.VALID
+
+
+def test_forecast_lead_just_inside_one_step_is_valid() -> None:
+    rec = _record(
+        valid_from=NOW + timedelta(minutes=59),
+        valid_until=NOW + timedelta(minutes=119),
+        retrieved_at=NOW - timedelta(minutes=1),
+    )
+    assert _verdict(rec) is ValidityState.VALID
+
+
+def test_future_only_forecast_beyond_one_step_is_invalid() -> None:
+    # More than one hourly step ahead -> genuinely future-only, still rejected.
+    rec = _record(
+        valid_from=NOW + timedelta(minutes=61),
+        valid_until=NOW + timedelta(minutes=121),
+        retrieved_at=NOW - timedelta(minutes=1),
+    )
+    assert _verdict(rec) is ValidityState.INVALID
+
+
+def test_forecast_window_ending_in_the_past_is_invalid() -> None:
+    # The upper bound is NOT relaxed: a window that already closed is stale.
+    rec = _record(
+        valid_from=NOW - timedelta(minutes=90),
+        valid_until=NOW - timedelta(minutes=30),
+        retrieved_at=NOW - timedelta(minutes=5),
+    )
+    assert _verdict(rec) is ValidityState.INVALID
+
+
+def test_lead_tolerance_does_not_bypass_retrieval_age() -> None:
+    # In-alignment window but the model run is 20 h old -> still INVALID.
+    rec = _record(
+        valid_from=NOW + timedelta(minutes=14),
+        valid_until=NOW + timedelta(minutes=74),
+        retrieved_at=NOW - timedelta(hours=20),
+    )
+    assert _verdict(rec) is ValidityState.INVALID
+
+
+def test_utc_boundary_forecast_across_midnight_is_valid() -> None:
+    # decision 23:52 UTC, first published bucket 00:00 next day (8 min lead).
+    dt = datetime(2026, 9, 7, 23, 52, tzinfo=timezone.utc)
+    rec = _record(
+        valid_from=datetime(2026, 9, 8, 0, 0, tzinfo=timezone.utc),
+        valid_until=datetime(2026, 9, 8, 1, 0, tzinfo=timezone.utc),
+        retrieved_at=dt - timedelta(minutes=3),
+    )
+    assert classify(rec, decision_time=dt, now=dt, config=CFG).state is ValidityState.VALID
+
+
 def test_recent_observation_is_valid() -> None:
     rec = _record(observed_at=NOW - timedelta(minutes=20))
     assert _verdict(rec) is ValidityState.VALID

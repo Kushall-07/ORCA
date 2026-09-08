@@ -99,8 +99,13 @@ def build_observations(
 
 
 def normalise_openmeteo(response, when: datetime, hourly_keys: tuple[str, ...]) -> dict:
-    """Extract the hour nearest ``when`` into a cache-friendly flat payload."""
-    idx = response.nearest_index(when)
+    """Extract the hourly bucket that *covers* ``when`` into a flat payload.
+
+    Uses ``index_for`` (interval-start containment), not ``nearest_index``:
+    an hourly value stamped 17:00 covers 17:00-18:00, so a 17:46 "right now"
+    query belongs to the 17:00 bucket, not the numerically closer 18:00 stamp.
+    """
+    idx = response.index_for(when)
     hour_iso = response.hourly.time[idx]
     hour_dt = datetime.fromisoformat(hour_iso)
     if hour_dt.tzinfo is None:

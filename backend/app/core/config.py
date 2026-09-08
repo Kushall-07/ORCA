@@ -14,8 +14,29 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEFAULT_CORS = ["http://localhost:3000", "http://127.0.0.1:3000"]
-# backend/app/core/config.py -> repo root
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# On a host checkout this file lives at ``<repo>/backend/app/core/config.py`` so
+# ``parents[3]`` is the repo root. Inside the backend container the code is copied
+# to ``/app/app/...`` (``WORKDIR /app``), where ``parents[3]`` overshoots to
+# ``/``. ``_resolve`` therefore probes several plausible bases and picks the
+# first one that actually contains the requested relative path.
+_CONFIG_FILE = Path(__file__).resolve()
+_REPO_ROOT = _CONFIG_FILE.parents[3]
+
+
+def _data_bases() -> tuple[Path, ...]:
+    """Ordered candidate bases for resolving a *relative* data dir.
+
+    The repo root covers a host checkout; ``parents[2]`` is ``backend/`` on a
+    host and ``/app`` in the container; the CWD and ``/app`` are extra safety
+    for the Docker layout. Evaluated per call so the CWD is current.
+    """
+    return (
+        _REPO_ROOT,
+        _CONFIG_FILE.parents[2],
+        Path.cwd(),
+        Path("/app"),
+    )
 
 
 class Settings(BaseSettings):
@@ -51,8 +72,13 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ---- LLM provider (Groq is the sole provider; used from Phase 5) ----
+    # Single authoritative model id, consumed by GroqLlmClient for BOTH the
+    # Query Understanding agent and the Evidence & Explanation agent. Override
+    # with the GROQ_MODEL env var. The earlier Llama 3.3 70B "versatile" model
+    # was retired by Groq for the developer/free tier and now returns
+    # 404 model_not_found.
     groq_api_key: str = Field(default="")
-    groq_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_model: str = Field(default="openai/gpt-oss-120b")
     groq_timeout_seconds: float = Field(default=20.0, gt=0)
     llm_max_retries: int = Field(default=1, ge=0, le=3)
 
@@ -117,10 +143,23 @@ class Settings(BaseSettings):
         return self.environment.lower() in {"production", "prod"}
 
     def _resolve(self, value: str) -> Path:
-        """Resolve a data directory against the repo root when it is relative,
-        so agents work regardless of the process working directory."""
+        """Resolve a data directory so it works both on a host checkout and
+        inside the container.
+
+        Absolute paths (e.g. ``DATA_STATIC_DIR=/data/static``) are used as-is.
+        A relative path is tried against each :data:`_DATA_BASES` candidate; the
+        first base under which it exists wins. If none exist we fall back to the
+        repo-root-relative path (unchanged historical behaviour) so a genuinely
+        missing data dir stays visible rather than silently resolving elsewhere.
+        """
         path = Path(value)
-        return path if path.is_absolute() else (_REPO_ROOT / path)
+        if path.is_absolute():
+            return path
+        for base in _data_bases():
+            candidate = base / path
+            if candidate.exists():
+                return candidate
+        return _REPO_ROOT / path
 
     @property
     def static_path(self) -> Path:

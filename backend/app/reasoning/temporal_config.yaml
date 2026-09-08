@@ -10,7 +10,11 @@
 #
 # Semantics:
 #   * For a FORECAST record (has valid_from/valid_until):
-#       - the requested decision time must fall within [valid_from, valid_until]
+#       - the requested decision time must fall within
+#         [valid_from - forecast.alignment_seconds, valid_until]
+#         (the lower bound has a one-hourly-step lead tolerance so a "right now"
+#          query issued minutes before the first published hour still resolves;
+#          the upper bound is NOT relaxed)
 #       - AND the record must have been retrieved within
 #         forecast.max_retrieval_seconds of "now"
 #       -> VALID; otherwise INVALID (window missed) or STALE (retrieval age
@@ -35,6 +39,9 @@ default:
 forecast:
   max_retrieval_seconds: 43200   # 12 h - a forecast fetched longer ago than this is not trusted
   stale_retrieval_seconds: 10800 # 3 h - fetched between this and max -> STALE
+  alignment_seconds: 3600        # 1 h - one hourly step; decision time may lead
+                                 #       valid_from by up to this and still be
+                                 #       covered. valid_until stays a hard bound.
 
 by_variable:
   wave_height:
