@@ -137,10 +137,29 @@ class DataQualityInfo(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class NodeTraceItem(BaseModel):
+    """One LangGraph node's measured execution (Phase 7 observability).
+
+    ``agent_trace`` (the flat token list the frontend maps onto the 19 frozen
+    stages) is unchanged; this is an additive, structured companion view.
+    """
+
+    node: str
+    status: str                       # PENDING | RUNNING | COMPLETED | SKIPPED | FAILED
+    started_at: str | None = None
+    ended_at: str | None = None
+    duration_ms: float | None = None  # real elapsed time, never fabricated
+    skipped: bool = False
+    error_type: str | None = None
+    source: str | None = None
+    record_count: int | None = None
+
+
 class QueryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     session_id: str
+    request_id: str = ""             # correlation id; also returned as the x-request-id header
     turn: int
     status: str                      # OK | QUERY_UNDERSTANDING_FAILED | CLARIFICATION_NEEDED | ERROR
     language: str
@@ -167,4 +186,5 @@ class QueryResponse(BaseModel):
     grounded: bool = True
     data_quality: DataQualityInfo = Field(default_factory=DataQualityInfo)
     agent_trace: list[str] = Field(default_factory=list)
+    node_trace: list[NodeTraceItem] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

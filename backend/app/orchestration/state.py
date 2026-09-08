@@ -27,6 +27,7 @@ from app.models.routing import RouteResult
 from app.models.safety import SafetyGuardResult
 from app.models.session import SessionContext
 from app.models.suitability import SuitabilityResult
+from app.observability.trace import NodeTrace
 from app.reasoning.arbitration import ArbitrationOutput
 from app.reasoning.fusion import FusionResult
 from app.risk.engine import RiskEngineInput
@@ -41,6 +42,7 @@ STATUS_ERROR = "ERROR"
 class OrcaGraphState(TypedDict, total=False):
     # ---- inputs ----
     session_id: str
+    request_id: str
     message: str
     now: datetime
     coordinate_override: Coordinate | None
@@ -87,4 +89,5 @@ class OrcaGraphState(TypedDict, total=False):
 
     # ---- diagnostics (additive) ----
     agent_trace: Annotated[list[str], operator.add]
+    node_trace: Annotated[list[NodeTrace], operator.add]
     errors: Annotated[list[str], operator.add]

@@ -562,7 +562,8 @@ button { font-family: inherit; }
 /* ---------- agent activity ---------- */
 .activity__lead { margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--orca-faint); }
 .activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.activity-step { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; font-size: 0.8rem; padding: 0.25rem 0.3rem; }
+.activity-step { display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.5rem; align-items: center; font-size: 0.8rem; padding: 0.25rem 0.3rem; }
+.activity-step__ms { font-size: 0.68rem; color: var(--orca-faint); font-variant-numeric: tabular-nums; }
 .activity-step__mark { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--orca-faint); flex: none; }
 .activity-step--done .activity-step__mark { background: var(--ok); }
 .activity-step--skipped .activity-step__mark { background: transparent; border: 1px solid var(--orca-faint); }
@@ -571,6 +572,8 @@ button { font-family: inherit; }
 .activity-step--skipped { opacity: 0.6; }
 .activity-step__state { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orca-muted); }
 .activity__foot { margin: 0.4rem 0 0; font-size: 0.7rem; color: var(--orca-faint); }
+.activity__corr { margin: 0.3rem 0 0; font-size: 0.68rem; color: var(--orca-faint); overflow-wrap: anywhere; }
+.activity__corr code { font-size: 0.66rem; }
 
 /* ---------- provenance ---------- */
 .prov__lead { margin: 0; font-size: 0.76rem; color: var(--orca-muted); }

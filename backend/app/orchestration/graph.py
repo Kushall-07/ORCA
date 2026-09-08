@@ -21,6 +21,7 @@ from functools import partial
 
 from langgraph.graph import END, START, StateGraph
 
+from app.observability.trace import trace_node
 from app.orchestration import nodes
 from app.orchestration.deps import OrcaDeps
 from app.orchestration.state import STATUS_CLARIFY, STATUS_QU_FAILED, OrcaGraphState
@@ -60,7 +61,10 @@ def build_orca_graph(deps: OrcaDeps):
     g = StateGraph(OrcaGraphState)
 
     def add(name: str, fn) -> None:  # type: ignore[no-untyped-def]
-        g.add_node(name, partial(fn, deps))
+        # Bind deps, then wrap with the observability tracer. The tracer only
+        # appends one structured node_trace record; it never alters the node's
+        # own state update or its agent_trace token.
+        g.add_node(name, trace_node(name, partial(fn, deps)))
 
     add("understand", nodes.understand)
     add("normalize", nodes.normalize)

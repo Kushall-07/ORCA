@@ -94,21 +94,53 @@ const STAGES: { token: string; label: string }[] = [
 
 type StageState = "done" | "skipped" | "error" | "pending";
 
+// Graph node names in node_trace vs the frozen agent_trace stage tokens.
+const NODE_TOKEN: Record<string, string> = {
+  collect_weather: "weather",
+  collect_ocean: "ocean",
+  collect_gis: "gis",
+};
+
+function tokenForNode(nodeName: string): string {
+  return NODE_TOKEN[nodeName] ?? nodeName;
+}
+
 export function AgentActivity({ resp }: { resp: QueryResponse }) {
   const { t } = useI18n();
   const trace = resp.agent_trace ?? [];
+  const nodeTrace = resp.node_trace ?? [];
+  const byToken = new Map(
+    nodeTrace.map((n) => [tokenForNode(n.node), n] as const),
+  );
+  const haveTiming = nodeTrace.some(
+    (n) => typeof n.duration_ms === "number",
+  );
+
   const stateFor = (token: string): StageState => {
+    const nt = byToken.get(token);
+    if (nt) {
+      if (nt.status === "FAILED") return "error";
+      if (nt.status === "SKIPPED" || nt.skipped) return "skipped";
+      if (nt.status === "COMPLETED") return "done";
+    }
+    // fall back to the flat token list
     if (trace.includes(`${token}:error`)) return "error";
     if (trace.includes(token)) return "done";
     if (trace.some((x) => x.startsWith(`${token}:skip`))) return "skipped";
     return "pending";
   };
+
   const label: Record<StageState, string> = {
     done: t("activity.done"),
     skipped: t("activity.skipped"),
-    error: "error",
+    error: t("activity.failed"),
     pending: t("activity.pending"),
   };
+
+  const totalMs = nodeTrace.reduce(
+    (sum, n) => sum + (typeof n.duration_ms === "number" ? n.duration_ms : 0),
+    0,
+  );
 
   return (
     <Panel title={t("panel.activity")}>
@@ -116,18 +148,32 @@ export function AgentActivity({ resp }: { resp: QueryResponse }) {
       <ol className="activity-list">
         {STAGES.map((s) => {
           const st = stateFor(s.token);
+          const nt = byToken.get(s.token);
+          const ms = nt && typeof nt.duration_ms === "number" ? nt.duration_ms : null;
           return (
             <li key={s.token} className={`activity-step activity-step--${st}`}>
               <span className="activity-step__mark" aria-hidden />
               <span className="activity-step__label">{s.label}</span>
+              {ms !== null && st !== "skipped" && (
+                <span className="activity-step__ms">{ms.toFixed(1)} ms</span>
+              )}
               <span className="activity-step__state">{label[st]}</span>
             </li>
           );
         })}
       </ol>
-      <p className="activity__foot">
-        Execution status only — ORCA does not report per-stage timings.
-      </p>
+      {haveTiming ? (
+        <p className="activity__foot">
+          {t("activity.total")}: {totalMs.toFixed(0)} ms · {t("activity.timingMeasured")}
+        </p>
+      ) : (
+        <p className="activity__foot">{t("activity.timingUnavailable")}</p>
+      )}
+      {resp.request_id && (
+        <p className="activity__corr">
+          {t("activity.correlation")}: <code>{resp.request_id}</code>
+        </p>
+      )}
     </Panel>
   );
 }

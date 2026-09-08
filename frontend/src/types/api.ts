@@ -182,8 +182,30 @@ export interface ProvenanceGraph {
   edges?: ProvEdge[];
 }
 
+// Phase 7 observability. `agent_trace` (the flat token list) is unchanged; this
+// is an additive, structured companion. Optional so older responses still type.
+export type NodeStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "SKIPPED"
+  | "FAILED";
+
+export interface NodeTraceItem {
+  node: string;
+  status: NodeStatus | string;
+  started_at?: string | null;
+  ended_at?: string | null;
+  duration_ms?: number | null; // real measured elapsed time, never fabricated
+  skipped?: boolean;
+  error_type?: string | null;
+  source?: string | null;
+  record_count?: number | null;
+}
+
 export interface QueryResponse {
   session_id: string;
+  request_id?: string;
   turn: number;
   status: QueryStatus;
   language: LanguageCode | string;
@@ -207,6 +229,7 @@ export interface QueryResponse {
   grounded: boolean;
   data_quality: DataQualityInfo;
   agent_trace: string[];
+  node_trace?: NodeTraceItem[];
   errors: string[];
 }
 

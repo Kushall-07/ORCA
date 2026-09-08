@@ -7,7 +7,9 @@ trace; they become a structured ``status="ERROR"`` response.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+import uuid
+
+from fastapi import APIRouter, Request
 
 from app.core.logging import get_logger
 from app.models.api import QueryRequest, QueryResponse
@@ -35,8 +37,16 @@ def set_pipeline(pipeline) -> None:  # test hook
     _pipeline = pipeline
 
 
+def _request_id(request: Request) -> str:
+    """The correlation id set by the middleware, or a fresh one as a fallback."""
+    rid = getattr(request.state, "request_id", None)
+    return rid or str(uuid.uuid4())
+
+
 @router.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest) -> QueryResponse:
+async def query(request: QueryRequest, http_request: Request) -> QueryResponse:
+    request_id = _request_id(http_request)
+
     coordinate = None
     if request.latitude is not None and request.longitude is not None:
         try:
@@ -44,6 +54,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         except ValueError:
             return QueryResponse(
                 session_id=request.session_id or "sess-unknown",
+                request_id=request_id,
                 turn=0,
                 status="ERROR",
                 language="en",
@@ -56,15 +67,17 @@ async def query(request: QueryRequest) -> QueryResponse:
         return await get_pipeline().run(
             message=request.message,
             session_id=request.session_id,
+            request_id=request_id,
             coordinate=coordinate,
             date_hint=request.date_hint,
             stakeholder=request.stakeholder,
             language=request.language,
         )
     except Exception as exc:  # noqa: BLE001 - defence in depth
-        logger.exception("query endpoint error")
+        logger.exception("query endpoint error", extra={"request_id": request_id})
         return QueryResponse(
             session_id=request.session_id or "sess-unknown",
+            request_id=request_id,
             turn=0,
             status="ERROR",
             language="en",

@@ -31,6 +31,7 @@ export function ReportView({
           <h1 className="report__h1">ORCA Marine Assessment</h1>
           <p className="report__meta">
             {now} · session {resp.session_id} · turn {resp.turn}
+            {resp.request_id ? ` · request ${resp.request_id}` : ""}
           </p>
 
           <section className="report__section">

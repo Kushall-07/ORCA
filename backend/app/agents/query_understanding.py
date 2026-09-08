@@ -334,10 +334,24 @@ def _extract_places(message: str, *, is_route: bool) -> tuple[str | None, str | 
         origin = m.group(1).strip().rstrip(" .")
         # drop trailing filler words the regex may have swallowed
         origin = re.sub(r"\s+(now|today|tomorrow|the|please|harbour|harbor|port|coast|area)$", "", origin).strip()
+    # For a route request phrased only as a destination ("route to Kochi",
+    # "navigate to Goa"), take the "to X" place as the destination so a prior
+    # turn's origin can be inherited from the session.
+    if is_route and destination is None:
+        m = re.search(r"\b(?:route|way|path|sail|navigate|go|head)\w*\s+to\s+([a-z][a-z\-]{2,}(?: [a-z\-]+)?)", text)
+        if m is None:
+            m = re.search(r"\bto\s+([a-z][a-z\-]{2,}(?: [a-z\-]+)?)\??\s*(?:safe|now|today|tomorrow)?\s*$", text)
+        if m:
+            candidate = re.sub(
+                r"\s+(now|today|tomorrow|the|please|safe|safely|harbour|harbor|port|coast|area)$",
+                "", m.group(1).strip(),
+            ).strip()
+            if candidate and candidate != origin:
+                destination = candidate
     # any gazetteer name mentioned
     for name in gazetteer.known_names():
         if name in text:
-            if origin is None:
+            if origin is None and name != destination:
                 origin = name
             elif is_route and destination is None and name != origin:
                 destination = name

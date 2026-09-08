@@ -76,6 +76,10 @@ async def correlation_middleware(
     """Attach a request id, propagate an optional session id, and log timing."""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     session_id = request.headers.get("x-session-id")
+    # Make the correlation id available to route handlers so the same value is
+    # threaded through the pipeline and echoed in the response body.
+    request.state.request_id = request_id
+    request.state.session_id = session_id
     start = time.perf_counter()
     response = await call_next(request)
     duration_ms = round((time.perf_counter() - start) * 1000, 2)

@@ -91,6 +91,11 @@ export type StringKey =
   | "activity.done"
   | "activity.skipped"
   | "activity.pending"
+  | "activity.failed"
+  | "activity.timingMeasured"
+  | "activity.timingUnavailable"
+  | "activity.correlation"
+  | "activity.total"
   | "explanation.why"
   | "explanation.disclaimer"
   | "map.layers"
@@ -213,6 +218,11 @@ const en: Table = {
   "activity.done": "done",
   "activity.skipped": "skipped",
   "activity.pending": "not run",
+  "activity.failed": "failed",
+  "activity.timingMeasured": "Per-stage timing is measured server-side (elapsed, not simulated).",
+  "activity.timingUnavailable": "Execution status only — no per-stage timing in this response.",
+  "activity.correlation": "Correlation ID",
+  "activity.total": "Total measured",
   "explanation.why": "Why this decision?",
   "explanation.disclaimer":
     "ORCA is a decision-support system. Verify official marine and weather advisories before operational action.",
@@ -336,6 +346,11 @@ const hi: Table = {
   "activity.done": "पूर्ण",
   "activity.skipped": "छोड़ा गया",
   "activity.pending": "नहीं चला",
+  "activity.failed": "विफल",
+  "activity.timingMeasured": "प्रति-चरण समय सर्वर पर मापा गया (वास्तविक, अनुकरण नहीं)।",
+  "activity.timingUnavailable": "केवल निष्पादन स्थिति — इस उत्तर में प्रति-चरण समय नहीं।",
+  "activity.correlation": "सहसंबंध आईडी",
+  "activity.total": "कुल मापा गया",
   "explanation.why": "यह निर्णय क्यों?",
   "explanation.disclaimer":
     "ORCA एक निर्णय-समर्थन प्रणाली है। परिचालन कार्रवाई से पहले आधिकारिक समुद्री और मौसम सलाह की पुष्टि करें।",
@@ -459,6 +474,11 @@ const kn: Table = {
   "activity.done": "ಪೂರ್ಣ",
   "activity.skipped": "ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
   "activity.pending": "ನಡೆದಿಲ್ಲ",
+  "activity.failed": "ವಿಫಲ",
+  "activity.timingMeasured": "ಪ್ರತಿ-ಹಂತದ ಸಮಯವನ್ನು ಸರ್ವರ್‌ನಲ್ಲಿ ಅಳೆಯಲಾಗಿದೆ (ನೈಜ, ಅನುಕರಣೆ ಅಲ್ಲ).",
+  "activity.timingUnavailable": "ಕಾರ್ಯಗತಿ ಸ್ಥಿತಿ ಮಾತ್ರ — ಈ ಪ್ರತಿಕ್ರಿಯೆಯಲ್ಲಿ ಪ್ರತಿ-ಹಂತದ ಸಮಯ ಇಲ್ಲ.",
+  "activity.correlation": "ಸಂಬಂಧ ಐಡಿ",
+  "activity.total": "ಒಟ್ಟು ಅಳತೆ",
   "explanation.why": "ಈ ನಿರ್ಣಯ ಏಕೆ?",
   "explanation.disclaimer":
     "ORCA ಒಂದು ನಿರ್ಣಯ-ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ. ಕಾರ್ಯಾಚರಣೆಯ ಮೊದಲು ಅಧಿಕೃತ ಸಮುದ್ರ ಮತ್ತು ಹವಾಮಾನ ಸಲಹೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",

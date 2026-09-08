@@ -20,7 +20,15 @@ safety thresholds, or the final decision).
 
 ## Status
 
-**Phase 6 complete — operator frontend.** A React/TypeScript workspace consumes
+**Phase 7 complete — demo hardening & observability.** The pipeline is unchanged
+semantically; a thin observability layer now records a structured, real-timed
+per-node execution trace (`node_trace`) alongside the untouched `agent_trace`, a
+correlation `request_id` is threaded end to end (header + body + logs), and a
+deterministic **Scenario Engine** (`app/scenario/`, `python -m app.scenario.run`)
+runs 16 judge-ready demo/regression scenarios through the *real* LangGraph
+pipeline with offline fixtures. See [Phase 7](#phase-7--demo-hardening--observability).
+
+**Phase 6 — operator frontend.** A React/TypeScript workspace consumes
 the real `POST /query` contract and presents the frozen pipeline
 (chat → decision → risk → evidence → provenance → conflicts → alerts → map).
 The frontend is presentation only: it never computes safety, risk, geofencing or
@@ -158,16 +166,49 @@ change a safety outcome**; the whole pipeline also runs with no LLM at all
   suggested questions, the default map layers and the emphasised tab. It is
   echoed to `/query` as `stakeholder`, recorded by the backend, and never
   changes reasoning.
-- **15 component tests** (`frontend/src/test/`, Vitest + Testing Library, API
+- **17 component tests** (`frontend/src/test/`, Vitest + Testing Library, API
   mocked): shell load, query round-trip, decision / risk / evidence / conflict /
   provenance / alerts / activity rendering, `NO_SAFE_RECOMMENDATION`, structured
   no-route reason, backend-error and loading states, language and stakeholder
-  switching, and "no fabricated data when a field is missing".
+  switching, "no fabricated data when a field is missing", and the Phase 7
+  `node_trace` timing view (with a status-only fallback).
+
+### Phase 7 — demo hardening & observability
+
+- **`observability/trace.py`** — `trace_node` wraps each *bound* graph node and
+  records one `NodeTrace` (typed status `PENDING/RUNNING/COMPLETED/SKIPPED/FAILED`,
+  wall-clock start/end, **real measured `duration_ms`** via `time.perf_counter`,
+  error type, optional data source / record count). It never changes a node's
+  state update or its `agent_trace` token. The frozen flat `agent_trace` the
+  frontend maps onto the 19 stages is **byte-for-byte unchanged**;
+  `QueryResponse.node_trace` is a new, additive, structured companion.
+- **Correlation id** — `POST /query` reads `x-request-id` (or generates a UUID),
+  threads it through `OrcaPipeline.run(request_id=…)` into the graph state, every
+  per-node log line, and the response body + `x-request-id` response header.
+- **`scenario/`** — a deterministic Scenario Engine. `Scenario` / `ExpectedBehavior`
+  are typed Pydantic models; `fixtures.py` holds clearly-labelled offline
+  fixtures (`scenario-fixture:*` sources); `runner.py` executes each scenario
+  through the **real** `OrcaPipeline` and asserts *structural* behaviour against
+  the public `QueryResponse`; `library.py` defines the 16 required scenarios.
+  CLI: `python -m app.scenario.run --list | --all | --scenario <id> | --perf <id>`.
+- **Performance** — `--perf` runs a scenario N times and reports
+  min / median / p95 / max from the real `node_trace` durations (no sleeps).
+  The deterministic core is < 25 ms p95; a full *production* request is dominated
+  by Open-Meteo (two HTTP calls) and, when configured, Groq — `node_trace` shows
+  exactly where the wall-clock goes.
+- **Frontend** — the Activity panel now shows real per-stage `duration_ms` and
+  the correlation id when `node_trace` is present, and falls back to
+  status-only (no invented timings) when it is not.
 
 **SST / chlorophyll status.** The SIH problem statement mentions satellite SST
 and chlorophyll. ORCA does **not** ingest them today. The frontend has disabled
 layer toggles and a documented placeholder so the capability can be added later;
 no SST/chlorophyll values are shown or implied anywhere.
+
+**Proxy signals.** Thunderstorm/lightning is a **WMO-code proxy**, never
+certified strike detection. Cyclone is a **model-derived proxy** from pressure /
+wind, never an authoritative real-time track. The PFZ layer is an **official
+INCOIS reference snapshot**, never an ORCA-derived suitability output.
 
 Data provenance & attribution: [`docs/data-sources.md`](docs/data-sources.md).
 
@@ -284,6 +325,14 @@ The `frontend` service runs the Vite dev server (`dev` stage of
 `frontend/Dockerfile`) with hot reload. The `prod` stage builds static assets
 served by nginx for deployment.
 
+> **Docker validation status (Phase 7).** The Docker CLI was **not available** in
+> the Phase 7 development environment, so `docker compose config` / `up --build`
+> were **not executed**. The compose file was validated structurally by
+> inspection: four services (`postgres`, `redis`, `backend`, `frontend`),
+> health-checks on both datastores, `backend` waiting for healthy `postgres` /
+> `redis`, all four ports mapped, and all referenced Dockerfiles + `init.sql`
+> present. Nothing here claims a runtime Docker E2E was performed.
+
 ### Option B — run each part on the host
 
 **Backend**
@@ -327,7 +376,7 @@ Set `VITE_API_URL` if the backend is not at `http://localhost:8000`.
 | `GET /` | service banner | JSON `{project, status, message, docs}` |
 | `GET /health` | liveness | `200 {"status":"healthy", ...}` — no I/O |
 | `GET /health/ready` | readiness | `200` always; body `status` is `ok` or `degraded` with a per-dependency breakdown for `postgres`, `postgis`, `redis`. Connection strings are never exposed. |
-| `POST /query` | conversational assessment | Body `{session_id?, message, latitude?, longitude?, date_hint?, stakeholder?, language?}` → Pydantic `QueryResponse`: `answer`, `language`, `intent`, `stakeholder` (echoed), `location`, `destination`, `decision` (status + safety status + reasons), `risk`, `suitability`, `route` (incl. `waypoints`, `origin`, `destination`, `hard_geofence_violations`), `gis` summary, `reference` (PFZ / RSMC), `alerts`, `conflicts`, `evidence`, `provenance` (node/edge graph), `data_quality`, `agent_trace`, `grounded`, `status` (`OK` / `CLARIFICATION_NEEDED` / `QUERY_UNDERSTANDING_FAILED` / `ERROR`). `stakeholder` and `language` are UX hints — `stakeholder` never changes reasoning; `language` only fills `UNKNOWN` detection. Never returns a stack trace. Needs `GROQ_API_KEY` for LLM phrasing; runs deterministically without one. |
+| `POST /query` | conversational assessment | Body `{session_id?, message, latitude?, longitude?, date_hint?, stakeholder?, language?}`; optional `x-request-id` header. → Pydantic `QueryResponse`: `request_id` (also returned as the `x-request-id` header), `answer`, `language`, `intent`, `stakeholder` (echoed), `location`, `destination`, `decision` (status + safety status + reasons), `risk`, `suitability`, `route` (incl. `waypoints`, `origin`, `destination`, `hard_geofence_violations`), `gis` summary, `reference` (PFZ / RSMC), `alerts`, `conflicts`, `evidence`, `provenance` (node/edge graph), `data_quality`, `agent_trace` (frozen flat token list), `node_trace` (Phase 7: structured, real-timed per-node execution), `grounded`, `status` (`OK` / `CLARIFICATION_NEEDED` / `QUERY_UNDERSTANDING_FAILED` / `ERROR`). `stakeholder` and `language` are UX hints — `stakeholder` never changes reasoning; `language` only fills `UNKNOWN` detection. Never returns a stack trace. Needs `GROQ_API_KEY` for LLM phrasing; runs deterministically without one. |
 | `GET /gis/layers` · `GET /gis/layers/{id}` | static map layers | Read-only. Manifest (only layers that have data) and EPSG:4326 GeoJSON for `coastline` / `eez` / `protected_areas`, each carrying `orca_meta` provenance. No pipeline. |
 | `GET /reference/registry` · `GET /reference/pfz` · `GET /reference/rsmc` | official reference snapshots | Read-only. INCOIS PFZ image + RSMC/IMD bulletin PDF and their metadata — labelled as reference snapshots, never as ORCA output. |
 
@@ -339,12 +388,22 @@ Set `VITE_API_URL` if the backend is not at `http://localhost:8000`.
 cd backend && pytest
 ```
 
-**394 backend tests + 15 frontend tests**, all deterministic; external APIs and
+**424 backend tests + 17 frontend tests**, all deterministic; external APIs and
 the LLM are mocked, no live network. Frontend tests (`cd frontend && npm test`)
 mock the API client and cover shell load, query round-trip, every intelligence
 panel, `NO_SAFE_RECOMMENDATION`, structured no-route reason, error / loading
-states, language + stakeholder switching, and "no fabricated data when a field
-is missing".
+states, language + stakeholder switching, "no fabricated data when a field
+is missing", and the Phase 7 timing view.
+
+Run the demo scenario suite (also part of `pytest`):
+
+```bash
+cd backend
+python -m app.scenario.run --list           # the 16 scenarios
+python -m app.scenario.run --all             # PASS/FAIL summary, exit 0/1
+python -m app.scenario.run --scenario 04_maritime_route
+python -m app.scenario.run --perf 01_fisherman_safe --repeat 30   # min/median/p95/max
+```
 
 - Phase 1 — `GET /`, `GET /health`, `GET /health/ready` (ok + degraded paths),
   datastore probes monkeypatched.
@@ -387,7 +446,16 @@ is missing".
   404, reference registry, PFZ content-type) and additions to
   `test_query_endpoint.py` (map + reference fields exposed, route waypoint
   geometry, `hard_geofence_violations == 0`). Frontend: `frontend/src/test/`
-  (Vitest, `npm test`) — 15 component tests, API client mocked.
+  (Vitest, `npm test`) — 17 component tests, API client mocked.
+- Phase 7 — `test_observability.py` (node_trace populated + real timing,
+  `agent_trace` unchanged, skipped/failed nodes recorded, request_id threaded,
+  error path graceful), `test_scenarios.py` (all 16 demo scenarios green through
+  the real pipeline; runner/CLI/fixture sanity), `test_phase7_api_contract.py`
+  (request_id in body + header, every Phase 6 field retained, `extra="forbid"`
+  held), `test_phase7_matrices.py` (data-failure LIVE/CACHE/DEMO/MISSING,
+  same-tier + PFZ-vs-derived conflict preservation, deterministic-chain
+  reproducibility over repeats, provenance completeness for every valid
+  response).
 
 | Phase | Scope |
 |---|---|
@@ -396,7 +464,8 @@ is missing".
 | **3 — done** | Routing hardening: 10-step `plan_route` pipeline, origin **and** destination hard-geofence rejection before A*, grid safety (OOB = blocked, malformed-config rejection), A* search budget, expanded independent route validator (bounds / navigability / contiguity / corner-cut / endpoint match), `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, `grid_path_cost` vs approximate `total_distance_m`. 215 tests |
 | **4 — done** | Data agents (Weather / Oceanographic / GIS & Geofencing), LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
 | **5 — done** | LangGraph 19-node pipeline, Query Understanding Agent (Groq + rule fallback, schema-validated, prompt-injection-hardened), `HierarchyArbitrator`, Conflict Detection, conditional Route Agent + Safety-Guard re-check, Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query`. 387 tests |
-| **6 — done** | Operator frontend: chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers (coastline / EEZ / protected areas / route / risk) via read-only `/gis/*` + `/reference/*` endpoints, data-provenance legend, en/hi/kn UI, stakeholder context (UX only), print/export report. Additive backward-compatible response fields (`location`, `destination`, `gis`, `reference`, `route.waypoints/origin/destination/hard_geofence_violations`, echoed `stakeholder`). 394 backend tests + 15 frontend tests |
-| 7 _(planned)_ | Demo hardening, deeper provenance, satellite SST / chlorophyll ingestion |
+| **6 — done** | Operator frontend: chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers (coastline / EEZ / protected areas / route / risk) via read-only `/gis/*` + `/reference/*` endpoints, data-provenance legend, en/hi/kn UI, stakeholder context (UX only), print/export report. Additive backward-compatible response fields (`location`, `destination`, `gis`, `reference`, `route.waypoints/origin/destination/hard_geofence_violations`, echoed `stakeholder`) |
+| **7 — done** | Demo hardening & observability: structured real-timed `node_trace` (additive to the unchanged `agent_trace`), end-to-end `request_id` correlation (header + body + logs), deterministic **Scenario Engine** (`python -m app.scenario.run`) with 16 judge scenarios executed through the real pipeline, `--perf` min/median/p95/max from measured timings, data-failure / conflict / determinism / provenance matrices, frontend timing view. Reasoning semantics unchanged. **424 backend tests + 17 frontend tests** |
+| 8 _(planned)_ | Deeper provenance exports, satellite SST / chlorophyll ingestion, regional spatial risk aggregation |
 
 See [`docs/architecture.md`](docs/architecture.md) for detail.

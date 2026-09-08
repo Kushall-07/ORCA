@@ -4,6 +4,7 @@ public :class:`QueryResponse`. No internal exception ever escapes to the caller.
 
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -16,6 +17,7 @@ from app.models.api import (
     EvidenceItem,
     GisSummary,
     LocationInfo,
+    NodeTraceItem,
     ProtectedAreaInfo,
     QueryResponse,
     ReferenceInfo,
@@ -43,6 +45,7 @@ class OrcaPipeline:
         *,
         message: str,
         session_id: str | None = None,
+        request_id: str | None = None,
         coordinate: Coordinate | None = None,
         date_hint: str | None = None,
         stakeholder: str | None = None,
@@ -50,8 +53,10 @@ class OrcaPipeline:
         now: datetime | None = None,
     ) -> QueryResponse:
         session_id = session_id or f"sess-{uuid.uuid4().hex[:12]}"
+        request_id = request_id or f"req-{uuid.uuid4().hex}"
         initial: dict = {
             "session_id": session_id,
+            "request_id": request_id,
             "message": message,
             "now": now or datetime.now(timezone.utc),
             "coordinate_override": coordinate,
@@ -59,14 +64,24 @@ class OrcaPipeline:
             "stakeholder": stakeholder,
             "language_hint": language,
             "agent_trace": [],
+            "node_trace": [],
             "errors": [],
         }
+        started = time.perf_counter()
+        logger.info(
+            "pipeline start",
+            extra={"request_id": request_id, "session_id": session_id},
+        )
         try:
             final = await self.graph.ainvoke(initial)
         except Exception as exc:  # noqa: BLE001 - never leak a stack trace
-            logger.exception("ORCA pipeline crashed")
+            logger.exception(
+                "ORCA pipeline crashed",
+                extra={"request_id": request_id, "session_id": session_id},
+            )
             return QueryResponse(
                 session_id=session_id,
+                request_id=request_id,
                 turn=self.deps.session_store.get(session_id).turn_count + 1,
                 status="ERROR",
                 language=Language.EN.value,
@@ -74,10 +89,19 @@ class OrcaPipeline:
                 answer="ORCA encountered an internal error and could not complete the assessment.",
                 errors=[f"{type(exc).__name__}"],
             )
-        return _project(session_id, final, self.deps)
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        logger.info(
+            "pipeline complete",
+            extra={
+                "request_id": request_id,
+                "session_id": session_id,
+                "duration_ms": duration_ms,
+            },
+        )
+        return _project(session_id, request_id, final, self.deps)
 
 
-def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
+def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
     u = state.get("understanding")
     decision = state.get("decision")
     risk = state.get("risk_result")
@@ -261,8 +285,16 @@ def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
         warnings=list(fabric.warnings) if fabric is not None else [],
     )
 
+    node_trace = [
+        NodeTraceItem(**rec.as_item())
+        for rec in sorted(
+            state.get("node_trace", []), key=lambda r: r.started_at
+        )
+    ]
+
     return QueryResponse(
         session_id=session_id,
+        request_id=request_id,
         turn=deps.session_store.get(session_id).turn_count,
         status=status,
         language=language,
@@ -286,6 +318,7 @@ def _project(session_id: str, state: dict, deps: OrcaDeps) -> QueryResponse:
         grounded=(expl.grounded if expl is not None else True),
         data_quality=dq,
         agent_trace=list(state.get("agent_trace", [])),
+        node_trace=node_trace,
         errors=list(state.get("errors", [])),
     )
 

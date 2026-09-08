@@ -173,6 +173,33 @@ describe("ORCA workspace", () => {
     expect(routeStep?.className).toContain("activity-step--skipped");
   });
 
+  it("shows measured per-stage timing and the correlation id from node_trace", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+    await userEvent.click(screen.getByRole("tab", { name: /activity/i }));
+    // real duration_ms rendered next to a completed stage
+    const fabricStep = screen.getByText("Spatial-temporal fabric").closest(".activity-step");
+    expect(fabricStep?.textContent).toMatch(/2\.4 ms/);
+    // measured-timing note, not a "no timings" disclaimer
+    expect(screen.getByText(/measured server-side/i)).toBeInTheDocument();
+    // correlation id surfaced
+    expect(screen.getByText(/req-web-test-1/)).toBeInTheDocument();
+  });
+
+  it("falls back to status-only activity when node_trace is absent", async () => {
+    postQuery.mockResolvedValue(makeResponse({ node_trace: undefined }));
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+    await userEvent.click(screen.getByRole("tab", { name: /activity/i }));
+    expect(screen.getByText(/no per-stage timing in this response/i)).toBeInTheDocument();
+    // agent_trace still drives status
+    const routeStep = screen.getByText("Route agent (A*)").closest(".activity-step");
+    expect(routeStep?.className).toContain("activity-step--skipped");
+  });
+
   it("shows an error bubble with retry when the backend fails", async () => {
     postQuery.mockRejectedValue(new ApiError("boom", "network"));
     render(<App />);

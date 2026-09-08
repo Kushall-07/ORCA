@@ -535,10 +535,71 @@ proxy"). **Agent activity** maps `agent_trace` tokens onto the frozen stage list
 placeholder only; no values shown or implied.
 
 **Tests.** `frontend/src/test/` (Vitest + Testing Library, API client mocked) —
-15 component tests covering shell load, query round-trip, every panel,
+17 component tests covering shell load, query round-trip, every panel,
 `NO_SAFE_RECOMMENDATION`, structured no-route reason, error / loading states,
-language + stakeholder switching, and "no fabricated data when a field is
-missing". Backend: `test_gis_endpoints.py` + `test_query_endpoint.py` additions.
+language + stakeholder switching, "no fabricated data when a field is missing",
+and the Phase 7 timing view. Backend: `test_gis_endpoints.py` +
+`test_query_endpoint.py` additions.
+
+---
+
+## 6e. Demo hardening & observability — Phase 7 (implemented)
+
+Phase 7 adds reliability and demonstrability *around* the pipeline. **No
+reasoning semantics change.**
+
+**Execution trace (`observability/trace.py`).** `trace_node(name, bound)` wraps
+each dependency-bound graph node. On every invocation it appends one frozen
+`NodeTrace`:
+
+| field | meaning |
+|---|---|
+| `node` | graph node name |
+| `status` | `PENDING` / `RUNNING` / `COMPLETED` / `SKIPPED` / `FAILED` (derived from the node's own `agent_trace` token, e.g. `weather:skip`) |
+| `started_at` / `ended_at` | wall-clock timestamps |
+| `duration_ms` | **real** elapsed time (`time.perf_counter`), never fabricated |
+| `skipped` | node returned a `:skip` token |
+| `error_type` | on `FAILED` |
+| `source` / `record_count` | optional, when trivially available from the update |
+
+`OrcaGraphState` gains `node_trace: Annotated[list[NodeTrace], operator.add]`
+(same additive reducer as `agent_trace`, so parallel branches concatenate).
+`_project` sorts by `started_at` and emits `QueryResponse.node_trace`. The flat
+`agent_trace` token list the frontend maps onto the 19 stages is **unchanged**.
+
+**Correlation id.** The HTTP middleware already minted `x-request-id`; Phase 7
+stores it on `request.state`, the `/query` handler passes it to
+`OrcaPipeline.run(request_id=…)`, it enters `OrcaGraphState`, is stamped on every
+per-node log line, and is returned both in `QueryResponse.request_id` and the
+`x-request-id` response header. No secret is ever logged.
+
+**Scenario Engine (`scenario/`).**
+
+| module | role |
+|---|---|
+| `models.py` | `Scenario`, `ExpectedBehavior` (all-optional structural assertions), `ScenarioResult` / `ScenarioReport` |
+| `fixtures.py` | offline `ScenarioWeather/Ocean/GisAgent` + hard-geofence / PFZ fixtures, all `scenario-fixture:*` labelled; `make_scenario_pipeline` builds a **real** `OrcaPipeline` with only the data agents faked |
+| `runner.py` | `run_scenario` / `run_all` execute turns through the real pipeline and check `ExpectedBehavior` against the public `QueryResponse` only; `perf_probe` repeats and summarises measured `node_trace` timings |
+| `library.py` | the 16 required scenarios (fisherman safe / hi / kn, route, dest-blocked, route-around, no-route, missing-data, PFZ reference, PFZ-vs-suitability conflict, thunderstorm proxy, cyclone proxy, multi-turn, prompt injection, coastal authority, disaster management) |
+| `run.py` | CLI: `--list` / `--all` / `--scenario <id>` / `--perf <id> --repeat N` / `--json` |
+
+Scenarios assert **structure** (intent, decision family, evidence presence,
+conflict preservation, provenance completeness), never brittle live values.
+Scenario 16 documents a known limitation: ORCA assesses one queried point, not a
+multi-region spatial risk aggregation.
+
+**Performance.** Measured, not simulated. The deterministic core (fixtures, no
+network, no LLM) is **< 25 ms p95** end-to-end. A production request's wall-clock
+is dominated by Open-Meteo (two HTTP calls) and, when configured, Groq;
+`node_trace` shows the real per-node split so a reviewer can see exactly where
+the time goes. There are no `sleep`s anywhere in the request path.
+
+**Deviation (minor, deliberate).** Two behaviour-preserving touches outside pure
+addition: (1) `graph.py` wraps each node with `trace_node` — no change to node
+order, state, or logic; (2) the QU rule-fallback parser's `_extract_places` now
+also recognises "route to X" / "navigate to X" as a destination so a prior
+turn's origin can be inherited (required for the multi-turn scenario). Neither
+touches any deterministic reasoning, safety, risk, geofence or routing code.
 
 ---
 
@@ -552,9 +613,10 @@ missing". Backend: `test_gis_endpoints.py` + `test_query_endpoint.py` additions.
 | 4 | ✅ Data agents (Weather, Oceanographic, GIS & Geofencing) with LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / Marine Regions EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
 | 5 | ✅ LangGraph orchestration (19-node typed graph), Query Understanding Agent (Groq + rule fallback, schema-validated, one retry), Evidence Arbitration (`HierarchyArbitrator`), Conflict Detection, Route Agent (conditional + guard re-check), Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query` |
 | 6 | ✅ Operator frontend (chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers via read-only `/gis/*` + `/reference/*`, data-provenance legend, en/hi/kn UI, stakeholder context, print/export). Additive backward-compatible response fields. Provenance graph + grounding + explanation + alerts were delivered in Phase 5. |
-| 7 | Demo hardening, deeper provenance / exports, satellite SST + chlorophyll ingestion |
-| 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
+| 7 | ✅ Demo hardening & observability: real-timed `node_trace` (additive to the frozen `agent_trace`), end-to-end `request_id` correlation, deterministic Scenario Engine (`python -m app.scenario.run`) with 16 scenarios through the real pipeline, `--perf` measurement (min/median/p95/max), data-failure / conflict / determinism / provenance matrices, structured logging fields, frontend timing view. Reasoning semantics unchanged. |
+| 8 | Deeper provenance exports, satellite SST + chlorophyll ingestion, regional spatial risk aggregation |
 
-Current status: **Phase 6 complete** (operator frontend against the real
-`POST /query`; 394 backend tests + 15 frontend tests passing). Next: Phase 7
-demo hardening and satellite EO ingestion.
+Current status: **Phase 7 complete** (demo hardening & observability; 424 backend
+tests + 17 frontend tests passing; 16/16 scenarios green through the real
+pipeline). Docker runtime E2E not executed — CLI unavailable in the dev
+environment; compose validated by inspection.
