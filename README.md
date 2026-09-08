@@ -20,9 +20,11 @@ safety thresholds, or the final decision).
 
 ## Status
 
-**Phase 4 complete — data ingestion + deterministic fusion.** No LLM anywhere.
-Phases 1–3 run with no network; Phase 4 adds real Open-Meteo ingestion (all
-tests mocked). What exists today:
+**Phase 5 complete — agentic reasoning pipeline.** LangGraph orchestrates
+Phases 2–4 into an end-to-end `POST /query`. The LLM (**Groq only**) is used in
+exactly two nodes — Query Understanding and Evidence & Explanation — and **cannot
+change a safety outcome**; the whole pipeline also runs with no LLM at all
+(deterministic fallbacks). All tests mocked, no live network. What exists today:
 
 *Phase 1 — infrastructure:*
 - FastAPI backend with `GET /`, `GET /health` (liveness) and `GET /health/ready`
@@ -85,13 +87,37 @@ tests mocked). What exists today:
   `FabricRecord`s and runs the Temporal Validity Gate; PFZ / RSMC references
   carried alongside, never merged.
 - **`reasoning/`** — Temporal Validity Gate (`VALID/STALE/INVALID/MISSING`,
-  configurable windows, never upgrades STALE), Spatial-Temporal Fusion
-  (candidates aligned by space + time + variable; conflicts **preserved**, no
-  averaging, no winner selection), Evidence Arbitration **interface** only.
+  never upgrades STALE), Spatial-Temporal Fusion (conflicts **preserved**, no
+  averaging), **Evidence Arbitration** (`HierarchyArbitrator` — deterministic
+  five-tier hierarchy; higher authority wins a disagreement, equal-authority
+  disagreement stays unresolved, never an LLM pick), **Conflict Detection**
+  (typed records; unresolved safety-critical ⇒ `NO_SAFE_RECOMMENDATION`).
 - **`scripts/ingest_static_gis.py`** — deterministic ingest of NE coastline,
-  Marine Regions EEZ v12, GEBCO GeoTIFF → git-tracked `data/static/*` (via
-  pyshp / tifffile, no GDAL). `scripts/load_postgis.py` loads them into `gis.*`.
-- **303 tests** (`backend/tests/`), all passing, all external APIs mocked.
+  Marine Regions EEZ v12, GEBCO GeoTIFF → git-tracked `data/static/*`.
+
+*Phase 5 — agentic pipeline (`backend/app/`):*
+- **`services/llm.py`** — `LlmClient` protocol; `GroqLlmClient` (JSON mode);
+  `StubLlmClient` for tests; `build_llm_client()` returns `None` without a key.
+- **`agents/query_understanding.py`** — NL → strict `QueryUnderstanding`
+  (`en/hi/kn` detection, intent, gazetteer origin/destination, date/time).
+  Groq path is schema-validated, retries once, then a deterministic rule parser
+  (`failed=True` ⇒ `QUERY_UNDERSTANDING_FAILED`). Prompt-injection-hardened.
+- **`orchestration/`** — 19-node LangGraph, typed `OrcaGraphState`, parallel
+  data collection, conditional edges (weather-only query never routes or scores
+  suitability). `OrcaPipeline` runs it; `POST /query` returns a Pydantic
+  `QueryResponse`.
+- **`agents/route.py`** — conditional Route Agent around the Phase 3 planner;
+  re-samples the finished route and re-runs the Safety Guard — a route can never
+  bypass the guard.
+- **`provenance/`** — Decision Provenance Graph (explicit nodes/edges, every
+  claim traces to the query) + numeric **grounding** (every number in the answer
+  must match provenance / a deterministic scalar, else regenerate → template).
+- **`agents/evidence_explanation.py`** — explains a decision it cannot change;
+  grounded; falls back to an i18n template.
+- **`alerts/engine.py`** — deterministic alerts; proxy signals labelled.
+- **`i18n/messages.py`** — en/hi/kn templates; numbers/units/source names consistent.
+- **`session/`** — in-memory 3–5 turn context inheritance.
+- **387 tests** (`backend/tests/`), all passing, all external APIs / the LLM mocked.
 
 Data provenance & attribution: [`docs/data-sources.md`](docs/data-sources.md).
 
@@ -138,7 +164,7 @@ lightning / cyclone / PFZ terminology rules are in
 
 | Layer | Choice |
 |---|---|
-| Backend | Python 3.11, FastAPI, Pydantic, LangGraph _(Phase 5)_, httpx, async SQLAlchemy + psycopg |
+| Backend | Python 3.11, FastAPI, Pydantic, LangGraph, Groq, httpx, async SQLAlchemy + psycopg |
 | Deterministic core | numpy, Shapely, pyproj (offline geometry / grid math — no network) |
 | LLM | **Groq** — the sole provider _(Phase 5)_ |
 | Datastores | PostgreSQL + **PostGIS**, **Redis** |
@@ -248,6 +274,7 @@ npm run build          # type-check + production build
 | `GET /` | service banner | JSON `{project, status, message, docs}` |
 | `GET /health` | liveness | `200 {"status":"healthy", ...}` — no I/O |
 | `GET /health/ready` | readiness | `200` always; body `status` is `ok` or `degraded` with a per-dependency breakdown for `postgres`, `postgis`, `redis`. Connection strings are never exposed. |
+| `POST /query` | conversational assessment | Body `{session_id?, message, latitude?, longitude?, date_hint?}` → Pydantic `QueryResponse`: `answer`, `language`, `intent`, `decision` (status + safety status + reasons), `risk`, `suitability`, `route`, `alerts`, `conflicts`, `evidence`, `provenance` (node/edge graph), `data_quality`, `agent_trace`, `grounded`, `status` (`OK` / `CLARIFICATION_NEEDED` / `QUERY_UNDERSTANDING_FAILED` / `ERROR`). Never returns a stack trace. Needs `GROQ_API_KEY` for LLM phrasing; runs deterministically without one. |
 
 ---
 
@@ -257,7 +284,7 @@ npm run build          # type-check + production build
 cd backend && pytest
 ```
 
-**303 tests**, all deterministic; external APIs mocked (`respx`), no live network:
+**387 tests**, all deterministic; external APIs and the LLM are mocked, no live network:
 
 - Phase 1 — `GET /`, `GET /health`, `GET /health/ready` (ok + degraded paths),
   datastore probes monkeypatched.
@@ -284,14 +311,26 @@ cd backend && pytest
   hard/soft/reference classification — against the real `data/static/` layers),
   `test_temporal_gate.py`, `test_fusion.py` (conflict preserved, no averaging),
   `test_fabric.py`, `test_reference_registry.py`, `test_mosdac.py` (non-blocking).
+- Phase 5 — `test_query_understanding.py` (en/hi/kn, intents, LLM schema +
+  retry + deterministic failure, prompt injection), `test_arbitration_hierarchy.py`
+  (deterministic five-tier, higher-authority wins, equal-authority disagreement
+  unresolved), `test_conflicts_and_alerts.py`, `test_provenance_grounding.py`
+  (traceability, supported numbers pass / unsupported rejected),
+  `test_explanation_agent.py` (template + LLM grounding fallback, cannot alter
+  the decision), `test_route_agent.py` (conditional, blocked, guard re-check),
+  `test_orchestration_graph.py` (compiles, conditional edges, parallel branches,
+  missing weather/marine ⇒ `NO_SAFE_RECOMMENDATION`), `test_session_multiturn.py`
+  (3–5 turns, language switch), `test_query_endpoint.py` (TestClient),
+  `test_phase5_e2e.py` (11 end-to-end scenarios), `test_phase5_invariants.py`
+  (no LLM import in the deterministic core — subprocess-checked).
 
 | Phase | Scope |
 |---|---|
 | **1 — done** | Docker, PostGIS, Redis, FastAPI, health endpoints, frontend + map shell |
 | **2 — done** | Deterministic core: domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation |
 | **3 — done** | Routing hardening: 10-step `plan_route` pipeline, origin **and** destination hard-geofence rejection before A*, grid safety (OOB = blocked, malformed-config rejection), A* search budget, expanded independent route validator (bounds / navigability / contiguity / corner-cut / endpoint match), `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, `grid_path_cost` vs approximate `total_distance_m`. 215 tests |
-| **4 — done** | Data agents (Weather / Oceanographic / GIS & Geofencing), LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry. 303 tests |
-| 5 _(planned)_ | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
+| **4 — done** | Data agents (Weather / Oceanographic / GIS & Geofencing), LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
+| **5 — done** | LangGraph 19-node pipeline, Query Understanding Agent (Groq + rule fallback, schema-validated, prompt-injection-hardened), `HierarchyArbitrator`, Conflict Detection, conditional Route Agent + Safety-Guard re-check, Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query`. 387 tests |
 | 6 _(planned)_ | Provenance graph, evidence records, grounding validation, explanation, alerts |
 | 7 _(planned)_ | Frontend: chat, risk heatmap, geofences, route, evidence / provenance / explanation panels |
 | 8 _(planned)_ | Testing + demo hardening |

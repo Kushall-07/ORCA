@@ -22,18 +22,26 @@ GRID = GridSpec(min_lat=12.80, min_lon=74.40, cell_size_deg=0.05, n_rows=8, n_co
 
 
 def test_invariant_1_llm_not_required_for_risk() -> None:
-    """No app.risk / app.policy / app.decision module imports an LLM client."""
-    forbidden = ("groq", "langgraph", "langchain", "openai", "anthropic")
-    offenders = [
-        name
-        for name in sys.modules
-        if name.startswith(("app.risk", "app.policy", "app.decision", "app.routing", "app.gis"))
-    ]
-    # The deterministic modules are importable and functional with nothing else loaded.
+    """No app.risk / app.policy / app.decision / app.routing / app.gis module
+    pulls in an LLM client. Checked in a fresh subprocess so the assertion is
+    unaffected by whatever else the test session has already imported."""
+    import subprocess
+
+    forbidden = ("groq", "langgraph", "langchain", "langchain_core", "openai", "anthropic")
+    code = (
+        "import sys;"
+        "import app.risk.engine, app.policy.safety_guard, app.decision.engine,"
+        " app.routing.planner, app.gis.operations;"
+        "bad=[m for m in sys.modules if m.split('.')[0] in " + repr(list(forbidden)) + "];"
+        "print('BAD' if bad else 'CLEAN', bad)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert out.startswith("CLEAN"), out
+    # still functional
     result = ENGINE.evaluate(RiskEngineInput(wave_height_m=1.0, wind_speed_ms=5.0))
     assert result.overall_score >= 0
-    assert not any(mod in sys.modules for mod in forbidden)
-    assert offenders  # sanity: the deterministic packages really are imported
 
 
 def test_invariant_2_missing_critical_data_cannot_be_allowed() -> None:

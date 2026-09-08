@@ -52,6 +52,14 @@ class Settings(BaseSettings):
 
     # ---- LLM provider (Groq is the sole provider; used from Phase 5) ----
     groq_api_key: str = Field(default="")
+    groq_model: str = Field(default="llama-3.3-70b-versatile")
+    groq_timeout_seconds: float = Field(default=20.0, gt=0)
+    llm_max_retries: int = Field(default=1, ge=0, le=3)
+
+    # ---- Phase 5: orchestration ----
+    session_max_turns: int = Field(default=5, ge=1, le=20)
+    orca_grid_cell_deg: float = Field(default=0.05, gt=0.0, le=1.0)
+    orca_grid_pad_deg: float = Field(default=0.35, gt=0.0, le=5.0)
 
     # ---- Secondary / supplementary data sources (later phases) ----
     mosdac_username: str = Field(default="")

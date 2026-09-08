@@ -392,6 +392,104 @@ orchestration.
 
 ---
 
+## 6c. Agentic reasoning pipeline — Phase 5 (implemented)
+
+The LangGraph pipeline that ties Phases 2–4 together. **The LLM (Groq only) is
+used in exactly two nodes — Query Understanding and Evidence & Explanation — and
+neither can change a safety outcome.** Everything between them is deterministic.
+
+**LLM boundary (`app/services/llm.py`)** — `LlmClient` protocol; `GroqLlmClient`
+(JSON mode for structured calls); `StubLlmClient` for tests; `build_llm_client()`
+returns `None` when `GROQ_API_KEY` is unset, so the whole pipeline runs with **no
+LLM at all** via deterministic fallbacks. The deterministic core never imports
+this module (`tests/test_phase5_invariants.py` proves it in a subprocess).
+
+**Query Understanding (`app/agents/query_understanding.py`)** — NL →
+`QueryUnderstanding` (language `en/hi/kn/unknown`, intent, origin/destination
+via an offline gazetteer, date/time hints, route/risk/pfz flags, clarification,
+confidence). Groq path validates the reply against a Pydantic schema, retries
+**once** with a stricter correction prompt, then falls back to a deterministic
+rule-based parser and marks `failed=True` (→ `QUERY_UNDERSTANDING_FAILED`). The
+system prompt states that user text can never change safety policy, thresholds,
+geofences, tool results, or force an ALLOWED outcome, and cannot request
+fabricated data.
+
+**Graph (`app/orchestration/`)** — a typed `OrcaGraphState` (`TypedDict`; every
+slot a validated model). 19 nodes:
+
+```
+START → understand → (failed/clarify ⇒ explain)
+      → normalize   → (no location ⇒ explain)
+      → [collect_weather ‖ collect_ocean ‖ collect_gis]      (parallel)
+      → fabric → temporal → fusion → arbitration → conflicts
+      → suitability (only for fishing intents) → risk → policy → decision
+      → (route requested & routing_allowed & O/D resolved ⇒ route)
+      → alerts → provenance → explain → assemble → END
+```
+
+Conditional edges skip unnecessary work (a weather-only query never routes or
+scores suitability). Data collection runs in parallel LangGraph branches and
+each `AgentResult` is preserved independently before entering the **Phase 4
+Marine Data Fabric** (reused, not re-implemented). The **Temporal Validity Gate**
+and **Spatial-Temporal Fusion** are the Phase 4 implementations.
+
+**Evidence Arbitration (`app/reasoning/arbitration.py::HierarchyArbitrator`)** —
+deterministic. Per variable it ranks the aligned+VALID candidates by
+`(source_tier, validity, time_gap, distance, source)` from the explicit five-tier
+`EVIDENCE_HIERARCHY`. A higher-authority source wins a disagreement (conflict
+still flagged); equal-authority disagreement stays **unresolved** with no value
+chosen — never hidden, never averaged, never an LLM pick.
+
+**Conflict Detection (`app/reasoning/conflicts.py`)** — typed `Conflict` records
+(source disagreement, temporal/spatial mismatch, stale-vs-current,
+PFZ-vs-suitability, spatial restriction) with severity + resolution status. An
+**unresolved safety-critical** conflict sets `required_evidence_present=False`
+into the Safety Guard → `NO_SAFE_RECOMMENDATION`; it never forces ALLOWED.
+
+**Deterministic decision chain** — the Phase 2 **Risk Engine** (fed the
+*arbitrated* values; missing wave/wind → `INSUFFICIENT`, never zero), **Safety
+Guard** (precedence: hard geofence → missing critical evidence → SEVERE →
+HIGH/MODERATE → ALLOWED), and **Decision Engine** are used unchanged. WMO codes
+95–99 remain a *thunderstorm/lightning proxy*; the cyclone signal remains a
+*model-derived proxy* (no live RSMC API).
+
+**Route Agent (`app/agents/route.py`)** — conditional. Only runs when routing was
+requested and the decision permits it. Calls the Phase 3 `plan_route` (so
+destination validation still happens *before* A*, and the 3-layer hard-geofence
+protection is intact), then re-samples the finished route against hard geofences
+and **re-runs the Safety Guard** with that route evidence — a route can never
+bypass the guard; `ROUTE_VALIDATION_FAILED` / `NO_ROUTE` are surfaced as-is.
+
+**Decision Provenance Graph (`app/provenance/graph.py`)** — explicit
+`ProvNode`/`ProvEdge` graph: query → intent → agent results → observations →
+validity → fusion → arbitration → conflicts → suitability → risk (+ per-factor)
+→ policy → decision → route. Every node traces back to the query.
+
+**Grounding (`app/provenance/grounding.py`)** — every numeric token in the final
+explanation must match a provenance numeric node or a deterministic scalar
+(exact for small structural integers / WMO codes; ±3 % otherwise). An ungrounded
+number, or an explanation that asserts safety for a negative decision, triggers
+one regenerate and then a deterministic i18n template. **The explanation can
+never alter the `DecisionResult`.**
+
+**Alerts (`app/alerts/engine.py`)** — deterministic rules from validated results;
+proxy alerts labelled `signal_kind="proxy"` / `"model_derived"`, never
+"real-time detection".
+
+**Multilingual (`app/i18n/messages.py`)** — deterministic en/hi/kn templates for
+every status; numbers, units and source names stay consistent and untranslated.
+The Explanation Agent responds in the detected language.
+
+**Multi-turn (`app/session/`)** — `InMemorySessionStore` keeps the last N turns
+(default 5); a follow-up inherits location / date / language / intent.
+
+**API (`app/api/query.py`)** — `POST /query` runs the pipeline and returns a
+Pydantic `QueryResponse` (answer, language, intent, decision, risk, suitability,
+route, alerts, conflicts, evidence, provenance, data-quality, agent trace). No
+stack trace ever reaches the client.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
@@ -400,10 +498,12 @@ orchestration.
 | 2 | ✅ Deterministic core (domain models, coordinate validation, Risk Engine + `risk_weights.yaml`, GIS ops, geofence model, Safety Guard, Decision foundation, A* + hard-geofence blocking + route validation, suitability foundation) with unit tests |
 | 3 | ✅ Routing hardening (strongly-typed `RouteRequest`, fixed 10-step validation pipeline, origin+destination hard-geofence rejection before A*, grid safety, `max_expanded` budget, expanded independent route validator, `ROUTE_VALIDATION_FAILED` status, `origin == destination` semantics, grid-cost vs approximate-distance) with regression tests |
 | 4 | ✅ Data agents (Weather, Oceanographic, GIS & Geofencing) with LIVE → CACHE → DEMO/MISSING fallback, Redis cache abstraction, Open-Meteo schema validation, static GIS ingestion (NE coastline / Marine Regions EEZ / GEBCO), Marine Data Fabric, Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration interface, non-blocking MOSDAC, PFZ/RSMC reference registry |
-| 5 | LangGraph orchestration, Query Understanding, Fabric, reasoning, `POST /query`, multi-turn, en/hi/kn |
-| 6 | Provenance graph, evidence records, grounding validation, explanation, alerts |
+| 5 | ✅ LangGraph orchestration (19-node typed graph), Query Understanding Agent (Groq + rule fallback, schema-validated, one retry), Evidence Arbitration (`HierarchyArbitrator`), Conflict Detection, Route Agent (conditional + guard re-check), Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query` |
+| 6 | (rolled into Phase 5) Provenance graph + grounding + explanation + alerts done; deeper provenance UI/exports remain |
 | 7 | Frontend (chat, map, risk heatmap, geofences, route, evidence/provenance/explanation panels, agent activity) |
 | 8 | Testing + demo hardening (conflict, fallback, `NO_SAFE_RECOMMENDATION`, proxy alerts, route recalculation, multilingual) |
 
-Current status: **Phase 4 complete** (data ingestion + deterministic fusion
-layer). Next: Phase 5 LangGraph orchestration + Query Understanding.
+Current status: **Phase 5 complete** (agentic reasoning pipeline: LangGraph
+orchestration, Query Understanding, arbitration, conflicts, provenance,
+grounding, explanation, multilingual, multi-turn, `POST /query`). Next: Phase 7
+frontend.

@@ -1,12 +1,17 @@
 """Specialist agents.
 
-Phase 4 implements the three live/spatial data agents:
+Data / spatial agents (Phase 4):
   * :class:`app.agents.weather.WeatherAgent`
   * :class:`app.agents.oceanographic.OceanographicAgent`
   * :class:`app.agents.gis_geofencing.GisGeofencingAgent`
 
-query_understanding.py, risk_suitability.py, route.py and evidence_explanation.py
-remain placeholders (Phase 5+).
+Reasoning agents (Phase 5):
+  * :class:`app.agents.query_understanding.QueryUnderstandingAgent`
+  * :class:`app.agents.evidence_explanation.ExplanationAgent`
+  * :class:`app.agents.route.RouteAgent`
+
+risk_suitability.py stays a placeholder (its engines are non-agent deterministic
+modules under app/risk and app/suitability).
 """
 
 from app.agents.base import AgentResult

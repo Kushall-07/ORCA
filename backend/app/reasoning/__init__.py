@@ -1,12 +1,15 @@
-"""Temporal Validity Gate, Spatial-Temporal Fusion, and the Evidence Arbitration
-interface (arbitration itself is Phase 5/6)."""
+"""Temporal Validity Gate, Spatial-Temporal Fusion, Evidence Arbitration, and
+deterministic Conflict Detection."""
 
 from app.reasoning.arbitration import (
     ArbitrationInput,
     ArbitrationOutput,
     Arbitrator,
+    EVIDENCE_HIERARCHY,
+    HierarchyArbitrator,
     NoOpArbitrator,
 )
+from app.reasoning.conflicts import detect_conflicts, has_unresolved_safety_critical
 from app.reasoning.fusion import ConflictKind, FusionResult, fuse
 from app.reasoning.temporal import (
     GateVerdict,
@@ -29,4 +32,8 @@ __all__ = [
     "ArbitrationOutput",
     "Arbitrator",
     "NoOpArbitrator",
+    "HierarchyArbitrator",
+    "EVIDENCE_HIERARCHY",
+    "detect_conflicts",
+    "has_unresolved_safety_critical",
 ]
