@@ -1,0 +1,58 @@
+# ============================================================
+# ORCA Chlorophyll-a Pixel-Neighbourhood Representativeness Profile
+# configuration - Phase 9 Step 7
+# ============================================================
+# version: 2026.09-mvp
+#
+# This feature answers exactly ONE question:
+#
+#   "Is the single ~4 km chlorophyll-a pixel that ORCA already uses
+#    representative of the valid nearby pixels on the same composite?"
+#
+# It is a QUALIFICATION of the existing central chlorophyll-a observation. It is
+# NOT fish detection, abundance, catch prediction, productivity estimation,
+# fishing suitability, bloom / front / plume / eddy / gradient detection,
+# interpolation, surface generation, forecasting, ML or biological inference.
+#
+# Every value below is an ENGINEERING constant - a resolution / data-quality /
+# adequacy floor. NONE of them is a scientifically validated ecological
+# threshold. The engine is deterministic: same pixels + this config -> same
+# result. No pixel value is ever fabricated, interpolated or zero-filled.
+
+version: "2026.09-mvp"
+
+disclaimer: >-
+  Chlorophyll-a is an environmental productivity proxy and does not indicate
+  fish presence, abundance, or catch. This neighbourhood profile only describes
+  how the single central pixel compares with the valid nearby pixels on the same
+  satellite composite; it is not a spatial field, a productivity estimate or a
+  fishing indicator.
+
+# ---- neighbourhood box --------------------------------------------------
+# Half-width, in decimal degrees, of the fixed square box centred on the queried
+# coordinate. 0.09 deg is roughly a ~20 km box (~5x5 native ~4 km VIIRS pixels).
+# This is a documented engineering choice, NOT a scientific length scale.
+neighbourhood_half_width_deg: 0.09
+
+# ---- valid-pixel floor ------------------------------------------------
+# The fewest valid nearby pixels required before any dispersion statistic
+# (min / max / range / quartiles / IQR) is computed. Below this only coverage /
+# limitation information is emitted - statistics stay null (honest missingness).
+neighbourhood_min_valid_pixels: 3
+
+# ---- "adequate" data-quality band -----------------------------------
+# The neighbourhood profile is described as "adequate" only when BOTH hold:
+#   * at least this many valid pixels, AND
+#   * valid pixels cover at least this fraction of the box's cells.
+# Otherwise it is "limited" (>= the min floor) or "insufficient" (< the floor).
+# A coarse descriptor band only - it never changes a computed statistic.
+neighbourhood_adequate_min_pixels: 9
+neighbourhood_adequate_min_coverage: 0.5
+
+# ---- chlorophyll-a reporting-resolution floor ----------------------
+# The smallest chlorophyll-a difference the ocean-colour product meaningfully
+# resolves. Statistics are rounded to the implied 2 decimal places; the central
+# pixel is classified against the [Q1, Q3] band with this tolerance so IEEE-754
+# noise cannot flip an exactly-at-edge value. NOT a "significant change"
+# threshold.
+chl_tie_epsilon_mg_m3: 0.01

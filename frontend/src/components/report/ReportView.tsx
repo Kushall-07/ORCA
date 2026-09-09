@@ -175,6 +175,41 @@ export function ReportView({
               {resp.environmental.stability && (
                 <p className="report__fine">{t("env.stab.note")}</p>
               )}
+              {resp.environmental.neighbourhood && (
+                <>
+                  <p>
+                    {t("env.nbhd.title")}:{" "}
+                    {String(resp.environmental.neighbourhood.status).toUpperCase()} —{" "}
+                    {resp.environmental.neighbourhood.cells_with_data} /{" "}
+                    {resp.environmental.neighbourhood.cells_total}{" "}
+                    {t("env.nbhd.pixels")}
+                    {resp.environmental.neighbourhood.median != null
+                      ? `, ${t("env.nbhd.median")} ${
+                          resp.environmental.neighbourhood.median
+                        } ${resp.environmental.neighbourhood.unit}, ${t(
+                          "env.nbhd.iqr",
+                        )} ${resp.environmental.neighbourhood.iqr ?? "—"} ${
+                          resp.environmental.neighbourhood.unit
+                        }`
+                      : ` — ${t("env.nbhd.insufficientProfile")}`}
+                    {`, ${t("env.nbhd.placement")}: ${t(
+                      (
+                        {
+                          within: "env.nbhd.placement.within",
+                          above: "env.nbhd.placement.above",
+                          below: "env.nbhd.placement.below",
+                          "n/a": "env.nbhd.placement.na",
+                        } as const
+                      )[
+                        String(
+                          resp.environmental.neighbourhood.central_pixel_vs_median,
+                        ) as "within" | "above" | "below" | "n/a"
+                      ] ?? "env.nbhd.placement.na",
+                    )}`}
+                  </p>
+                  <p className="report__fine">{t("env.nbhd.note")}</p>
+                </>
+              )}
               {resp.environmental.evidence &&
                 resp.environmental.evidence.items.length > 0 && (
                   <>

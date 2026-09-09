@@ -5,6 +5,7 @@ import {
   makeComparisonResponse,
   makeEnvironmentalResponse,
   makeEvidenceResponse,
+  makeNeighbourhoodResponse,
   makeNoRouteResponse,
   makeNoSafeResponse,
   makeResponse,
@@ -566,5 +567,48 @@ describe("ORCA workspace", () => {
     await sendQuery("chlorophyll near Mangalore");
     await screen.findByText("Environmental Context");
     expect(screen.queryByText("Dispersion & coverage")).not.toBeInTheDocument();
+  });
+
+  // ---- Phase 9 Step 7: chlorophyll-a pixel-neighbourhood representativeness ---
+  it("renders the local representativeness block with counts, stats, coverage and placement", async () => {
+    postQuery.mockResolvedValue(makeNeighbourhoodResponse());
+    render(<App />);
+    await sendQuery(
+      "is the chlorophyll pixel near Mangalore representative of the nearby pixels",
+    );
+    expect(await screen.findByText("Local representativeness")).toBeInTheDocument();
+    const panel = screen
+      .getByText("Local representativeness")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    // n of m nearby pixels + deterministic figures from the backend result
+    expect(text).toContain("19 / 25");
+    expect(text).toMatch(/median 1\.1/);
+    expect(text).toMatch(/IQR 0\.2/);
+    expect(text).toContain("ADEQUATE");
+    // central-pixel placement + coverage sentence
+    expect(text.toLowerCase()).toContain("within the nearby range");
+    expect(text.toLowerCase()).toContain("left missing, not interpolated");
+    // neutral framing - no fishing / spatial-structure / trend claim, no chart
+    for (const bad of [
+      "more fish", "better fishing", "expected catch", "higher catch", "yield",
+      "bloom", "front", "gradient", "hotspot", "more productive area",
+      "rising", "declining", "trending",
+    ]) {
+      expect(text.toLowerCase()).not.toContain(bad);
+    }
+    const block = panel.querySelector(".env-nbhd") as HTMLElement;
+    expect(block.querySelector("svg")).toBeNull(); // no chart / sparkline / heatmap
+    expect(block.querySelector("canvas")).toBeNull();
+  });
+
+  it("hides the local representativeness block when neighbourhood is null", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no neighbourhood
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(
+      screen.queryByText("Local representativeness"),
+    ).not.toBeInTheDocument();
   });
 });

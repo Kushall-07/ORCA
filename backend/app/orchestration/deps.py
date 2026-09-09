@@ -22,7 +22,9 @@ from app.core.config import Settings, get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.neighbourhood import EnvironmentalNeighbourhoodEngine
 from app.environmental.stability import EnvironmentalStabilityEngine
+from app.services import oceancolor
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
@@ -74,6 +76,17 @@ class OrcaDeps:
     # environmental_stability node simply skips (non-blocking). It issues ZERO
     # HTTP calls and never feeds risk / safety / decision / route / suitability.
     stability_engine: EnvironmentalStabilityEngine | None = None
+    # Phase 9 Step 7: deterministic Environmental Neighbourhood Engine
+    # (chlorophyll-a pixel-neighbourhood representativeness profile) + the
+    # isolated ERDDAP box-fetch callable. Both optional; when either is absent
+    # the environmental_neighbourhood node simply skips (non-blocking). The fetch
+    # is at most ONE extra batched HTTP request and is only spent for an
+    # environmental_conditions query that already has a usable current
+    # chlorophyll-a observation. Neither ever feeds risk / safety / decision /
+    # route / suitability / geofencing / conflict resolution, the Marine Data
+    # Fabric, fusion, arbitration or evidence[].
+    neighbourhood_engine: EnvironmentalNeighbourhoodEngine | None = None
+    neighbourhood_probe: object = None  # async (lat, lon, when, *, half_width_deg, settings[, client]) -> ChlorophyllNeighbourhood
 
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
@@ -98,4 +111,6 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         historical_environment_agent=HistoricalEnvironmentalAgent(settings=settings),
         evidence_engine=EnvironmentalEvidenceEngine(),
         stability_engine=EnvironmentalStabilityEngine(),
+        neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
+        neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
     )

@@ -237,6 +237,161 @@ def test_oceancolor_status_shape() -> None:
     assert "not a measure of fish presence" in s["note"]
 
 
+# ==========================================================================
+# Phase 9 Step 7 - fetch_chlorophyll_neighbourhood (one batched ERDDAP box request)
+# ==========================================================================
+def _box_row(days_before_when: float, value, *, lat, lon, alt=True) -> list:
+    t = (WHEN - timedelta(days=days_before_when)).strftime("%Y-%m-%dT12:00:00Z")
+    base = [t]
+    if alt:
+        base.append(0)
+    return base + [lat, lon, value]
+
+
+def _box_table(*, composite_days=1.0, valid=5, missing=0, variable="chlor_a") -> dict:
+    """A 5x5-style box table for one composite: `valid` positive pixels + `missing`
+    null pixels, each at its own lat/lon."""
+    rows = []
+    n = valid + missing
+    for i in range(n):
+        lat = LAT - 0.08 + (i % 5) * 0.04
+        lon = LON - 0.08 + (i // 5) * 0.04
+        v = None if i >= valid else round(0.80 + 0.10 * i, 2)
+        rows.append(_box_row(composite_days, v, lat=lat, lon=lon))
+    return _table(rows, variable=variable)
+
+
+@respx.mock
+async def test_neighbourhood_issues_one_batched_range_request() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    data = respx.get(NOAA_DATA).respond(json=_box_table(valid=19, missing=6))
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    assert data.call_count == 1                      # ONE batched request
+    url = str(data.calls.last.request.url)
+    assert "/griddap/noaacwNPPVIIRSchlaDaily.json?chlor_a" in url
+    # latitude range emitted high -> low (descending grid), longitude low -> high
+    assert "12.96000" in url and "12.78000" in url
+    assert "74.75000" in url and "74.93000" in url
+    assert r.cells_total == 25
+    assert len(r.pixels) == 19
+    assert r.dataset == "noaacwNPPVIIRSchlaDaily"
+
+
+@respx.mock
+async def test_neighbourhood_keeps_real_pixel_coordinates_and_distance() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_box_table(valid=6, missing=0))
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    for p in r.pixels:
+        assert LAT - 0.1 <= p.latitude <= LAT + 0.1
+        assert LON - 0.1 <= p.longitude <= LON + 0.1
+        assert p.value > 0.0
+        assert p.distance_m >= 0.0
+    # sorted nearest-first
+    assert [p.distance_m for p in r.pixels] == sorted(p.distance_m for p in r.pixels)
+
+
+@respx.mock
+async def test_neighbourhood_respects_griddap_axis_order() -> None:
+    # a dataset whose griddap axes are (time, latitude, longitude) - no altitude
+    respx.get(NOAA_INFO).respond(json=_info(axes=("time", "latitude", "longitude")))
+    respx.get(NOAA_DATA).respond(
+        json=_table(
+            [
+                _box_row(1.0, 0.9, lat=LAT, lon=LON, alt=False),
+                _box_row(1.0, 1.0, lat=LAT + 0.02, lon=LON, alt=False),
+                _box_row(1.0, 1.1, lat=LAT, lon=LON + 0.02, alt=False),
+            ],
+            with_altitude=False,
+        )
+    )
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    url = str(respx.calls.last.request.url)
+    assert "%5B0%5D" not in url                       # no altitude singleton
+    assert len(r.pixels) == 3
+
+
+@respx.mock
+async def test_neighbourhood_parses_a_multi_composite_block_and_picks_nearest() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    rows = []
+    # composite A: 5 days old, 4 valid cells
+    for i in range(4):
+        rows.append(_box_row(5.0, 0.30 + 0.05 * i, lat=LAT + 0.01 * i, lon=LON))
+    # composite B: 1 day old (nearest), 6 valid cells
+    for i in range(6):
+        rows.append(_box_row(1.0, 1.00 + 0.05 * i, lat=LAT + 0.01 * i, lon=LON + 0.01))
+    respx.get(NOAA_DATA).respond(json=_table(rows))
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    assert r.composite_at == datetime(2026, 9, 8, 12, 0, tzinfo=timezone.utc)
+    assert len(r.pixels) == 6                      # only composite B's pixels
+    assert all(p.value >= 1.0 for p in r.pixels)
+
+
+@respx.mock
+async def test_neighbourhood_missing_cells_are_counted_but_never_zeroed() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_box_table(valid=3, missing=22))
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    assert r.cells_total == 25
+    assert len(r.pixels) == 3
+    assert all(p.value > 0.0 for p in r.pixels)    # no 0.0 filler
+
+
+@respx.mock
+async def test_neighbourhood_404_is_typed_no_data() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(404, text='Error {code=404; message="axis maximum";}')
+    with pytest.raises(oc.OceanColorNoData):
+        await oc.fetch_chlorophyll_neighbourhood(
+            LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+        )
+
+
+@respx.mock
+async def test_neighbourhood_all_composites_too_old_is_no_data() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    rows = [_box_row(40.0, 0.9 + 0.05 * i, lat=LAT + 0.01 * i, lon=LON) for i in range(5)]
+    respx.get(NOAA_DATA).respond(json=_table(rows))
+    with pytest.raises(oc.OceanColorNoData):
+        await oc.fetch_chlorophyll_neighbourhood(
+            LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+        )
+
+
+@respx.mock
+async def test_neighbourhood_never_consults_incois() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_box_table(valid=5, missing=0))
+    incois_info = respx.get(INCOIS_INFO).respond(json=_info())
+    incois_data = respx.get(INCOIS_DATA).respond(json=_box_table(valid=5, missing=0))
+    s = _settings(
+        oceancolor_incois_erddap_url="https://erddap.incois.gov.in/erddap",
+        oceancolor_incois_chl_dataset="incoisChl",
+    )
+    await oc.fetch_chlorophyll_neighbourhood(LAT, LON, WHEN, half_width_deg=0.09, settings=s)
+    assert incois_info.call_count == 0 and incois_data.call_count == 0
+
+
+@respx.mock
+async def test_neighbourhood_disabled_raises_not_configured() -> None:
+    with pytest.raises(oc.OceanColorNotConfigured):
+        await oc.fetch_chlorophyll_neighbourhood(
+            LAT, LON, WHEN, half_width_deg=0.09,
+            settings=_settings(oceancolor_enabled=False),
+        )
+
+
 def test_no_llm_or_langgraph_import_in_oceancolor() -> None:
     code = (
         "import sys, app.services.oceancolor;"

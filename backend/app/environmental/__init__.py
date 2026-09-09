@@ -21,6 +21,11 @@ from app.environmental.evidence import (
     EvidenceConfig,
     load_evidence_config,
 )
+from app.environmental.neighbourhood import (
+    EnvironmentalNeighbourhoodEngine,
+    NeighbourhoodConfig,
+    load_neighbourhood_config,
+)
 
 __all__ = [
     "EnvironmentalProductivityEngine",
@@ -32,4 +37,7 @@ __all__ = [
     "EnvironmentalEvidenceEngine",
     "EvidenceConfig",
     "load_evidence_config",
+    "EnvironmentalNeighbourhoodEngine",
+    "NeighbourhoodConfig",
+    "load_neighbourhood_config",
 ]

@@ -4,6 +4,7 @@ import type {
   EnvironmentalComparisonInfo,
   EnvironmentalComparisonVariableInfo,
   EnvironmentalEvidenceInfo,
+  EnvironmentalNeighbourhoodInfo,
   EnvironmentalObservationInfo,
   EnvironmentalStabilityInfo,
   EnvironmentalStabilityVariableInfo,
@@ -327,6 +328,96 @@ function StabilityBlock({
   );
 }
 
+const _NBHD_STATUS_KEY: Record<string, StringKey> = {
+  adequate: "env.nbhd.status.adequate",
+  limited: "env.nbhd.status.limited",
+  insufficient: "env.nbhd.status.insufficient",
+  unavailable: "env.nbhd.status.unavailable",
+};
+
+const _NBHD_PLACEMENT_KEY: Record<string, StringKey> = {
+  within: "env.nbhd.placement.within",
+  above: "env.nbhd.placement.above",
+  below: "env.nbhd.placement.below",
+  "n/a": "env.nbhd.placement.na",
+};
+
+/**
+ * Phase 9 Step 7 - "Local representativeness". A restrained, neutral statement of
+ * whether the single central chlorophyll-a pixel ORCA already uses is typical of
+ * the valid nearby pixels on the SAME satellite composite. It NEVER affects risk
+ * / safety / decision / route / suitability, is NOT a spatial field, a bloom /
+ * front / gradient / hotspot, a productivity estimate or a fishing indicator,
+ * and carries no chart, sparkline, arrows, heatmap, interpolation surface or
+ * good/bad colour - only one neutral status chip and plain figures. The map is
+ * never touched.
+ */
+function NeighbourhoodBlock({
+  neighbourhood,
+  t,
+}: {
+  neighbourhood: EnvironmentalNeighbourhoodInfo;
+  t: (k: StringKey) => string;
+}) {
+  const nb = neighbourhood;
+  const statusKey =
+    _NBHD_STATUS_KEY[String(nb.status)] ?? "env.nbhd.status.unavailable";
+  const hasProfile = nb.median != null;
+  const unit = nb.unit ?? "";
+  const placementKey =
+    _NBHD_PLACEMENT_KEY[String(nb.central_pixel_vs_median)] ??
+    "env.nbhd.placement.na";
+
+  return (
+    <div className="env-nbhd">
+      <p className="env__section-label">{t("env.nbhd.title")}</p>
+      <div className="env-nbhd__row">
+        <span className="env-nbhd__chip" data-neutral="true">
+          {t(statusKey)}
+        </span>
+        <span className="env-nbhd__count">
+          {nb.cells_with_data} / {nb.cells_total} {t("env.nbhd.pixels")}
+        </span>
+      </div>
+      {hasProfile ? (
+        <span className="env-nbhd__figures">
+          {t("env.nbhd.range")} {fmtStat(nb.minimum, "")}–{fmtStat(nb.maximum, unit)}
+          {" · "}
+          {t("env.nbhd.median")} {fmtStat(nb.median, unit)}
+          {" · "}
+          {t("env.nbhd.iqr")} {fmtStat(nb.iqr, unit)}
+          {nb.nearest_valid_pixel_km != null ? (
+            <>
+              {" · "}
+              {t("env.nbhd.nearest")} {nb.nearest_valid_pixel_km} km
+            </>
+          ) : null}
+        </span>
+      ) : (
+        <span className="env-nbhd__figures env-nbhd__figures--none">
+          {t("env.nbhd.insufficientProfile")}
+        </span>
+      )}
+      {nb.coverage_sentence && (
+        <span className="env-nbhd__coverage">
+          {t("env.nbhd.coverage")}: {nb.coverage_sentence}
+        </span>
+      )}
+      <span className="env-nbhd__placement">
+        {t("env.nbhd.placement")}: {t(placementKey)}
+      </span>
+      {nb.limitations.length > 0 && (
+        <ul className="env__limitations">
+          {nb.limitations.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      )}
+      <p className="env-nbhd__note">{t("env.nbhd.note")}</p>
+    </div>
+  );
+}
+
 /**
  * Phase 9 Step 3 - the smallest possible researcher-facing environmental
  * summary. It is purely informational: environmental productivity potential
@@ -386,6 +477,10 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
         {env.comparison && <ComparisonBlock comparison={env.comparison} t={t} />}
 
         {env.stability && <StabilityBlock stability={env.stability} t={t} />}
+
+        {env.neighbourhood && (
+          <NeighbourhoodBlock neighbourhood={env.neighbourhood} t={t} />
+        )}
 
         {env.evidence && <EvidenceBlock evidence={env.evidence} t={t} />}
 

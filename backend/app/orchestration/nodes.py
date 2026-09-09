@@ -688,6 +688,123 @@ async def environmental_stability_node(deps, state: OrcaGraphState) -> dict:  # 
     }
 
 
+async def environmental_neighbourhood_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 7: deterministic chlorophyll-a pixel-neighbourhood
+    representativeness profile.
+
+    Runs strictly downstream of decision / route / alerts / productivity /
+    comparison / stability and BEFORE environmental_evidence. It answers ONLY
+    "is the single ~4 km chlorophyll-a pixel ORCA already uses representative of
+    the valid nearby pixels on the same composite?" - a qualification of the
+    existing central observation.
+
+    Gate: an ``environmental_conditions`` query that already has a USABLE current
+    chlorophyll-a observation. Only then is the isolated ERDDAP box fetch spent
+    (at most ONE extra batched HTTP request). If no usable current chlorophyll-a
+    observation exists, the fetch is NOT spent and the result is ``None``.
+
+    Non-blocking: any fetch or engine failure returns ``None`` and records
+    ``environmental_neighbourhood:skip``; the main query completes. It NEVER
+    feeds RiskEngine, Policy & Safety Guard, DecisionEngine, RouteAgent, fishing
+    suitability, GIS/geofencing or conflict resolution, and is NEVER added to
+    the Marine Data Fabric, fusion, arbitration, ``evidence[]`` or the Temporal
+    Validity Gate's gated set.
+    """
+    from app.models.environmental import (
+        EnvironmentalNeighbourhoodInputs,
+        NeighbourhoodPixel,
+    )
+
+    engine = getattr(deps, "neighbourhood_engine", None)
+    probe = getattr(deps, "neighbourhood_probe", None)
+    u = state.get("understanding")
+    fabric = state.get("fabric")
+    coord = state.get("resolved_origin")
+
+    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    chl_current = _env_observation(state, fabric, "chlorophyll_a", role="current")
+    usable = chl_current is not None and chl_current.usable
+
+    if (
+        engine is None
+        or probe is None
+        or coord is None
+        or not (is_env_intent and usable)
+    ):
+        # No usable current chlorophyll-a observation -> do NOT spend the fetch.
+        return {
+            "environmental_neighbourhood": None,
+            "agent_trace": ["environmental_neighbourhood:skip"],
+        }
+
+    when = state["decision_time"]
+    if chl_current.observed_at:
+        try:
+            parsed = datetime.fromisoformat(chl_current.observed_at)
+            when = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+
+    try:
+        neighbourhood = await probe(
+            coord.latitude,
+            coord.longitude,
+            when,
+            half_width_deg=engine.half_width_deg,
+            settings=deps.settings,
+        )
+    except Exception as exc:  # noqa: BLE001 - the fetch must never fail the query
+        logger.warning(
+            "environmental neighbourhood fetch skipped: %s", type(exc).__name__
+        )
+        return {
+            "environmental_neighbourhood": None,
+            "agent_trace": ["environmental_neighbourhood:skip"],
+        }
+
+    try:
+        result = engine.assess(
+            EnvironmentalNeighbourhoodInputs(
+                central_value=chl_current.value,
+                unit=chl_current.unit or "mg m-3",
+                dataset=getattr(neighbourhood, "dataset", "") or "",
+                composite_date=(
+                    neighbourhood.composite_at.isoformat()
+                    if getattr(neighbourhood, "composite_at", None) is not None
+                    else None
+                ),
+                half_width_deg=float(
+                    getattr(neighbourhood, "half_width_deg", 0.0) or 0.0
+                ),
+                box=getattr(neighbourhood, "box", "") or "",
+                cells_total=int(getattr(neighbourhood, "cells_total", 0) or 0),
+                pixels=tuple(
+                    NeighbourhoodPixel(
+                        value=p.value,
+                        latitude=p.latitude,
+                        longitude=p.longitude,
+                        observed_at=p.observed_at.isoformat(),
+                        distance_km=round(p.distance_m / 1000.0, 2),
+                    )
+                    for p in getattr(neighbourhood, "pixels", ()) or ()
+                ),
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise; be defensive
+        logger.warning(
+            "environmental neighbourhood engine error: %s", type(exc).__name__
+        )
+        return {
+            "environmental_neighbourhood": None,
+            "agent_trace": ["environmental_neighbourhood:skip"],
+        }
+
+    return {
+        "environmental_neighbourhood": result,
+        "agent_trace": ["environmental_neighbourhood"],
+    }
+
+
 async def environmental_evidence_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     """Phase 9 Step 5: deterministic environmental evidence / reproducibility
     assessment.
@@ -762,6 +879,7 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         comparison=state.get("environmental_comparison"),
         evidence=state.get("environmental_evidence"),
         stability=state.get("environmental_stability"),
+        neighbourhood=state.get("environmental_neighbourhood"),
         environment_tier=_tier(state.get("environment_result")),
     )
     return {"provenance": prov, "agent_trace": ["provenance"]}
@@ -785,6 +903,7 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         comparison=state.get("environmental_comparison"),
         environmental_evidence=state.get("environmental_evidence"),
         stability=state.get("environmental_stability"),
+        neighbourhood=state.get("environmental_neighbourhood"),
     )
     return {"explanation": expl, "agent_trace": ["explain"]}
 

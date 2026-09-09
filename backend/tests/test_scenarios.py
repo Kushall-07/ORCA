@@ -4,8 +4,9 @@ pipeline, plus runner/CLI sanity.
 The first 16 scenarios are the frozen Phase 7 regression set; scenarios 17-18
 are additive Phase 9 Step 3 researcher environmental cases, 19-20 are the
 additive Phase 9 Step 4 temporal-comparison cases, 21-22 are the additive
-Phase 9 Step 5 environmental-evidence cases and 23-24 are the additive Phase 9
-Step 6 bounded-window stability & coverage cases.
+Phase 9 Step 5 environmental-evidence cases, 23-24 are the additive Phase 9
+Step 6 bounded-window stability & coverage cases and 25-26 are the additive
+Phase 9 Step 7 chlorophyll-a pixel-neighbourhood representativeness cases.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ async def test_all_scenarios_pass() -> None:
         if not r.passed
     ]
     assert report.ok, "scenario failures:\n" + "\n".join(failures)
-    assert report.passed == len(SCENARIOS) == 24
+    assert report.passed == len(SCENARIOS) == 26
 
 
 # The 16 frozen Phase 7 scenarios - environmental intelligence must not add,
@@ -57,7 +58,7 @@ async def test_phase7_scenarios_still_all_pass() -> None:
 
 def test_scenario_library_is_well_formed() -> None:
     ids = [s.scenario_id for s in LIB_SCENARIOS]
-    assert len(ids) == len(set(ids)) == 24
+    assert len(ids) == len(set(ids)) == 26
     for s in LIB_SCENARIOS:
         assert len(s.turns) == len(s.expects) >= 1
         assert s.fixture in fixture_names()
@@ -84,7 +85,7 @@ async def test_unknown_fixture_is_a_clean_failure_not_a_crash() -> None:
 def test_cli_list_and_unknown(capsys) -> None:
     assert cli_main(["--list"]) == 0
     out = capsys.readouterr().out
-    assert "24 scenarios" in out
+    assert "26 scenarios" in out
     assert cli_main(["--scenario", "nope-nope"]) == 2
 
 

@@ -425,13 +425,14 @@ START → understand → (failed/clarify ⇒ explain)
       → suitability (only for fishing intents) → risk → policy → decision
       → (route requested & routing_allowed & O/D resolved ⇒ route)
       → alerts → productivity → environmental_comparison → environmental_stability
-      → environmental_evidence
+      → environmental_neighbourhood → environmental_evidence
       → provenance → explain → assemble → END
 ```
 
 The **`productivity`** node (Phase 9 Step 3), the **`environmental_comparison`**
-node (Phase 9 Step 4), the **`environmental_stability`** node (Phase 9 Step 6) and
-the **`environmental_evidence`** node (Phase 9 Step 5) are deterministic,
+node (Phase 9 Step 4), the **`environmental_stability`** node (Phase 9 Step 6),
+the **`environmental_neighbourhood`** node (Phase 9 Step 7) and the
+**`environmental_evidence`** node (Phase 9 Step 5) are deterministic,
 non-blocking, and strictly downstream of the decision.
 `productivity` runs the **Environmental Productivity Engine** on the
 already-collected SST + chlorophyll-a observations. `environmental_comparison`
@@ -445,13 +446,24 @@ max / range, median) and observational **coverage** of the *accepted raw Step 4
 series* — it consumes existing data only (**zero extra HTTP calls, no LLM**),
 computes no slope / trend / forecast / seasonality / bloom, makes no fish / catch
 claim, and never exposes the raw series through the API.
+`environmental_neighbourhood` runs the **Environmental Neighbourhood Engine**,
+which qualifies whether the single ~4 km chlorophyll-a pixel ORCA already uses is
+representative of the valid nearby pixels on the same composite. It spends **at
+most one** extra batched ERDDAP box request (`+/-0.09°`, ~20 km), and only for an
+`environmental_conditions` query that already has a usable current chlorophyll-a
+observation; otherwise it skips with **zero** HTTP calls. It computes only
+descriptive dispersion (nearest-rank quartiles, IQR, min / max / range, coverage,
+nearest-valid-pixel distance) and a plain `[Q1, Q3]` within/above/below placement
+of the central pixel — **no** interpolation, spatial field, gradient, bloom,
+front, hotspot, forecast or fish / catch claim — and never exposes the raw
+per-pixel array through the API.
 `environmental_evidence` runs the **Environmental Evidence Engine**, which fetches
 **nothing** (zero extra HTTP calls, no LLM) and only re-serialises + categorises
 metadata that already exists into a reproducibility bundle and a categorical
-data-quality status. None of these four nodes feed Risk / Safety / Decision /
-Suitability / geofencing / Routing / Alerts — risk/safety/decision/routing output
-is byte-identical with and without them. `collect_environment` (Step 2) is the
-parallel ocean-colour branch.
+data-quality status. None of these five nodes feed Risk / Safety / Decision /
+Suitability / geofencing / Routing / Alerts / conflict resolution —
+risk/safety/decision/routing output is byte-identical with and without them.
+`collect_environment` (Step 2) is the parallel ocean-colour branch.
 
 Conditional edges skip unnecessary work (a weather-only query never routes or
 scores suitability). Data collection runs in parallel LangGraph branches and

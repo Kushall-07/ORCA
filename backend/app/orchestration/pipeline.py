@@ -19,6 +19,7 @@ from app.models.api import (
     EnvironmentalEvidenceInfo,
     EnvironmentalEvidenceItemInfo,
     EnvironmentalInfo,
+    EnvironmentalNeighbourhoodInfo,
     EnvironmentalObservationInfo,
     EnvironmentalStabilityInfo,
     EnvironmentalStabilityVariableInfo,
@@ -118,6 +119,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     comparison = state.get("environmental_comparison")
     evidence = state.get("environmental_evidence")
     stability = state.get("environmental_stability")
+    neighbourhood = state.get("environmental_neighbourhood")
     route = state.get("route_result")
     fabric = state.get("fabric")
     expl = state.get("explanation")
@@ -274,6 +276,35 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=stability.engine_version,
         )
 
+    neighbourhood_info = None
+    if neighbourhood is not None:
+        neighbourhood_info = EnvironmentalNeighbourhoodInfo(
+            variable=neighbourhood.variable,
+            status=neighbourhood.status,
+            unit=neighbourhood.unit,
+            dataset=neighbourhood.dataset,
+            box=neighbourhood.box,
+            half_width_deg=neighbourhood.half_width_deg,
+            composite_date=neighbourhood.composite_date,
+            cells_total=neighbourhood.cells_total,
+            cells_with_data=neighbourhood.cells_with_data,
+            coverage=neighbourhood.coverage,
+            coverage_sentence=neighbourhood.coverage_sentence,
+            nearest_valid_pixel_km=neighbourhood.nearest_valid_pixel_km,
+            minimum=neighbourhood.minimum,
+            maximum=neighbourhood.maximum,
+            range=neighbourhood.range,
+            q1=neighbourhood.q1,
+            median=neighbourhood.median,
+            q3=neighbourhood.q3,
+            iqr=neighbourhood.iqr,
+            central_value=neighbourhood.central_value,
+            central_pixel_vs_median=neighbourhood.central_pixel_vs_median,
+            limitations=list(neighbourhood.limitations),
+            disclaimer=neighbourhood.disclaimer,
+            engine_version=neighbourhood.engine_version,
+        )
+
     environmental_info = None
     if productivity is not None:
         environmental_info = EnvironmentalInfo(
@@ -292,17 +323,25 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             comparison=comparison_info,
             evidence=evidence_info,
             stability=stability_info,
+            neighbourhood=neighbourhood_info,
         )
-    elif comparison_info is not None or evidence_info is not None or stability_info is not None:
+    elif (
+        comparison_info is not None
+        or evidence_info is not None
+        or stability_info is not None
+        or neighbourhood_info is not None
+    ):
         environmental_info = EnvironmentalInfo(
             disclaimer=(
                 comparison.disclaimer if comparison is not None
                 else evidence.disclaimer if evidence is not None
-                else stability.disclaimer
+                else stability.disclaimer if stability is not None
+                else neighbourhood.disclaimer
             ),
             comparison=comparison_info,
             evidence=evidence_info,
             stability=stability_info,
+            neighbourhood=neighbourhood_info,
         )
 
     route_info = None

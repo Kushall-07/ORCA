@@ -19,8 +19,10 @@ from app.core.config import get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.neighbourhood import EnvironmentalNeighbourhoodEngine
 from app.environmental.stability import EnvironmentalStabilityEngine
 from app.agents.historical_environment import HistoricalReference
+from app.services.oceancolor import ChlorophyllNeighbourhood, NeighbourhoodPixelRaw
 from app.models.common import Coordinate, SignalKind, SourceTier
 from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPoint
 from app.models.fabric import DataTier, SourceStatus
@@ -244,6 +246,61 @@ class ScenarioHistoricalEnvironmentalAgent:
         )
 
 
+class ScenarioNeighbourhoodProbe:
+    """Deterministic chlorophyll-a pixel-neighbourhood box-fetch stand-in -
+    Phase 9 Step 7. Returns REAL-looking native pixels for a single composite;
+    ``fail=True`` raises so the node still degrades non-blocking. ``n_valid`` /
+    ``cells_total`` set how many nearby pixels carried a value (the rest are left
+    missing, never zero-filled). Never enters the fabric / risk / safety."""
+
+    def __init__(
+        self,
+        *,
+        median: float = 1.1,
+        n_valid: int = 19,
+        cells_total: int = 25,
+        fail: bool = False,
+    ) -> None:
+        self._median = median
+        self._n_valid = n_valid
+        self._cells_total = cells_total
+        self._fail = fail
+
+    async def __call__(
+        self, latitude, longitude, when, *, half_width_deg, settings, client=None
+    ) -> ChlorophyllNeighbourhood:
+        if self._fail:
+            raise RuntimeError("scenario: neighbourhood box fetch unavailable")
+        composite_at = when if getattr(when, "tzinfo", None) else when.replace(
+            tzinfo=timezone.utc
+        )
+        pixels: list[NeighbourhoodPixelRaw] = []
+        for i in range(self._n_valid):
+            offset = ((i % 5) - 2) * 0.1
+            pixels.append(
+                NeighbourhoodPixelRaw(
+                    value=round(self._median + offset, 3),
+                    latitude=latitude + (i % 5 - 2) * 0.03,
+                    longitude=longitude + (i // 5 - 2) * 0.03,
+                    observed_at=composite_at,
+                    distance_m=round(1500.0 + i * 400.0, 1),
+                )
+            )
+        return ChlorophyllNeighbourhood(
+            pixels=tuple(pixels),
+            cells_total=max(self._cells_total, self._n_valid),
+            composite_at=composite_at,
+            box=(
+                f"lat {latitude - half_width_deg:.3f}..{latitude + half_width_deg:.3f}, "
+                f"lon {longitude - half_width_deg:.3f}..{longitude + half_width_deg:.3f} "
+                f"(+/-{half_width_deg:.2f} deg around {latitude:.3f}, {longitude:.3f})"
+            ),
+            half_width_deg=half_width_deg,
+            dataset="noaacwNPPVIIRSchlaDaily",
+            source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+        )
+
+
 class ScenarioGisAgent:
     def __init__(self, *, inside_hard=False, hard_ids=(), protected_areas=(), depth_m=-540.0,
                  on_land=False, fail=False):
@@ -458,6 +515,34 @@ _FIXTURES = {
             sst=27.9, chl=1.1, sst_points=15, chl_points=2, span_days=24,
         ),
     ),
+    # Phase 9 Step 7 - chlorophyll-a pixel-neighbourhood representativeness. The
+    # neighbourhood node spends AT MOST one isolated ERDDAP box request (here a
+    # deterministic offline stand-in) and never feeds the safety chain, the
+    # fabric, fusion, arbitration or evidence[].
+    "researcher_env_neighbourhood": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.1),  # usable current chlorophyll-a
+        # 19 of 25 nearby pixels valid, fanned around the central 1.1 mg/m3 pixel
+        # -> a populated profile with the central pixel inside the IQR.
+        neighbourhood_probe=ScenarioNeighbourhoodProbe(
+            median=1.1, n_valid=19, cells_total=25,
+        ),
+    ),
+    "researcher_env_neighbourhood_cloud_gap": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.1),
+        # monsoon cloud gap: only 2 of 25 nearby pixels valid -> honest
+        # 'insufficient', no fabricated statistics; the main query still completes.
+        neighbourhood_probe=ScenarioNeighbourhoodProbe(
+            median=1.1, n_valid=2, cells_total=25,
+        ),
+    ),
 }
 
 
@@ -472,6 +557,7 @@ def make_scenario_pipeline(
     gis=None,
     environment=None,
     historical_environment_agent=None,
+    neighbourhood_probe=None,
     hard_geofences=(),
     references=(),
 ) -> OrcaPipeline:
@@ -502,6 +588,8 @@ def make_scenario_pipeline(
         historical_environment_agent=historical_environment_agent,
         evidence_engine=EnvironmentalEvidenceEngine(),
         stability_engine=EnvironmentalStabilityEngine(),
+        neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
+        neighbourhood_probe=neighbourhood_probe,
     )
     return OrcaPipeline(deps)
 

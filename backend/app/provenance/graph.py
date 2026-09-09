@@ -11,6 +11,7 @@ from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
+    EnvironmentalNeighbourhoodResult,
     EnvironmentalProductivityResult,
     EnvironmentalStabilityResult,
 )
@@ -54,6 +55,7 @@ def build_provenance(
     comparison: EnvironmentalComparisonResult | None = None,
     evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
 ) -> ProvenanceGraph:
     nodes: list[ProvNode] = []
     edges: list[ProvEdge] = []
@@ -437,6 +439,124 @@ def build_provenance(
                 },
             ),
             stab_agent, *dict.fromkeys(stab_prof_ids),
+        )
+
+    # ---- chlorophyll-a pixel-neighbourhood representativeness (Phase 9 Step 7; never feeds safety) ----
+    if neighbourhood is not None:
+        _NB = ProvNodeKind.ENVIRONMENTAL_NEIGHBOURHOOD
+        # parent: the EXISTING central chlorophyll-a observation this profile qualifies.
+        chl_parent = None
+        for cand in ("comparison:chlorophyll_a", "productivity"):
+            if any(n.id == cand for n in nodes):
+                chl_parent = cand
+                break
+        if chl_parent is None:
+            chl_parent = arb_ids.get("chlorophyll_a")
+        if chl_parent is None:
+            ids = obs_ids.get("chlorophyll_a")
+            chl_parent = ids[-1] if ids else parent_for_data
+
+        nb_agent = add(
+            ProvNode(
+                id="agent:environment_neighbourhood", kind=_AGENT_RESULT,
+                label=(
+                    "chlorophyll-a pixel-neighbourhood profile (ORCA-derived, one "
+                    "isolated ERDDAP box request)"
+                ),
+                value=neighbourhood.status,
+                source=(
+                    f"noaa-coastwatch-erddap:{neighbourhood.dataset}"
+                    if neighbourhood.dataset
+                    else "noaa-coastwatch-erddap"
+                ),
+            ),
+            chl_parent,
+        )
+
+        count_id = add(
+            ProvNode(
+                id="neighbourhood_pixels", kind=ProvNodeKind.OBSERVATION,
+                label="valid chlorophyll-a pixels in the neighbourhood box",
+                value=neighbourhood.cells_with_data, unit="pixels",
+                detail={
+                    "box": neighbourhood.box,
+                    "half_width_deg": f"{neighbourhood.half_width_deg}",
+                    "cells_total": f"{neighbourhood.cells_total}",
+                    "cells_with_data": f"{neighbourhood.cells_with_data}",
+                    "composite_date": neighbourhood.composite_date or "",
+                    "coverage": (
+                        "" if neighbourhood.coverage is None
+                        else f"{neighbourhood.coverage}"
+                    ),
+                    "status": neighbourhood.status,
+                },
+            ),
+            nb_agent,
+        )
+
+        ndetail: dict[str, str] = {
+            "variable": neighbourhood.variable,
+            "status": neighbourhood.status,
+            "unit": neighbourhood.unit,
+            "dataset": neighbourhood.dataset,
+            "box": neighbourhood.box,
+            "half_width_deg": f"{neighbourhood.half_width_deg}",
+            "composite_date": neighbourhood.composite_date or "",
+            "cells_total": f"{neighbourhood.cells_total}",
+            "cells_with_data": f"{neighbourhood.cells_with_data}",
+            "central_pixel_vs_median": neighbourhood.central_pixel_vs_median,
+            "engine_version": neighbourhood.engine_version,
+            "disclaimer": neighbourhood.disclaimer,
+        }
+        for k, v in (
+            ("coverage", neighbourhood.coverage),
+            ("nearest_valid_pixel_km", neighbourhood.nearest_valid_pixel_km),
+            ("minimum", neighbourhood.minimum), ("maximum", neighbourhood.maximum),
+            ("range", neighbourhood.range), ("q1", neighbourhood.q1),
+            ("median", neighbourhood.median), ("q3", neighbourhood.q3),
+            ("iqr", neighbourhood.iqr), ("central_value", neighbourhood.central_value),
+        ):
+            if v is not None:
+                ndetail[k] = f"{v}"
+        if neighbourhood.limitations:
+            ndetail["limitations"] = " | ".join(neighbourhood.limitations)
+
+        stats_id = add(
+            ProvNode(
+                id="neighbourhood_stats", kind=_NB,
+                label="chlorophyll-a neighbourhood dispersion statistics",
+                value=(
+                    neighbourhood.median
+                    if neighbourhood.median is not None
+                    else neighbourhood.status
+                ),
+                unit=(
+                    (neighbourhood.unit or None)
+                    if neighbourhood.median is not None
+                    else None
+                ),
+                detail=ndetail,
+            ),
+            count_id,
+        )
+
+        add(
+            ProvNode(
+                id="assessment:environment_neighbourhood", kind=_NB,
+                label=(
+                    "chlorophyll-a pixel-neighbourhood representativeness "
+                    "assessment (ORCA-derived)"
+                ),
+                value=neighbourhood.central_pixel_vs_median,
+                detail={
+                    "status": neighbourhood.status,
+                    "central_pixel_vs_median": neighbourhood.central_pixel_vs_median,
+                    "engine_version": neighbourhood.engine_version,
+                    "disclaimer": neighbourhood.disclaimer,
+                    "limitations": " | ".join(neighbourhood.limitations),
+                },
+            ),
+            nb_agent, count_id, stats_id,
         )
 
     # ---- environmental evidence / reproducibility (Phase 9 Step 5; never feeds safety) ----

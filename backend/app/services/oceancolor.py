@@ -114,6 +114,41 @@ class ChlorophyllResult(BaseModel):
     dataset: str
 
 
+class NeighbourhoodPixelRaw(BaseModel):
+    """One REAL native chlorophyll-a pixel returned inside the Step 7
+    neighbourhood box (already validated: finite, > 0, coordinates in range).
+    Never fabricated or interpolated."""
+
+    model_config = ConfigDict(frozen=True)
+
+    value: float                 # mg m-3, strictly > 0
+    latitude: float
+    longitude: float
+    observed_at: datetime        # the real composite time of this pixel (UTC)
+    distance_m: float            # requested coordinate -> this pixel
+
+
+class ChlorophyllNeighbourhood(BaseModel):
+    """Result of ONE isolated ERDDAP griddap box request (Phase 9 Step 7).
+
+    ``pixels`` are the VALID native pixels for the single chosen composite (the
+    one nearest in time to the request). ``cells_total`` counts every grid cell
+    the box returned for that composite, valid or missing - cloud cells are left
+    missing, never zero-filled. This is contextual qualification of the existing
+    central observation only; it never enters the Marine Data Fabric, fusion,
+    arbitration, evidence, risk, safety, decision or routing."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pixels: tuple[NeighbourhoodPixelRaw, ...] = ()
+    cells_total: int = 0
+    composite_at: datetime | None = None
+    box: str = ""
+    half_width_deg: float = 0.0
+    dataset: str = ""
+    source: str = ""
+
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
@@ -202,6 +237,36 @@ def _constraint(
             parts.append(f"[({latitude:.5f})]")
         elif a in ("longitude", "lon"):
             parts.append(f"[({longitude:.5f})]")
+        else:
+            parts.append("[0]")  # singleton altitude / depth for a surface product
+    return "".join(parts)
+
+
+def _box_constraint(
+    axes: list[str],
+    lat_lo: float,
+    lat_hi: float,
+    lon_lo: float,
+    lon_hi: float,
+    time_expr: str,
+) -> str:
+    """Griddap constraint for a small lat/lon BOX (Phase 9 Step 7).
+
+    The latitude range is emitted high -> low because the NOAA CoastWatch VIIRS
+    grid's latitude axis descends; longitude ascends. ERDDAP returns one row per
+    (time, lat, lon) cell inside the box, including cloud cells as null - so the
+    caller can count total cells as well as the valid ones. No interpolation is
+    requested; every returned coordinate is a real native pixel centre.
+    """
+    parts: list[str] = []
+    for axis in axes:
+        a = axis.lower()
+        if a in _TIME_AXES:
+            parts.append(time_expr)
+        elif a in ("latitude", "lat"):
+            parts.append(f"[({lat_hi:.5f}):({lat_lo:.5f})]")
+        elif a in ("longitude", "lon"):
+            parts.append(f"[({lon_lo:.5f}):({lon_hi:.5f})]")
         else:
             parts.append("[0]")  # singleton altitude / depth for a surface product
     return "".join(parts)
@@ -517,6 +582,187 @@ async def fetch_chlorophyll_series(
     finally:
         if owns_client:
             await active.aclose()
+
+
+async def fetch_chlorophyll_neighbourhood(
+    latitude: float,
+    longitude: float,
+    when: datetime,
+    *,
+    half_width_deg: float,
+    settings: Settings,
+    client: httpx.AsyncClient | None = None,
+) -> ChlorophyllNeighbourhood:
+    """Phase 9 Step 7 - ONE batched NOAA CoastWatch griddap request over a small
+    fixed box (``+/- half_width_deg``) around the queried coordinate.
+
+    Used ONLY by the ``environmental_neighbourhood`` node to qualify whether the
+    single central chlorophyll-a pixel ORCA already uses is representative of the
+    valid nearby pixels on the SAME composite. It never touches INCOIS, never
+    enters the Marine Data Fabric / fusion / arbitration / evidence / risk /
+    safety / decision / routing, and never interpolates or zero-fills a cloud
+    cell. Returns the VALID native pixels for the single composite nearest in
+    time to ``when`` plus that composite's total cell count. Raises a typed
+    :class:`OceanColorError` on transport / schema failure or when no composite
+    is spatially + temporally acceptable, so the caller degrades to
+    ``neighbourhood = None`` (non-blocking).
+    """
+    if not settings.oceancolor_enabled:
+        raise OceanColorNotConfigured("ocean-colour integration is disabled")
+
+    base_url = settings.oceancolor_noaa_erddap_url
+    dataset = settings.oceancolor_noaa_chl_dataset
+    variable = settings.oceancolor_noaa_chl_variable
+    source_label = "noaa-coastwatch-erddap"
+    timeout_s = settings.oceancolor_timeout_seconds
+    max_age_s = settings.oceancolor_chl_max_age_seconds
+    hw = abs(float(half_width_deg))
+    box = (
+        f"lat {latitude - hw:.3f}..{latitude + hw:.3f}, "
+        f"lon {longitude - hw:.3f}..{longitude + hw:.3f} "
+        f"(+/-{hw:.2f} deg around {latitude:.3f}, {longitude:.3f})"
+    )
+
+    owns_client = client is None
+    active = client or httpx.AsyncClient(timeout=timeout_s, headers=_ERDDAP_HEADERS)
+    try:
+        axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=active)
+        target = _as_utc(when)
+        lookback_days = max_age_s // 86400 + 2
+        start = target - timedelta(days=lookback_days)
+        stop = target + timedelta(days=1)
+        range_expr = f"[({_iso_z(start)}):({_iso_z(stop)})]"
+        url = (
+            f"{base_url.rstrip('/')}/griddap/{dataset}.json?{variable}"
+            + _box_constraint(
+                axes,
+                latitude - hw, latitude + hw,
+                longitude - hw, longitude + hw,
+                range_expr,
+            )
+        )
+        try:
+            payload = await get_json(url, timeout_s=timeout_s, retries=1, client=active)
+        except HttpDecodeError as exc:
+            raise SchemaValidationError(
+                f"{source_label}: non-JSON ERDDAP neighbourhood response"
+            ) from exc
+        except HttpStatusError as exc:
+            if exc.status_code == 404:
+                raise OceanColorNoData(
+                    f"{source_label}: neighbourhood window outside the dataset time axis"
+                ) from exc
+            raise OceanColorUnavailable(
+                f"{source_label}: HTTP {exc.status_code}"
+            ) from exc
+        except HttpClientError as exc:
+            raise OceanColorUnavailable(f"{source_label}: {exc}") from exc
+
+        total_by_ts, valid_by_ts = _extract_box_cells(
+            payload, variable, latitude, longitude
+        )
+        if not total_by_ts:
+            raise OceanColorNoData(
+                f"{source_label}: no chlorophyll-a cells returned for the neighbourhood box"
+            )
+
+        # pick the single composite nearest in time to the request, within the
+        # existing chlorophyll acceptance window (<= max_age_s).
+        acceptable = [
+            ts for ts in total_by_ts
+            if abs((target - ts).total_seconds()) <= max_age_s
+        ]
+        if not acceptable:
+            newest = max(total_by_ts)
+            age_d = abs((target - newest).total_seconds()) / 86400.0
+            raise OceanColorNoData(
+                f"{source_label}: nearest neighbourhood composite is {age_d:.1f} d old "
+                f"(outside the <= {max_age_s // 86400} d window)"
+            )
+        chosen = min(
+            acceptable, key=lambda ts: (abs((target - ts).total_seconds()), -ts.timestamp())
+        )
+        pixels = tuple(
+            sorted(valid_by_ts.get(chosen, ()), key=lambda p: p.distance_m)
+        )
+        return ChlorophyllNeighbourhood(
+            pixels=pixels,
+            cells_total=total_by_ts[chosen],
+            composite_at=chosen,
+            box=box,
+            half_width_deg=hw,
+            dataset=dataset,
+            source=f"{source_label}:{dataset}",
+        )
+    finally:
+        if owns_client:
+            await active.aclose()
+
+
+def _extract_box_cells(
+    payload: dict[str, Any],
+    variable: str,
+    latitude: float,
+    longitude: float,
+) -> tuple[dict[datetime, int], dict[datetime, list[NeighbourhoodPixelRaw]]]:
+    """Validate the ERDDAP box table and split its rows per composite timestamp.
+
+    Returns ``(total_cells_by_ts, valid_pixels_by_ts)``. Every well-formed row
+    (parseable time + in-range coordinates) counts towards the total for its
+    composite; a row whose value is null / NaN / <= 0 is counted but not added
+    to the valid list (honest missingness - never zero). An unparseable *table*
+    is a :class:`SchemaValidationError`.
+    """
+    try:
+        table = _ErddapResponse.model_validate(payload).table
+    except Exception as exc:  # noqa: BLE001 - normalise to our typed error
+        raise SchemaValidationError(
+            f"unexpected ERDDAP neighbourhood response shape: {exc}"
+        ) from exc
+
+    names = [c.lower() for c in table.columnNames]
+
+    def _col(*candidates: str) -> int | None:
+        for cand in candidates:
+            if cand in names:
+                return names.index(cand)
+        return None
+
+    i_time = _col("time")
+    i_lat = _col("latitude", "lat")
+    i_lon = _col("longitude", "lon")
+    i_val = _col(variable.lower())
+    if i_val is None and len(table.columnNames) >= 4:
+        i_val = len(table.columnNames) - 1
+    if None in (i_time, i_lat, i_lon) or i_val is None:
+        raise SchemaValidationError(
+            f"ERDDAP neighbourhood table is missing required columns (got {table.columnNames})"
+        )
+
+    total: dict[datetime, int] = {}
+    valid: dict[datetime, list[NeighbourhoodPixelRaw]] = {}
+    for row in table.rows:
+        if not isinstance(row, list) or len(row) <= max(i_time, i_lat, i_lon, i_val):
+            continue
+        t = _parse_time(row[i_time])
+        lat = _finite_number(row[i_lat])
+        lon = _finite_number(row[i_lon])
+        if t is None or lat is None or lon is None:
+            continue
+        if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+            continue
+        total[t] = total.get(t, 0) + 1
+        val = _finite_number(row[i_val])
+        if val is None or val <= 0.0:
+            continue  # NaN / fill / non-positive -> missing, never zero
+        dist = geodesic_distance_m(latitude, longitude, lat, lon)
+        valid.setdefault(t, []).append(
+            NeighbourhoodPixelRaw(
+                value=val, latitude=lat, longitude=lon,
+                observed_at=t, distance_m=round(dist, 1),
+            )
+        )
+    return total, valid
 
 
 def oceancolor_status(settings: Settings) -> dict[str, Any]:

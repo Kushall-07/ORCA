@@ -206,6 +206,43 @@ export interface EnvironmentalStabilityInfo {
   engine_version: string;
 }
 
+// ---- Phase 9 Step 7: chlorophyll-a pixel-neighbourhood representativeness -----
+// Deterministic QUALIFICATION of the single central chlorophyll-a pixel ORCA
+// already uses against the valid nearby pixels on the SAME satellite composite.
+// It is NOT fish detection, abundance, catch, productivity, fishing suitability,
+// a bloom / front / plume / eddy / gradient / patch / hotspot, interpolation, a
+// continuous surface, a forecast or biological inference, and never affects risk
+// / safety / decision / route. Quartiles are nearest-rank; statistics are null
+// when fewer than three valid nearby pixels exist. The raw per-pixel array is
+// never returned. `central_pixel_vs_median` is a plain [Q1, Q3] band
+// classification (within / above / below / n/a), not an abnormality judgement.
+export interface EnvironmentalNeighbourhoodInfo {
+  variable: string;
+  status: ReproducibilityStatus | string;
+  unit: string;
+  dataset: string;
+  box: string;
+  half_width_deg: number;
+  composite_date: string | null;
+  cells_total: number;
+  cells_with_data: number;
+  coverage: number | null;
+  coverage_sentence: string | null;
+  nearest_valid_pixel_km: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  range: number | null;
+  q1: number | null;
+  median: number | null;
+  q3: number | null;
+  iqr: number | null;
+  central_value: number | null;
+  central_pixel_vs_median: "within" | "above" | "below" | "n/a" | string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
 export interface EnvironmentalInfo {
   sst: EnvironmentalObservationInfo | null;
   chlorophyll_a: EnvironmentalObservationInfo | null;
@@ -219,6 +256,7 @@ export interface EnvironmentalInfo {
   comparison?: EnvironmentalComparisonInfo | null; // Phase 9 Step 4 - optional
   evidence?: EnvironmentalEvidenceInfo | null; // Phase 9 Step 5 - optional
   stability?: EnvironmentalStabilityInfo | null; // Phase 9 Step 6 - optional
+  neighbourhood?: EnvironmentalNeighbourhoodInfo | null; // Phase 9 Step 7 - optional
 }
 
 export interface RouteInfo {

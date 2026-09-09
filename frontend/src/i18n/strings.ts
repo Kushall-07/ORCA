@@ -117,6 +117,24 @@ export type StringKey =
   | "env.stab.status.limited"
   | "env.stab.status.insufficient"
   | "env.stab.status.unavailable"
+  | "env.nbhd.title"
+  | "env.nbhd.pixels"
+  | "env.nbhd.range"
+  | "env.nbhd.median"
+  | "env.nbhd.iqr"
+  | "env.nbhd.nearest"
+  | "env.nbhd.coverage"
+  | "env.nbhd.placement"
+  | "env.nbhd.placement.within"
+  | "env.nbhd.placement.above"
+  | "env.nbhd.placement.below"
+  | "env.nbhd.placement.na"
+  | "env.nbhd.insufficientProfile"
+  | "env.nbhd.note"
+  | "env.nbhd.status.adequate"
+  | "env.nbhd.status.limited"
+  | "env.nbhd.status.insufficient"
+  | "env.nbhd.status.unavailable"
   | "panel.route"
   | "route.status"
   | "route.distance"
@@ -306,6 +324,26 @@ const en: Table = {
   "env.stab.status.limited": "LIMITED",
   "env.stab.status.insufficient": "INSUFFICIENT",
   "env.stab.status.unavailable": "UNAVAILABLE",
+  "env.nbhd.title": "Local representativeness",
+  "env.nbhd.pixels": "nearby pixels",
+  "env.nbhd.range": "range",
+  "env.nbhd.median": "median",
+  "env.nbhd.iqr": "IQR",
+  "env.nbhd.nearest": "nearest valid pixel",
+  "env.nbhd.coverage": "coverage",
+  "env.nbhd.placement": "central pixel",
+  "env.nbhd.placement.within": "within the nearby range",
+  "env.nbhd.placement.above": "above the nearby range",
+  "env.nbhd.placement.below": "below the nearby range",
+  "env.nbhd.placement.na": "not placed",
+  "env.nbhd.insufficientProfile":
+    "Fewer than three valid nearby pixels on this composite - no neighbourhood statistics were computed.",
+  "env.nbhd.note":
+    "This only compares the single central chlorophyll-a pixel with the valid nearby pixels on the same satellite composite. It is a descriptive representativeness check, not a spatial map, a productivity estimate or a fishing indicator.",
+  "env.nbhd.status.adequate": "ADEQUATE",
+  "env.nbhd.status.limited": "LIMITED",
+  "env.nbhd.status.insufficient": "INSUFFICIENT",
+  "env.nbhd.status.unavailable": "UNAVAILABLE",
   "panel.route": "Route",
   "route.status": "Status",
   "route.distance": "Distance",
@@ -499,6 +537,26 @@ const hi: Table = {
   "env.stab.status.limited": "सीमित",
   "env.stab.status.insufficient": "अपर्याप्त",
   "env.stab.status.unavailable": "अनुपलब्ध",
+  "env.nbhd.title": "स्थानीय प्रतिनिधित्वशीलता",
+  "env.nbhd.pixels": "निकटवर्ती पिक्सेल",
+  "env.nbhd.range": "परिसर",
+  "env.nbhd.median": "माध्यिका",
+  "env.nbhd.iqr": "IQR",
+  "env.nbhd.nearest": "निकटतम मान्य पिक्सेल",
+  "env.nbhd.coverage": "कवरेज",
+  "env.nbhd.placement": "केंद्रीय पिक्सेल",
+  "env.nbhd.placement.within": "निकटवर्ती परिसर के भीतर",
+  "env.nbhd.placement.above": "निकटवर्ती परिसर से ऊपर",
+  "env.nbhd.placement.below": "निकटवर्ती परिसर से नीचे",
+  "env.nbhd.placement.na": "स्थान नहीं दिया गया",
+  "env.nbhd.insufficientProfile":
+    "इस कम्पोज़िट पर तीन से कम मान्य निकटवर्ती पिक्सेल - कोई नेबरहुड आँकड़े नहीं निकाले गए।",
+  "env.nbhd.note":
+    "यह केवल एकल केंद्रीय क्लोरोफिल-a पिक्सेल की तुलना उसी उपग्रह कम्पोज़िट पर मान्य निकटवर्ती पिक्सेल से करता है। यह एक वर्णनात्मक प्रतिनिधित्वशीलता जाँच है, कोई स्थानिक मानचित्र, उत्पादकता अनुमान या मछली पकड़ने का संकेतक नहीं।",
+  "env.nbhd.status.adequate": "पर्याप्त",
+  "env.nbhd.status.limited": "सीमित",
+  "env.nbhd.status.insufficient": "अपर्याप्त",
+  "env.nbhd.status.unavailable": "अनुपलब्ध",
   "panel.route": "मार्ग",
   "route.status": "स्थिति",
   "route.distance": "दूरी",
@@ -691,6 +749,26 @@ const kn: Table = {
   "env.stab.status.limited": "ಸೀಮಿತ",
   "env.stab.status.insufficient": "ಅಸಮರ್ಪಕ",
   "env.stab.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "env.nbhd.title": "ಸ್ಥಳೀಯ ಪ್ರಾತಿನಿಧ್ಯ",
+  "env.nbhd.pixels": "ಸಮೀಪದ ಪಿಕ್ಸೆಲ್‌ಗಳು",
+  "env.nbhd.range": "ವ್ಯಾಪ್ತಿ",
+  "env.nbhd.median": "ಮಧ್ಯಂಕ",
+  "env.nbhd.iqr": "IQR",
+  "env.nbhd.nearest": "ಹತ್ತಿರದ ಮಾನ್ಯ ಪಿಕ್ಸೆಲ್",
+  "env.nbhd.coverage": "ವ್ಯಾಪ್ತಿ",
+  "env.nbhd.placement": "ಕೇಂದ್ರ ಪಿಕ್ಸೆಲ್",
+  "env.nbhd.placement.within": "ಸಮೀಪದ ವ್ಯಾಪ್ತಿಯೊಳಗೆ",
+  "env.nbhd.placement.above": "ಸಮೀಪದ ವ್ಯಾಪ್ತಿಗಿಂತ ಮೇಲೆ",
+  "env.nbhd.placement.below": "ಸಮೀಪದ ವ್ಯಾಪ್ತಿಗಿಂತ ಕೆಳಗೆ",
+  "env.nbhd.placement.na": "ಸ್ಥಾನ ನೀಡಲಾಗಿಲ್ಲ",
+  "env.nbhd.insufficientProfile":
+    "ಈ ಕಾಂಪೊಸಿಟ್‌ನಲ್ಲಿ ಮೂರಕ್ಕಿಂತ ಕಡಿಮೆ ಮಾನ್ಯ ಸಮೀಪದ ಪಿಕ್ಸೆಲ್‌ಗಳು - ಯಾವುದೇ ನೆರೆಹೊರೆ ಅಂಕಿಅಂಶಗಳನ್ನು ಲೆಕ್ಕಿಸಲಾಗಿಲ್ಲ.",
+  "env.nbhd.note":
+    "ಇದು ಕೇವಲ ಒಂದೇ ಕೇಂದ್ರ ಕ್ಲೋರೊಫಿಲ್-a ಪಿಕ್ಸೆಲ್ ಅನ್ನು ಅದೇ ಉಪಗ್ರಹ ಕಾಂಪೊಸಿಟ್‌ನಲ್ಲಿ ಮಾನ್ಯ ಸಮೀಪದ ಪಿಕ್ಸೆಲ್‌ಗಳೊಂದಿಗೆ ಹೋಲಿಸುತ್ತದೆ. ಇದು ವಿವರಣಾತ್ಮಕ ಪ್ರಾತಿನಿಧ್ಯ ಪರಿಶೀಲನೆ, ಸ್ಥಳೀಯ ನಕ್ಷೆ, ಉತ್ಪಾದಕತೆ ಅಂದಾಜು ಅಥವಾ ಮೀನುಗಾರಿಕೆ ಸೂಚಕವಲ್ಲ.",
+  "env.nbhd.status.adequate": "ಸಮರ್ಪಕ",
+  "env.nbhd.status.limited": "ಸೀಮಿತ",
+  "env.nbhd.status.insufficient": "ಅಸಮರ್ಪಕ",
+  "env.nbhd.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
   "panel.route": "ಮಾರ್ಗ",
   "route.status": "ಸ್ಥಿತಿ",
   "route.distance": "ದೂರ",

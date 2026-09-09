@@ -19,6 +19,7 @@ from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
+    EnvironmentalNeighbourhoodResult,
     EnvironmentalProductivityResult,
     EnvironmentalReferenceSeries,
     EnvironmentalStabilityResult,
@@ -106,6 +107,12 @@ class OrcaGraphState(TypedDict, total=False):
     # Phase 9 Step 6: deterministic bounded-window dispersion & coverage profile.
     # Downstream-only research context; never feeds the safety chain.
     environmental_stability: EnvironmentalStabilityResult | None
+    # Phase 9 Step 7: deterministic chlorophyll-a pixel-neighbourhood
+    # representativeness profile. Qualifies the existing central chlorophyll-a
+    # observation against the valid nearby pixels on the same composite. At most
+    # one extra batched HTTP request; downstream-only research context; never
+    # feeds the safety chain, the fabric, fusion, arbitration or evidence[].
+    environmental_neighbourhood: EnvironmentalNeighbourhoodResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

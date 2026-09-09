@@ -561,6 +561,84 @@ SCENARIOS: tuple[Scenario, ...] = (
               "manufactured statistics; the SST profile is still computed and "
               "the main query still completes.",
     ),
+    # ---- Phase 9 Step 7: chlorophyll-a pixel-neighbourhood representativeness --
+    # Additive. Scenarios 01-24 above are frozen and unchanged. These two
+    # exercise the environmental_neighbourhood node, which spends AT MOST one
+    # isolated ERDDAP box request (a deterministic offline stand-in here) and
+    # never touches the safety chain, the fabric, fusion, arbitration or
+    # evidence[].
+    Scenario(
+        scenario_id="25_researcher_environmental_neighbourhood",
+        title="Researcher: chlorophyll-a pixel-neighbourhood representativeness profile",
+        stakeholder="researcher",
+        fixture="researcher_env_neighbourhood",
+        turns=("Is the chlorophyll-a pixel ORCA is using near Mangalore "
+               "representative of the valid nearby pixels on the same satellite "
+               "image right now?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("chlorophyll_a",),
+                provenance_has_kinds=("environmental_neighbourhood",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=(
+                    "neighbourhood", "nearby pixels", "representative",
+                ),
+                answer_excludes_all=(
+                    "more fish", "fewer fish", "fish are present", "expected catch",
+                    "higher catch", "lower catch", "good catch", "yield",
+                    "better fishing", "worse fishing", "good fishing",
+                    "bloom", "front", "plume", "eddy", "gradient", "patch",
+                    "hotspot", "more productive area", "fishing hotspot",
+                    "rising trend", "declining trend", "trending up",
+                    "trending down", "increasing trend", "decreasing trend",
+                    "biological inference",
+                ),
+                node_trace_present=True,
+                request_id_present=True,
+            ),
+        ),
+        tags=("phase9", "researcher", "neighbourhood"),
+        notes="The neighbourhood engine describes whether the single central "
+              "~4 km chlorophyll-a pixel is typical of the valid nearby pixels "
+              "on the same composite (nearest-rank quartiles, IQR, coverage, "
+              "within/above/below placement). It is not a spatial field, a "
+              "bloom / front / gradient / hotspot, a productivity estimate or a "
+              "fishing indicator, and never enters risk / safety / decision / "
+              "route.",
+    ),
+    Scenario(
+        scenario_id="26_researcher_environmental_neighbourhood_cloud_gap",
+        title="Researcher: monsoon cloud gap -> honest insufficient neighbourhood",
+        stakeholder="researcher",
+        fixture="researcher_env_neighbourhood_cloud_gap",
+        turns=("During this monsoon cloud cover near Mangalore, how do the "
+               "nearby chlorophyll-a pixels compare with the one ORCA is using?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                provenance_has_kinds=("environmental_neighbourhood",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=(
+                    "fewer than three", "nearby pixels", "neighbourhood",
+                ),
+                answer_excludes_all=(
+                    "more fish", "better fishing", "higher catch", "yield",
+                    "bloom", "front", "gradient", "hotspot",
+                    "rising trend", "declining trend",
+                ),
+            ),
+        ),
+        tags=("phase9", "researcher", "neighbourhood", "limitation"),
+        notes="Only two valid nearby chlorophyll-a pixels in the box -> the "
+              "neighbourhood engine reports 'insufficient' with no manufactured "
+              "statistics and no interpolated / zero-filled cloud cell; the main "
+              "query still completes.",
+    ),
 )
 
 

@@ -15,6 +15,7 @@ from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
+    EnvironmentalNeighbourhoodResult,
     EnvironmentalProductivityResult,
     EnvironmentalStabilityResult,
 )
@@ -73,6 +74,7 @@ def _engine_values(
     comparison: EnvironmentalComparisonResult | None,
     environmental_evidence: EnvironmentalEvidenceResult | None,
     stability: EnvironmentalStabilityResult | None,
+    neighbourhood: EnvironmentalNeighbourhoodResult | None,
     extra: tuple[float, ...],
 ) -> list[float]:
     values: list[float] = list(extra)
@@ -119,6 +121,23 @@ def _engine_values(
             ):
                 if n is not None:
                     values += [n, round(n, 1), round(n, 2), round(n, 3), round(n)]
+    if neighbourhood is not None:
+        # Step 7 explanation text uses categorical words + counts + already-observed
+        # dispersion values; every figure is a copy of a validated native pixel or
+        # a deterministic count, added here so any figure the explanation restates
+        # is grounded.
+        nb = neighbourhood
+        for c in (nb.cells_total, nb.cells_with_data):
+            values += [float(c), float(c)]
+        if nb.coverage is not None:
+            values += [nb.coverage, round(nb.coverage, 2), round(nb.coverage * 100.0),
+                       round(nb.coverage * 100.0, 1)]
+        for n in (
+            nb.nearest_valid_pixel_km, nb.minimum, nb.maximum, nb.range,
+            nb.q1, nb.median, nb.q3, nb.iqr, nb.central_value, nb.half_width_deg,
+        ):
+            if n is not None:
+                values += [n, round(n, 1), round(n, 2), round(n, 3), round(n)]
     if risk is not None:
         values += [risk.overall_score, round(risk.overall_score)]
         for f in risk.factors:
@@ -150,11 +169,12 @@ def ground_text(
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
     extra_allowed: tuple[float, ...] = (),
 ) -> GroundingReport:
     engine = _engine_values(
         provenance, decision, risk, suitability, route, environmental, comparison,
-        environmental_evidence, stability, extra_allowed,
+        environmental_evidence, stability, neighbourhood, extra_allowed,
     )
     claims: list[GroundingClaim] = []
     unsupported: list[str] = []

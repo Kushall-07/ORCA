@@ -490,6 +490,66 @@ export function makeStabilityResponse(
   });
 }
 
+// Phase 9 Step 7 - chlorophyll-a pixel-neighbourhood representativeness.
+// Additive, neutral, never affects the safety chain, never a fish / catch /
+// bloom / front / gradient / hotspot claim. The raw per-pixel array is never
+// present.
+export function makeNeighbourhoodResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  const base = makeEnvironmentalResponse();
+  return makeResponse({
+    ...base,
+    answer:
+      base.answer +
+      " Across the neighbourhood box, 19 of 25 nearby chlorophyll-a pixels on " +
+      "the same composite carried a valid value (median 1.1 mg m-3, " +
+      "interquartile range 0.2 mg m-3, spanning 0.9 to 1.3 mg m-3). The central " +
+      "chlorophyll-a pixel ORCA uses lies within the neighbourhood interquartile " +
+      "range, so it is representative of the valid nearby pixels on this " +
+      "composite. This only compares the single central chlorophyll-a pixel with " +
+      "the valid nearby pixels on the same satellite composite.",
+    environmental: {
+      ...base.environmental!,
+      neighbourhood: {
+        variable: "chlorophyll_a",
+        status: "adequate",
+        unit: "mg m-3",
+        dataset: "noaacwNPPVIIRSchlaDaily",
+        box: "lat 12.780..12.960, lon 74.750..74.930 (+/-0.09 deg around 12.870, 74.840)",
+        half_width_deg: 0.09,
+        composite_date: "2026-09-06T07:00:00+00:00",
+        cells_total: 25,
+        cells_with_data: 19,
+        coverage: 0.76,
+        coverage_sentence:
+          "19 of 25 chlorophyll-a cells in the neighbourhood box carried a valid " +
+          "value on this composite; the remainder were missing (cloud gap) and " +
+          "were left missing, not interpolated.",
+        nearest_valid_pixel_km: 1.5,
+        minimum: 0.9,
+        maximum: 1.3,
+        range: 0.4,
+        q1: 1.0,
+        median: 1.1,
+        q3: 1.2,
+        iqr: 0.2,
+        central_value: 1.1,
+        central_pixel_vs_median: "within",
+        limitations: [],
+        disclaimer:
+          "Chlorophyll-a is an environmental productivity proxy and does not " +
+          "indicate fish presence, abundance, or catch. This neighbourhood " +
+          "profile only describes how the single central pixel compares with the " +
+          "valid nearby pixels on the same satellite composite; it is not a " +
+          "spatial field, a productivity estimate or a fishing indicator.",
+        engine_version: "environmental-neighbourhood-0.1.0",
+      },
+    },
+    ...overrides,
+  });
+}
+
 export function makeNoRouteResponse(): QueryResponse {
   return makeResponse({
     intent: "ROUTE",

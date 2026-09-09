@@ -18,8 +18,10 @@ from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPo
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.neighbourhood import EnvironmentalNeighbourhoodEngine
 from app.environmental.stability import EnvironmentalStabilityEngine
 from app.agents.historical_environment import HistoricalReference
+from app.services.oceancolor import ChlorophyllNeighbourhood, NeighbourhoodPixelRaw
 from app.orchestration.deps import OrcaDeps
 from app.orchestration.pipeline import OrcaPipeline
 from app.reasoning.arbitration import HierarchyArbitrator
@@ -274,6 +276,54 @@ class FakeHistoricalEnvironmentalAgent:
         )
 
 
+class FakeNeighbourhoodProbe:
+    """Deterministic chlorophyll-a pixel-neighbourhood box-fetch stand-in for the
+    graph tests. ``fail=True`` raises so the node still degrades non-blocking.
+    ``n_valid`` / ``cells_total`` control how many nearby pixels carried a value
+    (the rest are left missing, never zero-filled). Never enters the fabric /
+    risk / safety. ``calls`` counts invocations so a test can assert the HTTP
+    budget."""
+
+    def __init__(
+        self, *, median: float = 1.1, n_valid: int = 19, cells_total: int = 25,
+        fail: bool = False,
+    ) -> None:
+        self.median = median
+        self.n_valid = n_valid
+        self.cells_total = cells_total
+        self.fail = fail
+        self.calls = 0
+
+    async def __call__(
+        self, latitude, longitude, when, *, half_width_deg, settings, client=None
+    ) -> ChlorophyllNeighbourhood:
+        self.calls += 1
+        if self.fail:
+            raise RuntimeError("neighbourhood box fetch blew up")
+        composite_at = when if getattr(when, "tzinfo", None) else when.replace(
+            tzinfo=timezone.utc
+        )
+        pixels = tuple(
+            NeighbourhoodPixelRaw(
+                value=round(self.median + ((i % 5) - 2) * 0.1, 3),
+                latitude=latitude + (i % 5 - 2) * 0.03,
+                longitude=longitude + (i // 5 - 2) * 0.03,
+                observed_at=composite_at,
+                distance_m=round(1500.0 + i * 400.0, 1),
+            )
+            for i in range(self.n_valid)
+        )
+        return ChlorophyllNeighbourhood(
+            pixels=pixels,
+            cells_total=max(self.cells_total, self.n_valid),
+            composite_at=composite_at,
+            box=f"+/-{half_width_deg:.2f} deg around {latitude:.3f}, {longitude:.3f}",
+            half_width_deg=half_width_deg,
+            dataset="noaacwNPPVIIRSchlaDaily",
+            source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+        )
+
+
 def make_pipeline(
     *,
     weather=None,
@@ -284,6 +334,8 @@ def make_pipeline(
     comparison_engine=_UNSET,
     evidence_engine=_UNSET,
     stability_engine=_UNSET,
+    neighbourhood_engine=_UNSET,
+    neighbourhood_probe=None,
     historical_environment_agent=None,
     qu_llm=None,
     explain_llm=None,
@@ -326,6 +378,12 @@ def make_pipeline(
             if stability_engine is _UNSET
             else stability_engine
         ),
+        neighbourhood_engine=(
+            EnvironmentalNeighbourhoodEngine()
+            if neighbourhood_engine is _UNSET
+            else neighbourhood_engine
+        ),
+        neighbourhood_probe=neighbourhood_probe,
         historical_environment_agent=historical_environment_agent,
     )
     return OrcaPipeline(deps)

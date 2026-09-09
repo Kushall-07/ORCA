@@ -31,6 +31,10 @@ ENVIRONMENTAL_EVIDENCE_ENGINE_VERSION = "environmental-evidence-0.1.0"
 # Phase 9 Step 6: deterministic bounded-window stability / coverage profile.
 ENVIRONMENTAL_STABILITY_ENGINE_VERSION = "environmental-stability-0.1.0"
 
+# Phase 9 Step 7: deterministic chlorophyll-a pixel-neighbourhood
+# representativeness profile.
+ENVIRONMENTAL_NEIGHBOURHOOD_ENGINE_VERSION = "environmental-neighbourhood-0.1.0"
+
 PRODUCTIVITY_DISCLAIMER = (
     "Chlorophyll-a is an environmental productivity proxy and does not indicate "
     "fish presence, abundance, or catch."
@@ -423,3 +427,101 @@ class EnvironmentalStabilityResult(BaseModel):
         return any(
             p is not None and p.has_profile for p in (self.sst, self.chlorophyll_a)
         )
+
+
+# ==========================================================================
+# Phase 9 Step 7: Chlorophyll-a Pixel-Neighbourhood Representativeness Profile
+# ==========================================================================
+# A deterministic, LLM-free, I/O-free engine that describes whether the SINGLE
+# ~4 km chlorophyll-a pixel ORCA already uses is representative of the valid
+# nearby pixels on the SAME satellite composite. It is a QUALIFICATION of the
+# existing central observation.
+#
+# It is NOT fish detection, abundance, catch prediction, productivity
+# estimation, fishing suitability, bloom / front / plume / eddy / gradient
+# detection, spatial interpolation, continuous-surface generation, forecasting,
+# ML or biological inference. It computes NO slope, trend, rate of change,
+# spatial gradient, directional vector, interpolation, forecast or anomaly
+# field. Missing / cloud pixels are MISSING - never zero-filled, interpolated or
+# synthesised. Quartiles are NEAREST-RANK. With fewer than three valid pixels no
+# dispersion statistic is emitted (honest missingness).
+#
+# The engine imports nothing from ``app.policy`` / ``app.risk`` / ``app.decision``
+# / ``app.routing`` / ``app.safety`` and its output NEVER feeds any of them, the
+# Marine Data Fabric, fusion, arbitration, ``evidence[]`` or the Temporal
+# Validity Gate.
+
+
+class NeighbourhoodPixel(BaseModel):
+    """One REAL native pixel returned inside the neighbourhood box (already
+    validated: finite, > 0, coordinates in range). Never fabricated or
+    interpolated. This is an INTERNAL pipeline detail - the raw per-pixel array
+    is never exposed through the public API."""
+
+    model_config = ConfigDict(frozen=True)
+
+    value: float                 # mg m-3, strictly > 0
+    latitude: float
+    longitude: float
+    observed_at: str             # ISO - the real composite time of this pixel
+    distance_km: float           # queried point -> this pixel
+
+
+class EnvironmentalNeighbourhoodInputs(BaseModel):
+    """Everything the neighbourhood engine needs. The node builds this from the
+    single isolated ERDDAP neighbourhood fetch plus the central observation ORCA
+    already holds; the engine performs NO I/O."""
+
+    model_config = ConfigDict(frozen=True)
+
+    central_value: float | None = None       # the existing queried CHL pixel value
+    unit: str = "mg m-3"
+    dataset: str = ""
+    composite_date: str | None = None        # the real composite the box was read from
+    half_width_deg: float = 0.0
+    box: str = ""                            # human label of the fixed box
+    cells_total: int = 0                     # every grid cell in the box (valid + missing)
+    pixels: tuple[NeighbourhoodPixel, ...] = ()   # the VALID nearby pixels only
+
+
+class EnvironmentalNeighbourhoodResult(BaseModel):
+    """Deterministic output of the Environmental Neighbourhood Engine.
+
+    Purely a descriptive statistical qualification of the central chlorophyll-a
+    pixel against the valid nearby pixels on the same composite. It NEVER feeds
+    risk, safety, decision, routing, suitability, geofencing, conflict
+    resolution, the Marine Data Fabric, fusion, arbitration or ``evidence[]``,
+    and never makes a fish / catch / productivity / bloom / front / gradient /
+    hotspot claim. ``central_pixel_vs_median`` is a plain [Q1, Q3] band
+    classification, not an abnormality / biological judgement."""
+
+    model_config = ConfigDict(frozen=True)
+
+    variable: str = "chlorophyll_a"
+    status: str = ReproducibilityStatus.UNAVAILABLE.value  # adequate|limited|insufficient|unavailable
+    unit: str = "mg m-3"
+    dataset: str = ""
+    box: str = ""
+    half_width_deg: float = 0.0
+    composite_date: str | None = None
+    cells_total: int = 0
+    cells_with_data: int = 0
+    coverage: float | None = None            # cells_with_data / cells_total, rounded
+    coverage_sentence: str | None = None     # plain-language coverage description
+    nearest_valid_pixel_km: float | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    iqr: float | None = None
+    central_value: float | None = None
+    central_pixel_vs_median: str = "n/a"     # within | above | below | n/a
+    limitations: tuple[str, ...] = ()
+    disclaimer: str = PRODUCTIVITY_DISCLAIMER
+    engine_version: str = ENVIRONMENTAL_NEIGHBOURHOOD_ENGINE_VERSION
+
+    @property
+    def has_profile(self) -> bool:
+        return self.median is not None

@@ -255,6 +255,48 @@ class EnvironmentalStabilityInfo(BaseModel):
     engine_version: str = ""
 
 
+class EnvironmentalNeighbourhoodInfo(BaseModel):
+    """Phase 9 Step 7: deterministic chlorophyll-a pixel-neighbourhood
+    representativeness profile. It QUALIFIES the single central chlorophyll-a
+    pixel ORCA already uses against the valid nearby pixels on the SAME satellite
+    composite. It is descriptive research context only - NOT fish detection,
+    abundance, catch, productivity, fishing suitability, a bloom / front / plume
+    / eddy / gradient / patch / hotspot, interpolation, a continuous surface, a
+    forecast or biological inference - and NEVER affects risk, safety, decision,
+    route, suitability, geofencing or conflict resolution. Quartiles are
+    nearest-rank; statistics are ``null`` when fewer than three valid nearby
+    pixels exist (honest missingness). The raw per-pixel array is never exposed.
+    ``central_pixel_vs_median`` is a plain [Q1, Q3] band classification
+    (within / above / below / n/a), not an abnormality judgement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    variable: str = "chlorophyll_a"
+    status: str = "unavailable"          # adequate | limited | insufficient | unavailable
+    unit: str = "mg m-3"
+    dataset: str = ""
+    box: str = ""
+    half_width_deg: float = 0.0
+    composite_date: str | None = None
+    cells_total: int = 0
+    cells_with_data: int = 0
+    coverage: float | None = None        # cells_with_data / cells_total
+    coverage_sentence: str | None = None
+    nearest_valid_pixel_km: float | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    iqr: float | None = None
+    central_value: float | None = None
+    central_pixel_vs_median: str = "n/a"  # within | above | below | n/a
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
 class EnvironmentalInfo(BaseModel):
     """Phase 9 Step 3: deterministic researcher-facing environmental context.
 
@@ -283,6 +325,12 @@ class EnvironmentalInfo(BaseModel):
     # profile. Null unless the query was comparative and an accepted historical
     # series was available. Additive - existing clients are unaffected.
     stability: EnvironmentalStabilityInfo | None = None
+    # Phase 9 Step 7: optional deterministic chlorophyll-a pixel-neighbourhood
+    # representativeness profile. Null unless the query was an
+    # environmental_conditions query with a usable current chlorophyll-a
+    # observation and the isolated neighbourhood fetch succeeded. Additive -
+    # existing clients are unaffected.
+    neighbourhood: EnvironmentalNeighbourhoodInfo | None = None
 
 
 class DataQualityInfo(BaseModel):

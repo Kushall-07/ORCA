@@ -34,6 +34,7 @@ class ProvNodeKind(str, Enum):
     ENVIRONMENTAL_COMPARISON = "environmental_comparison"  # Phase 9 Step 4: temporal comparison
     ENVIRONMENTAL_EVIDENCE = "environmental_evidence"  # Phase 9 Step 5: evidence / reproducibility assessment
     ENVIRONMENTAL_STABILITY = "environmental_stability"  # Phase 9 Step 6: bounded-window dispersion & coverage
+    ENVIRONMENTAL_NEIGHBOURHOOD = "environmental_neighbourhood"  # Phase 9 Step 7: chlorophyll-a pixel-neighbourhood representativeness
     EXPLANATION = "explanation"
 
 

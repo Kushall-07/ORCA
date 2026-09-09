@@ -10,6 +10,7 @@ and then replaced by a deterministic template.
 from __future__ import annotations
 
 import json
+import re
 
 from app.core.logging import get_logger
 from app.i18n.messages import (
@@ -28,6 +29,7 @@ from app.models.environmental import (
     ComparisonDirection,
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
+    EnvironmentalNeighbourhoodResult,
     EnvironmentalProductivityResult,
     EnvironmentalStabilityResult,
     ProductivityPotential,
@@ -84,6 +86,16 @@ Hard rules:
   NOT mean safer/better fishing; a wide spread does NOT mean worse fishing;
   sparse coverage does NOT mean poor conditions. Never read observation ordering
   as a direction over time.
+- If a chlorophyll-a pixel-neighbourhood profile is present: it describes ONLY
+  whether the single central chlorophyll-a pixel is typical of the valid nearby
+  pixels on the SAME satellite composite. Restate the given number of valid
+  pixels, total pixels / cells, coverage, nearest-valid-pixel distance, the
+  min / max / median / IQR and the within / above / below / n/a placement, and
+  the categorical status. Do NOT compute any of them. It is NOT a spatial field,
+  a bloom, a front, a plume, an eddy, a gradient, a patch, a hotspot, a "more
+  productive area" or a fishing indicator, and NOT fish presence, abundance or
+  catch. "Above" or "below" the neighbourhood range is a plain statistical
+  placement, never "abnormal", "unusual" or biologically meaningful.
 - Respond in the requested language only. Be concise (3-6 sentences).
 Return plain text, no markdown headings."""
 
@@ -105,6 +117,19 @@ _BIOLOGICAL_CLAIMS = (
     "good conditions for fishing", "favourable for catch", "favorable for catch",
     "productive fishing ground", "reliable fishing", "chlorophyll proves",
     "sst proves", "guarantees catch", "guarantees fish",
+    # Step 7 - a pixel-neighbourhood placement must never imply spatial structure
+    # or a biological / fishing meaning ("bloom" is already forbidden above).
+    "hot spot", "more productive area", "fishing hotspot", "productive patch",
+    "biologically unusual", "abnormally high", "abnormally low",
+)
+
+# Step 7 - single words that would recast a plain statistical placement as
+# spatial structure / biology. Word-boundaried so "dispatch", "confront" etc.
+# are not false positives.
+_NEIGHBOURHOOD_FORBIDDEN = re.compile(
+    r"\b(front|plume|eddy|eddies|gradient|patch|patches|hotspot|hotspots|"
+    r"upwelling)\b",
+    re.IGNORECASE,
 )
 
 
@@ -130,6 +155,7 @@ class ExplanationAgent:
         comparison: EnvironmentalComparisonResult | None = None,
         environmental_evidence: EnvironmentalEvidenceResult | None = None,
         stability: EnvironmentalStabilityResult | None = None,
+        neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
     ) -> Explanation:
         template = render_template(
             language=language,
@@ -144,6 +170,7 @@ class ExplanationAgent:
             comparison=comparison,
             environmental_evidence=environmental_evidence,
             stability=stability,
+            neighbourhood=neighbourhood,
         )
 
         notes = _structured_notes(
@@ -157,7 +184,7 @@ class ExplanationAgent:
         context = json.dumps(
             _llm_context(language, understanding, decision, risk, suitability,
                          conflicts, route, fabric, productivity, comparison,
-                         environmental_evidence, stability),
+                         environmental_evidence, stability, neighbourhood),
             ensure_ascii=False,
         )
         user = f"CONTEXT (authoritative, do not change):\n{context}\n\nExplain this decision."
@@ -175,7 +202,7 @@ class ExplanationAgent:
                 text, provenance=provenance, decision=decision, risk=risk,
                 suitability=suitability, route=route, environmental=productivity,
                 comparison=comparison, environmental_evidence=environmental_evidence,
-                stability=stability,
+                stability=stability, neighbourhood=neighbourhood,
             )
             contradiction = _contradicts_decision(text, decision)
             biological = (
@@ -183,7 +210,10 @@ class ExplanationAgent:
                 or comparison is not None
                 or environmental_evidence is not None
                 or stability is not None
-            ) and _contains_biological_claim(text)
+                or neighbourhood is not None
+            ) and _contains_biological_claim(
+                text, check_neighbourhood=neighbourhood is not None
+            )
             if report.grounded and not contradiction and not biological:
                 return Explanation(
                     text=text.strip(),
@@ -228,6 +258,7 @@ def render_template(
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
 ) -> Explanation:
     parts: list[str] = []
     notes = _structured_notes(decision, risk, suitability, conflicts, route, (), fabric)
@@ -335,6 +366,17 @@ def render_template(
         ):
             parts.append(frag(language, "env_disclaimer"))
 
+    # ---- chlorophyll-a pixel-neighbourhood representativeness (Phase 9 Step 7) ----
+    if neighbourhood is not None:
+        _render_neighbourhood(parts, language, neighbourhood)
+        if (
+            productivity is None
+            and comparison is None
+            and environmental_evidence is None
+            and stability is None
+        ):
+            parts.append(frag(language, "env_disclaimer"))
+
     proxy_mentioned = risk is not None and any(
         f.name in ("lightning_proxy", "cyclone_proxy") and (f.normalized_score or 0) > 0.1
         for f in risk.factors
@@ -376,12 +418,18 @@ def _contradicts_decision(text: str, decision: DecisionResult | None) -> bool:
     return any(phrase in low for phrase in _UNSAFE_ASSERTIONS)
 
 
-def _contains_biological_claim(text: str) -> bool:
-    """Deterministic guard: an environmental / comparison explanation must never
-    claim fish presence, abundance, catch, fishing success, or imply a trend /
-    bloom."""
+def _contains_biological_claim(text: str, *, check_neighbourhood: bool = False) -> bool:
+    """Deterministic guard: an environmental / comparison / neighbourhood
+    explanation must never claim fish presence, abundance, catch, fishing
+    success, or imply a trend / bloom. When a chlorophyll-a pixel-neighbourhood
+    profile is present it must also never recast a plain [Q1, Q3] placement as
+    spatial structure (front / plume / eddy / gradient / patch / hotspot)."""
     low = text.lower()
-    return any(phrase in low for phrase in _BIOLOGICAL_CLAIMS)
+    if any(phrase in low for phrase in _BIOLOGICAL_CLAIMS):
+        return True
+    if check_neighbourhood and _NEIGHBOURHOOD_FORBIDDEN.search(text):
+        return True
+    return False
 
 
 def _render_comparison(parts, language, comparison) -> None:  # type: ignore[no-untyped-def]
@@ -523,6 +571,62 @@ def _render_stability(parts, language, stability) -> None:  # type: ignore[no-un
     parts.append(frag(language, "env_stab_note"))
 
 
+_VS_KEY = {
+    "within": "env_nbhd_within",
+    "above": "env_nbhd_above",
+    "below": "env_nbhd_below",
+    "n/a": "env_nbhd_vs_na",
+}
+
+
+def _render_neighbourhood(parts, language, nbhd) -> None:  # type: ignore[no-untyped-def]
+    """Append deterministic chlorophyll-a pixel-neighbourhood sentences
+    (EN / HI / KN).
+
+    States only: the number of valid / total nearby pixels, coverage, the
+    nearest-valid-pixel distance, min / max / median / IQR and the within /
+    above / below / n/a placement of the central pixel against the neighbourhood
+    interquartile range, plus the categorical status. NEVER a bloom, front,
+    plume, eddy, gradient, patch, hotspot, "more productive area", spatial field,
+    trend, forecast or a fish / catch claim.
+    """
+    var_label = frag(language, "env_var_chl")
+
+    if nbhd.status == "unavailable" or nbhd.cells_with_data == 0:
+        parts.append(frag(language, "env_nbhd_unavailable", var=var_label))
+        parts.append(frag(language, "env_nbhd_note"))
+        return
+
+    if nbhd.status == "insufficient" or nbhd.median is None:
+        parts.append(
+            frag(
+                language, "env_nbhd_insufficient",
+                var=var_label, n=nbhd.cells_with_data, m=nbhd.cells_total,
+            )
+        )
+        parts.append(frag(language, "env_nbhd_note"))
+        return
+
+    unit = nbhd.unit
+    parts.append(
+        frag(
+            language, "env_nbhd_stats",
+            var=var_label, n=nbhd.cells_with_data, m=nbhd.cells_total,
+            min=_fmt_stat(nbhd.minimum), max=_fmt_stat(nbhd.maximum),
+            median=_fmt_stat(nbhd.median), iqr=_fmt_stat(nbhd.iqr), unit=unit,
+        )
+    )
+    if nbhd.nearest_valid_pixel_km is not None:
+        parts.append(
+            frag(language, "env_nbhd_nearest",
+                 km=_fmt_stat(nbhd.nearest_valid_pixel_km))
+        )
+    parts.append(frag(language, _VS_KEY.get(nbhd.central_pixel_vs_median, "env_nbhd_vs_na")))
+    if nbhd.status == "limited":
+        parts.append(frag(language, "env_nbhd_limited"))
+    parts.append(frag(language, "env_nbhd_note"))
+
+
 def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fabric) -> dict:  # type: ignore[no-untyped-def]
     reasoning = " | ".join(decision.reasons[:4]) if decision else "no decision"
     evidence_refs = tuple(
@@ -557,7 +661,7 @@ def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fab
     }
 
 
-def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None, stability=None) -> dict:  # type: ignore[no-untyped-def]
+def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None, stability=None, neighbourhood=None) -> dict:  # type: ignore[no-untyped-def]
     ctx: dict = {"language": language.value if hasattr(language, "value") else str(language)}
     if understanding is not None:
         ctx["intent"] = understanding.intent.value
@@ -747,6 +851,44 @@ def _llm_context(language, understanding, decision, risk, suitability, conflicts
                 "rising/declining, forecast, seasonality, bloom, more/fewer fish, "
                 "better/worse fishing, catch or yield. A narrow spread is not "
                 "'safer fishing'; sparse coverage is not 'poor conditions'."
+            ),
+        }
+
+    if neighbourhood is not None:
+        nb = neighbourhood
+        ctx["environmental_neighbourhood"] = {
+            "variable": nb.variable,
+            "status": nb.status,
+            "unit": nb.unit,
+            "box": nb.box,
+            "half_width_deg": nb.half_width_deg,
+            "composite_date": nb.composite_date,
+            "cells_total": nb.cells_total,
+            "cells_with_data": nb.cells_with_data,
+            "coverage": nb.coverage,
+            "nearest_valid_pixel_km": nb.nearest_valid_pixel_km,
+            "minimum": nb.minimum,
+            "maximum": nb.maximum,
+            "range": nb.range,
+            "q1": nb.q1,
+            "median": nb.median,
+            "q3": nb.q3,
+            "iqr": nb.iqr,
+            "central_value": nb.central_value,
+            "central_pixel_vs_median": nb.central_pixel_vs_median,
+            "limitations": list(nb.limitations),
+            "disclaimer": nb.disclaimer,
+            "note": (
+                "This QUALIFIES the single central chlorophyll-a pixel against "
+                "the valid nearby pixels on the SAME satellite composite. Restate "
+                "the given valid / total pixel counts, coverage, nearest-valid- "
+                "pixel distance, min / max / median / IQR and the within / above "
+                "/ below / n/a placement, plus the categorical status - do NOT "
+                "compute them. NEVER say bloom, front, plume, eddy, gradient, "
+                "patch, hotspot, 'more productive area', spatial field / map, "
+                "trend, forecast, more/fewer fish, catch or yield. 'Above' or "
+                "'below' is a plain statistical placement, never 'abnormal' or "
+                "biologically meaningful."
             ),
         }
     return ctx
