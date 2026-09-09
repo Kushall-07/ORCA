@@ -159,6 +159,37 @@ The `SourceStatus` on every `FabricRecord` / agent result carries `tier`,
   role `environmental / non-blocking`.
 - **Rule:** chlorophyll-a ≠ fish presence. Productivity interpretation is
   Phase 9 Step 3.
+- **Step 3 interpretation (deterministic, no new source):** the Environmental
+  Productivity Engine (`app/environmental/engine.py`, boundaries in
+  `app/environmental/environmental_config.yaml`) maps chlorophyll-a to a
+  descriptive trophic class (`oligotrophic < 0.1 ≤ low < 1 ≤ moderate < 3 ≤
+  elevated < 10 ≤ high`, mg m⁻³) and a qualitative `productivity_potential`
+  from chlorophyll-a **alone** (SST is context only). Surfaced in the additive
+  `QueryResponse.environmental` block; never feeds Risk / Safety / Decision /
+  Routing. See
+  [`phase9-step3-environmental-intelligence.md`](phase9-step3-environmental-intelligence.md).
+- **Step 4 temporal comparison (deterministic, no new source):** a researcher
+  current-vs-reference comparison. The reference is an **ORCA-computed** value —
+  the lower-median of the values the source actually returned over a recent past
+  window (default 30 days). **Not a climatological normal.**
+  - SST history: `openmeteo.fetch_marine_history(past_days ≤ 92)` — the **same**
+    Open-Meteo Marine product as the live SST call. One HTTP call.
+  - Chlorophyll-a history: `oceancolor.fetch_chlorophyll_series(start, end)` —
+    **one** ranged NOAA CoastWatch ERDDAP griddap request; existing spatial
+    (≤ 25 km) + temporal acceptance; median computed client-side. NOAA only.
+  - **At most two extra HTTP calls per comparative query.** An anti-`[last]`
+    guard discards any composite nearer to "now" than to the requested window.
+  - Fetched **inside** the `environmental_comparison` node by
+    `app/agents/historical_environment.py` (no LLM). Historical observations
+    **never** enter the Marine Data Fabric, fusion, arbitration, conflict
+    detection, the Temporal Validity Gate's gated set, or `RiskEngineInput`.
+  - Cloud gaps (SW monsoon) and NRT lag make `insufficient_history` a common,
+    honest outcome for coastal chlorophyll. No baseline is ever fabricated.
+  - SST comparison exposes `absolute_change` only; chlorophyll-a also exposes
+    `relative_change_pct` (guarded by a near-zero-denominator epsilon).
+    `direction` ∈ higher / lower / unchanged / unknown — a sign classification
+    of one difference, **not** a trend. See
+    [`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
 
 ---
 

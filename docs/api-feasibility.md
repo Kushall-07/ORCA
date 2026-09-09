@@ -61,10 +61,37 @@ The thunderstorm/lightning proxy is **not** strike-level detection. The cyclone
 proxy is **not** a certified detection system. Official PFZ information and
 ORCA-derived fishing suitability are kept conceptually separate and are labelled
 distinctly: PFZ = reference/official; suitability = ORCA-derived.
-**Chlorophyll-a is never equated with fish presence.** The eventual
-interpretation is "elevated chlorophyll + favourable SST ⇒ elevated
-environmental productivity *indicator* (uncertain)", and that engine is Phase 9
-Step 3 — not implemented in Step 2, which only integrates the raw observations.
+**Chlorophyll-a is never equated with fish presence.**
+
+As of Phase 9 **Step 3**, the deterministic **Environmental Productivity Engine**
+(`app/environmental/engine.py`) interprets chlorophyll-a into a descriptive
+trophic class and a qualitative `productivity_potential`
+(`unknown | low | moderate | elevated`), derived from **chlorophyll-a alone** —
+SST is context and never changes it. `productivity_potential` is a
+researcher-facing *environmental* indicator; it **does not** affect Risk, Safety,
+Decision, Suitability, Geofencing, Routing or Alerts, and it is surfaced only in
+the additive `QueryResponse.environmental` block (see
+`phase9-step3-environmental-intelligence.md`). Every place it appears carries the
+mandatory disclaimer: *"Chlorophyll-a is an environmental productivity proxy and
+does not indicate fish presence, abundance, or catch."* Forbidden wording is
+unchanged: no "more fish", "fish are present", "expected catch",
+"guaranteed fishing success".
+
+Phase 9 **Step 4** adds a deterministic **Environmental Comparison Engine**
+(`app/environmental/comparison.py`) that compares a current SST / chlorophyll-a
+observation with an **ORCA-computed reference** (the median of the values the
+source returned over a recent past window, default 30 days — **not a
+climatological normal**). SST exposes an absolute difference only; chlorophyll-a
+also exposes a percentage change, guarded by a near-zero-denominator epsilon.
+`direction` ∈ `higher | lower | unchanged | unknown` is a sign classification of
+**one** difference — never a trend, slope or forecast. The historical reference
+is fetched locally (≤ 2 extra HTTP calls) and **never** enters the Marine Data
+Fabric or `RiskEngineInput`. It is surfaced only in the additive
+`QueryResponse.environmental.comparison` block (see
+`phase9-step4-temporal-comparative-intelligence.md`). Forbidden wording extends
+to: no "rising/declining trend", "trending up/down", "bloom", "better/worse
+fishing", "higher/lower catch", "yield". **A chlorophyll-a change is never
+interpreted as a fish / catch / productivity change.**
 
 ---
 

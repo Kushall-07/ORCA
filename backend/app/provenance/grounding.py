@@ -12,6 +12,10 @@ import re
 from pydantic import BaseModel, ConfigDict
 
 from app.models.decision import DecisionResult
+from app.models.environmental import (
+    EnvironmentalComparisonResult,
+    EnvironmentalProductivityResult,
+)
 from app.models.provenance import ProvenanceGraph
 from app.models.risk import RiskResult
 from app.models.routing import RouteResult
@@ -63,6 +67,8 @@ def _engine_values(
     risk: RiskResult | None,
     suitability: SuitabilityResult | None,
     route: RouteResult | None,
+    environmental: EnvironmentalProductivityResult | None,
+    comparison: EnvironmentalComparisonResult | None,
     extra: tuple[float, ...],
 ) -> list[float]:
     values: list[float] = list(extra)
@@ -70,6 +76,23 @@ def _engine_values(
         for node in provenance.numeric_nodes():
             if isinstance(node.value, (int, float)):
                 values.append(float(node.value))
+    if environmental is not None:
+        for obs in (environmental.sst, environmental.chlorophyll_a):
+            if obs is not None and obs.value is not None:
+                values += [obs.value, round(obs.value, 1), round(obs.value, 2), round(obs.value)]
+    if comparison is not None:
+        for cmp in (comparison.sst, comparison.chlorophyll_a):
+            if cmp is None:
+                continue
+            for n in (
+                cmp.current.value if cmp.current is not None else None,
+                cmp.reference.value if cmp.reference is not None else None,
+                cmp.absolute_change,
+                cmp.relative_change_pct,
+            ):
+                if n is not None:
+                    values += [n, round(n, 1), round(n, 2), round(n), abs(n),
+                               round(abs(n), 1), round(abs(n), 2)]
     if risk is not None:
         values += [risk.overall_score, round(risk.overall_score)]
         for f in risk.factors:
@@ -97,9 +120,14 @@ def ground_text(
     risk: RiskResult | None = None,
     suitability: SuitabilityResult | None = None,
     route: RouteResult | None = None,
+    environmental: EnvironmentalProductivityResult | None = None,
+    comparison: EnvironmentalComparisonResult | None = None,
     extra_allowed: tuple[float, ...] = (),
 ) -> GroundingReport:
-    engine = _engine_values(provenance, decision, risk, suitability, route, extra_allowed)
+    engine = _engine_values(
+        provenance, decision, risk, suitability, route, environmental, comparison,
+        extra_allowed,
+    )
     claims: list[GroundingClaim] = []
     unsupported: list[str] = []
     for token, value in _numbers_in(text):

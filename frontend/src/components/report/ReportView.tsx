@@ -12,7 +12,8 @@ export function ReportView({
   query: string;
   onClose: () => void;
 }) {
-  const { t, decisionLabel, riskLabel, suitabilityLabel } = useI18n();
+  const { t, decisionLabel, riskLabel, suitabilityLabel, chlClassLabel, productivityLabel } =
+    useI18n();
   const now = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
   return (
@@ -89,6 +90,68 @@ export function ReportView({
                   : ""}
               </p>
               <p className="report__fine">{resp.suitability.disclaimer}</p>
+            </section>
+          )}
+
+          {resp.environmental && (
+            <section className="report__section">
+              <h2>{t("panel.environmental")}</h2>
+              <p>
+                {t("env.productivity")}:{" "}
+                {productivityLabel(resp.environmental.productivity_potential)}
+                {" · "}
+                {t("env.confidence")}:{" "}
+                {String(resp.environmental.confidence).toUpperCase()}
+              </p>
+              <p>
+                {t("env.sst")}:{" "}
+                {resp.environmental.sst?.value != null
+                  ? `${resp.environmental.sst.value} ${resp.environmental.sst.unit}`
+                  : t("env.unavailable")}
+                {" · "}
+                {t("env.chlorophyll")}:{" "}
+                {resp.environmental.chlorophyll_a?.value != null
+                  ? `${resp.environmental.chlorophyll_a.value} ${resp.environmental.chlorophyll_a.unit}`
+                  : t("env.unavailable")}
+                {resp.environmental.chlorophyll_class
+                  ? ` (${chlClassLabel(resp.environmental.chlorophyll_class)})`
+                  : ""}
+              </p>
+              {resp.environmental.limitations.length > 0 && (
+                <ul>
+                  {resp.environmental.limitations.map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+              )}
+              {resp.environmental.comparison &&
+                ([resp.environmental.comparison.sst, resp.environmental.comparison.chlorophyll_a]
+                  .filter((c): c is NonNullable<typeof c> => c != null)
+                  .map((c) => (
+                    <p key={c.variable}>
+                      {c.variable === "sea_surface_temperature"
+                        ? t("env.sst")
+                        : t("env.chlorophyll")}{" "}
+                      — {t("env.cmp.title")}:{" "}
+                      {c.status === "ok" && c.absolute_change != null
+                        ? `${t("env.cmp.now")} ${c.current?.value ?? "—"}, ${t(
+                            "env.cmp.reference",
+                          )} ${c.reference?.value ?? "—"}, ${t("env.cmp.delta")} ${
+                            c.absolute_change >= 0 ? "+" : "−"
+                          }${Math.abs(c.absolute_change)}${
+                            c.relative_change_pct != null
+                              ? ` (${c.relative_change_pct >= 0 ? "+" : "−"}${Math.abs(
+                                  c.relative_change_pct,
+                                ).toFixed(0)}%)`
+                              : ""
+                          } (${c.reference_window})`
+                        : c.limitations[0] ?? t("env.cmp.unavailable")}
+                    </p>
+                  )))}
+              {resp.environmental.comparison && (
+                <p className="report__fine">{t("env.cmp.note")}</p>
+              )}
+              <p className="report__fine">{resp.environmental.disclaimer}</p>
             </section>
           )}
 

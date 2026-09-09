@@ -317,6 +317,122 @@ SCENARIOS: tuple[Scenario, ...] = (
         notes="Spatial risk aggregation across regions is a documented gap; the "
               "scenario asserts graceful single-point behaviour, not a fake heatmap.",
     ),
+    # ---- Phase 9 Step 3: researcher environmental intelligence ----------
+    # These are additive. Scenarios 01-16 above are the frozen Phase 7
+    # regression set and are unchanged by environmental intelligence.
+    Scenario(
+        scenario_id="17_researcher_environmental",
+        title="Researcher: SST + chlorophyll-a environmental context (no safety impact)",
+        stakeholder="researcher",
+        fixture="researcher_env",
+        turns=("What are the chlorophyll-a and sea-surface temperature conditions "
+               "near Mangalore for our research survey?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("sea_surface_temperature", "chlorophyll_a"),
+                provenance_has_kinds=("environmental",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=("chlorophyll",),
+                # chlorophyll-a must never be spoken of as fish / catch
+                answer_excludes_all=(
+                    "more fish", "expected catch", "catch will", "good catch",
+                    "fish abundance", "abundant fish", "fishing success",
+                    "guaranteed",
+                ),
+                node_trace_present=True,
+                request_id_present=True,
+            ),
+        ),
+        tags=("phase9", "researcher", "environmental"),
+        notes="Environmental productivity potential is derived from chlorophyll-a "
+              "alone; SST is context only. It never changes risk/safety/decision.",
+    ),
+    Scenario(
+        scenario_id="18_researcher_environmental_missing_chl",
+        title="Researcher: chlorophyll-a unavailable -> honest 'unknown', still OK",
+        stakeholder="researcher",
+        fixture="researcher_env_missing",
+        turns=("Give me the environmental productivity picture near Mangalore "
+               "from chlorophyll and sea surface temperature.",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("sea_surface_temperature",),
+                provenance_has_kinds=("environmental",),
+                provenance_complete=True,
+                grounded=True,
+                answer_excludes_all=(
+                    "more fish", "expected catch", "catch will", "good catch",
+                    "fishing success", "guaranteed",
+                ),
+            ),
+        ),
+        tags=("phase9", "researcher", "environmental", "limitation"),
+        notes="A missing chlorophyll pixel yields productivity_potential=unknown; "
+              "no value is fabricated and the main query still completes.",
+    ),
+    # ---- Phase 9 Step 4: researcher temporal & comparative intelligence ----
+    # Additive. Scenarios 01-16 remain the frozen Phase 7 regression set; 17-18
+    # are the Step 3 additions. These two exercise the Step 4 comparison node.
+    Scenario(
+        scenario_id="19_researcher_temporal_comparison",
+        title="Researcher: current vs ORCA-computed reference (SST + chlorophyll-a)",
+        stakeholder="researcher",
+        fixture="researcher_env_compare",
+        turns=("Compare the current chlorophyll-a and sea-surface temperature near "
+               "Mangalore with the previous month.",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("sea_surface_temperature", "chlorophyll_a"),
+                provenance_has_kinds=("environmental_comparison",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=("reference",),
+                answer_excludes_all=(
+                    "more fish", "fewer fish", "better fishing", "worse fishing",
+                    "higher catch", "lower catch", "yield", "bloom",
+                    "rising trend", "declining trend", "trending up", "trending down",
+                ),
+                node_trace_present=True,
+                request_id_present=True,
+            ),
+        ),
+        tags=("phase9", "researcher", "comparison"),
+        notes="The historical reference is fetched locally by the comparison node "
+              "and never enters the fabric / fusion / arbitration / risk. The "
+              "reference is an ORCA-computed value over a past window, not a "
+              "climatological normal; a single difference is not a trend.",
+    ),
+    Scenario(
+        scenario_id="20_researcher_temporal_comparison_insufficient_history",
+        title="Researcher: no usable historical data -> honest insufficient_history",
+        stakeholder="researcher",
+        fixture="researcher_env_compare_nohist",
+        turns=("How has the chlorophyll-a near Mangalore changed since last month?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                provenance_has_kinds=("environmental_comparison",),
+                provenance_complete=True,
+                grounded=True,
+                answer_excludes_all=(
+                    "more fish", "better fishing", "higher catch", "yield", "bloom",
+                    "rising trend", "declining trend",
+                ),
+            ),
+        ),
+        tags=("phase9", "researcher", "comparison", "limitation"),
+        notes="No reference could be computed; the comparison reports "
+              "insufficient_history with no fabricated baseline and the main "
+              "query still completes.",
+    ),
 )
 
 

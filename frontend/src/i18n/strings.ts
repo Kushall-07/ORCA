@@ -55,6 +55,34 @@ export type StringKey =
   | "risk.notComputed"
   | "suitability.derived"
   | "suitability.pfzNote"
+  | "panel.environmental"
+  | "env.productivity"
+  | "env.sst"
+  | "env.chlorophyll"
+  | "env.chlClass"
+  | "env.confidence"
+  | "env.dataSufficiency"
+  | "env.limitations"
+  | "env.derived"
+  | "env.noFish"
+  | "env.unavailable"
+  | "env.suggestions"
+  | "env.suggestion.historical"
+  | "env.suggestion.seasonal"
+  | "env.suggestion.combine"
+  | "env.mapPoint"
+  | "env.cmp.title"
+  | "env.cmp.now"
+  | "env.cmp.reference"
+  | "env.cmp.delta"
+  | "env.cmp.window"
+  | "env.cmp.validity"
+  | "env.cmp.higher"
+  | "env.cmp.lower"
+  | "env.cmp.unchanged"
+  | "env.cmp.unknown"
+  | "env.cmp.unavailable"
+  | "env.cmp.note"
   | "panel.route"
   | "route.status"
   | "route.distance"
@@ -180,6 +208,34 @@ const en: Table = {
   "risk.notComputed": "Risk was not computed for this query.",
   "suitability.derived": "ORCA-derived — separate from operational safety",
   "suitability.pfzNote": "PFZ reference",
+  "panel.environmental": "Environmental Context",
+  "env.productivity": "Environmental productivity potential",
+  "env.sst": "Sea-surface temperature",
+  "env.chlorophyll": "Chlorophyll-a",
+  "env.chlClass": "Chlorophyll level",
+  "env.confidence": "Confidence",
+  "env.dataSufficiency": "Data sufficiency",
+  "env.limitations": "Limitations",
+  "env.derived": "ORCA-derived from chlorophyll-a alone — environmental context only, never a safety input. SST is context, not a driver.",
+  "env.noFish": "Chlorophyll-a reflects phytoplankton biomass. It is not a measure of fish presence, abundance or catch.",
+  "env.unavailable": "unavailable",
+  "env.suggestions": "Researcher next steps",
+  "env.suggestion.historical": "Compare with historical climatology for this location and season.",
+  "env.suggestion.seasonal": "Inspect seasonal phytoplankton patterns before reading a single snapshot.",
+  "env.suggestion.combine": "Combine with in-situ nutrient, salinity or primary-productivity observations.",
+  "env.mapPoint": "Environmental sample point",
+  "env.cmp.title": "Compared with an earlier observation",
+  "env.cmp.now": "now",
+  "env.cmp.reference": "reference",
+  "env.cmp.delta": "difference",
+  "env.cmp.window": "Reference window",
+  "env.cmp.validity": "validity",
+  "env.cmp.higher": "higher than reference",
+  "env.cmp.lower": "lower than reference",
+  "env.cmp.unchanged": "unchanged from reference",
+  "env.cmp.unknown": "not comparable",
+  "env.cmp.unavailable": "A temporal comparison could not be computed.",
+  "env.cmp.note": "The reference is an ORCA-computed value over a recent past window, not a climatological normal. A single difference is not a trend.",
   "panel.route": "Route",
   "route.status": "Status",
   "route.distance": "Distance",
@@ -309,6 +365,34 @@ const hi: Table = {
   "risk.notComputed": "इस प्रश्न के लिए जोखिम की गणना नहीं की गई।",
   "suitability.derived": "ORCA-निर्मित — सुरक्षा से अलग",
   "suitability.pfzNote": "PFZ संदर्भ",
+  "panel.environmental": "पर्यावरणीय संदर्भ",
+  "env.productivity": "पर्यावरणीय उत्पादकता क्षमता",
+  "env.sst": "समुद्री सतह तापमान",
+  "env.chlorophyll": "क्लोरोफिल-a",
+  "env.chlClass": "क्लोरोफिल स्तर",
+  "env.confidence": "विश्वास",
+  "env.dataSufficiency": "डेटा पर्याप्तता",
+  "env.limitations": "सीमाएँ",
+  "env.derived": "केवल क्लोरोफिल-a से ORCA-निर्मित — केवल पर्यावरणीय संदर्भ, सुरक्षा इनपुट नहीं। SST संदर्भ है, चालक नहीं।",
+  "env.noFish": "क्लोरोफिल-a पादपप्लवक जैवभार दर्शाता है। यह मछली की उपस्थिति, बहुतायत या पकड़ का माप नहीं है।",
+  "env.unavailable": "अनुपलब्ध",
+  "env.suggestions": "शोधकर्ता के अगले कदम",
+  "env.suggestion.historical": "इस स्थान और मौसम के लिए ऐतिहासिक जलवायु-विज्ञान से तुलना करें।",
+  "env.suggestion.seasonal": "एकल स्नैपशॉट पढ़ने से पहले मौसमी पादपप्लवक पैटर्न की जाँच करें।",
+  "env.suggestion.combine": "स्थल-स्थित पोषक, लवणता या प्राथमिक-उत्पादकता प्रेक्षणों के साथ मिलाएँ।",
+  "env.mapPoint": "पर्यावरणीय नमूना बिंदु",
+  "env.cmp.title": "पहले के प्रेक्षण से तुलना",
+  "env.cmp.now": "अभी",
+  "env.cmp.reference": "संदर्भ",
+  "env.cmp.delta": "अंतर",
+  "env.cmp.window": "संदर्भ अवधि",
+  "env.cmp.validity": "वैधता",
+  "env.cmp.higher": "संदर्भ से अधिक",
+  "env.cmp.lower": "संदर्भ से कम",
+  "env.cmp.unchanged": "संदर्भ से अपरिवर्तित",
+  "env.cmp.unknown": "तुलनीय नहीं",
+  "env.cmp.unavailable": "सामयिक तुलना नहीं की जा सकी।",
+  "env.cmp.note": "संदर्भ हाल की एक पिछली अवधि पर ORCA-गणित मान है, कोई जलवायु सामान्य नहीं। एक अंतर कोई प्रवृत्ति नहीं।",
   "panel.route": "मार्ग",
   "route.status": "स्थिति",
   "route.distance": "दूरी",
@@ -437,6 +521,34 @@ const kn: Table = {
   "risk.notComputed": "ಈ ಪ್ರಶ್ನೆಗೆ ಅಪಾಯ ಲೆಕ್ಕಹಾಕಲಾಗಿಲ್ಲ.",
   "suitability.derived": "ORCA-ಪಡೆದ — ಸುರಕ್ಷತೆಯಿಂದ ಪ್ರತ್ಯೇಕ",
   "suitability.pfzNote": "PFZ ಉಲ್ಲೇಖ",
+  "panel.environmental": "ಪರಿಸರ ಸಂದರ್ಭ",
+  "env.productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ",
+  "env.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
+  "env.chlorophyll": "ಕ್ಲೋರೊಫಿಲ್-a",
+  "env.chlClass": "ಕ್ಲೋರೊಫಿಲ್ ಮಟ್ಟ",
+  "env.confidence": "ವಿಶ್ವಾಸ",
+  "env.dataSufficiency": "ದತ್ತಾಂಶ ಸಮರ್ಪಕತೆ",
+  "env.limitations": "ಮಿತಿಗಳು",
+  "env.derived": "ಕೇವಲ ಕ್ಲೋರೊಫಿಲ್-a ನಿಂದ ORCA-ಪಡೆದ — ಕೇವಲ ಪರಿಸರ ಸಂದರ್ಭ, ಸುರಕ್ಷತಾ ಇನ್‌ಪುಟ್ ಅಲ್ಲ. SST ಸಂದರ್ಭ, ಚಾಲಕವಲ್ಲ.",
+  "env.noFish": "ಕ್ಲೋರೊಫಿಲ್-a ಪ್ಲವಕ ಜೀವರಾಶಿಯನ್ನು ಪ್ರತಿಬಿಂಬಿಸುತ್ತದೆ. ಇದು ಮೀನಿನ ಇರುವಿಕೆ, ಸಮೃದ್ಧಿ ಅಥವಾ ಹಿಡಿತದ ಅಳತೆ ಅಲ್ಲ.",
+  "env.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "env.suggestions": "ಸಂಶೋಧಕರ ಮುಂದಿನ ಹಂತಗಳು",
+  "env.suggestion.historical": "ಈ ಸ್ಥಳ ಮತ್ತು ಋತುವಿಗೆ ಐತಿಹಾಸಿಕ ಹವಾಮಾನಶಾಸ್ತ್ರದೊಂದಿಗೆ ಹೋಲಿಸಿ.",
+  "env.suggestion.seasonal": "ಒಂದೇ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಓದುವ ಮೊದಲು ಋತುಮಾನ ಪ್ಲವಕ ಮಾದರಿಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+  "env.suggestion.combine": "ಸ್ಥಳೀಯ ಪೋಷಕಾಂಶ, ಲವಣತೆ ಅಥವಾ ಪ್ರಾಥಮಿಕ-ಉತ್ಪಾದಕತೆ ವೀಕ್ಷಣೆಗಳೊಂದಿಗೆ ಸಂಯೋಜಿಸಿ.",
+  "env.mapPoint": "ಪರಿಸರ ಮಾದರಿ ಬಿಂದು",
+  "env.cmp.title": "ಹಿಂದಿನ ವೀಕ್ಷಣೆಯೊಂದಿಗೆ ಹೋಲಿಕೆ",
+  "env.cmp.now": "ಈಗ",
+  "env.cmp.reference": "ಉಲ್ಲೇಖ",
+  "env.cmp.delta": "ವ್ಯತ್ಯಾಸ",
+  "env.cmp.window": "ಉಲ್ಲೇಖ ಅವಧಿ",
+  "env.cmp.validity": "ಮಾನ್ಯತೆ",
+  "env.cmp.higher": "ಉಲ್ಲೇಖಕ್ಕಿಂತ ಹೆಚ್ಚು",
+  "env.cmp.lower": "ಉಲ್ಲೇಖಕ್ಕಿಂತ ಕಡಿಮೆ",
+  "env.cmp.unchanged": "ಉಲ್ಲೇಖದಿಂದ ಬದಲಾಗಿಲ್ಲ",
+  "env.cmp.unknown": "ಹೋಲಿಸಲಾಗದು",
+  "env.cmp.unavailable": "ತಾತ್ಕಾಲಿಕ ಹೋಲಿಕೆ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+  "env.cmp.note": "ಉಲ್ಲೇಖವು ಇತ್ತೀಚಿನ ಹಿಂದಿನ ಅವಧಿಯ ORCA-ಗಣಿತ ಮೌಲ್ಯ, ಹವಾಮಾನ ಸಾಮಾನ್ಯವಲ್ಲ. ಒಂದು ವ್ಯತ್ಯಾಸ ಪ್ರವೃತ್ತಿಯಲ್ಲ.",
   "panel.route": "ಮಾರ್ಗ",
   "route.status": "ಸ್ಥಿತಿ",
   "route.distance": "ದೂರ",
@@ -588,4 +700,36 @@ export const TIER_LABEL: Record<LanguageCode, Record<string, string>> = {
     DEMO: "ಡೆಮೊ",
     MISSING: "ಇಲ್ಲ",
   },
+};
+
+// Phase 9 Step 3 - descriptive chlorophyll-a trophic-magnitude bands. These are
+// NOT fish-abundance / catch thresholds.
+export const CHL_CLASS_LABEL: Record<LanguageCode, Record<string, string>> = {
+  en: {
+    oligotrophic: "very low (oligotrophic)",
+    low: "low",
+    moderate: "moderate",
+    elevated: "elevated",
+    high: "very high",
+  },
+  hi: {
+    oligotrophic: "बहुत कम (अल्पपोषी)",
+    low: "कम",
+    moderate: "मध्यम",
+    elevated: "बढ़ा हुआ",
+    high: "बहुत अधिक",
+  },
+  kn: {
+    oligotrophic: "ಬಹಳ ಕಡಿಮೆ (ಒಲಿಗೊಟ್ರೋಫಿಕ್)",
+    low: "ಕಡಿಮೆ",
+    moderate: "ಮಧ್ಯಮ",
+    elevated: "ಹೆಚ್ಚಿನ",
+    high: "ಬಹಳ ಹೆಚ್ಚು",
+  },
+};
+
+export const PRODUCTIVITY_LABEL: Record<LanguageCode, Record<string, string>> = {
+  en: { unknown: "UNKNOWN", low: "LOW", moderate: "MODERATE", elevated: "ELEVATED" },
+  hi: { unknown: "अज्ञात", low: "कम", moderate: "मध्यम", elevated: "बढ़ा हुआ" },
+  kn: { unknown: "ಅಜ್ಞಾತ", low: "ಕಡಿಮೆ", moderate: "ಮಧ್ಯಮ", elevated: "ಹೆಚ್ಚಿನ" },
 };

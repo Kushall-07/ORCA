@@ -1,7 +1,10 @@
-"""Phase 9 Step 2 - critical invariants for the SST + chlorophyll-a integration.
+"""Phase 9 Step 2 & 3 - critical invariants for the SST + chlorophyll-a
+integration and the Environmental Productivity Engine.
 
-Environmental data enriches the evidence base but must NOT touch the
-deterministic safety chain.
+Environmental data enriches the evidence base and, in Step 3, produces a
+researcher-facing productivity interpretation - but neither must ever touch the
+deterministic safety chain (risk / safety / decision / suitability / routing /
+alerts). "Byte-identical with and without environmental intelligence."
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from app.risk.engine import RiskEngineInput
 from tests.orchestration_fakes import (
     NOW,
     FakeEnvironmentalAgent,
+    FakeHistoricalEnvironmentalAgent,
     FakeOceanAgent,
     FakeWeatherAgent,
     make_pipeline,
@@ -22,6 +26,8 @@ from tests.orchestration_fakes import (
 )
 
 FISHING_Q = "Is it safe to go fishing from Mangalore now?"
+ENV_Q = "chlorophyll and sea surface temperature near Mangalore"
+CMP_Q = "compare the current chlorophyll and sea surface temperature near Mangalore with last month"
 
 
 def _ocean_with_sst(sst: float = 29.2):
@@ -201,6 +207,370 @@ async def test_equal_authority_sst_sources_are_not_averaged() -> None:
 def test_new_environmental_modules_have_no_llm_or_langgraph_import() -> None:
     code = (
         "import sys, app.services.oceancolor, app.agents.environmental;"
+        "bad=[m for m in sys.modules if m.split('.')[0] in "
+        "('groq','langgraph','langchain','langchain_core','openai','anthropic','ollama')];"
+        "print('BAD' if bad else 'CLEAN', bad)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert out.startswith("CLEAN"), out
+
+
+# ==========================================================================
+# Phase 9 Step 3 - the Environmental Productivity Engine + productivity node
+# ==========================================================================
+def _safety_chain_snapshot(r):
+    """Risk / safety / decision / suitability / routing / alerts - the chain that
+    MUST be byte-identical with and without environmental intelligence."""
+    return {
+        "status": r.status,
+        "decision": _decision_snapshot(r),
+        "risk_warnings": tuple(r.risk.warnings) if r.risk else (),
+        "risk_limiting": tuple(r.risk.limiting_factors) if r.risk else (),
+        "risk_missing": tuple(r.risk.missing_critical_factors) if r.risk else (),
+        "suitability": (
+            (r.suitability.level, r.suitability.score) if r.suitability else None
+        ),
+        "alerts": tuple((a.kind, a.severity, a.message, a.signal_kind) for a in r.alerts),
+        "route_waypoints": tuple(map(tuple, r.route.waypoints)) if r.route else (),
+        "route_status": r.route.status if r.route else None,
+        "evidence": tuple(sorted((e.variable, e.value) for e in r.evidence)),
+        "grounded": r.grounded,
+    }
+
+
+async def test_safety_chain_byte_identical_with_and_without_productivity_engine() -> None:
+    """The single most important Step 3 regression: turning the Environmental
+    Productivity Engine on must change nothing a client sees about the safety
+    chain. Only the additive ``environmental`` block and the extra explanatory
+    sentences may appear."""
+    common = dict(
+        weather=FakeWeatherAgent(),
+        ocean=_ocean_with_sst(29.1),
+        environment=FakeEnvironmentalAgent(1.9),
+    )
+    without = await make_pipeline(**common, productivity_engine=None).run(
+        message=FISHING_Q, session_id="p3-off", now=NOW
+    )
+    with_engine = await make_pipeline(**common).run(
+        message=FISHING_Q, session_id="p3-on", now=NOW
+    )
+
+    assert _safety_chain_snapshot(with_engine) == _safety_chain_snapshot(without)
+    # the additive field is the only structural difference
+    assert without.environmental is None
+    assert with_engine.environmental is not None
+    # environmental intelligence only ADDS explanatory sentences - every sentence
+    # in the safety-only answer is still present verbatim.
+    for sentence in filter(None, (s.strip() for s in without.answer.split(". "))):
+        assert sentence.rstrip(".") in with_engine.answer
+
+
+async def test_productivity_never_present_for_a_plain_fishing_query_without_env_data() -> None:
+    r = await make_pipeline(weather=FakeWeatherAgent(), ocean=FakeOceanAgent()).run(
+        message=FISHING_Q, session_id="p3-none", now=NOW
+    )
+    assert r.environmental is None
+    assert "productivity:skip" in r.agent_trace
+
+
+async def test_productivity_engine_failure_does_not_fail_the_query() -> None:
+    class BoomEngine:
+        version = "environmental-0.1.0"
+
+        def evaluate(self, _inputs):
+            raise RuntimeError("engine exploded")
+
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(),
+        environment=FakeEnvironmentalAgent(2.0),
+        productivity_engine=BoomEngine(),
+    ).run(message=ENV_Q, session_id="p3-boom", now=NOW)
+    assert r.status == "OK"
+    assert r.environmental is None
+    assert r.decision is not None
+
+
+async def test_missing_chlorophyll_reports_unknown_not_a_fabricated_value() -> None:
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(28.7),
+        environment=FakeEnvironmentalAgent(None),   # no chlorophyll pixel
+    ).run(message=ENV_Q, session_id="p3-miss", now=NOW)
+    assert r.environmental is not None
+    assert r.environmental.productivity_potential == "unknown"
+    assert r.environmental.chlorophyll_class is None
+    assert r.environmental.chlorophyll_a is None or r.environmental.chlorophyll_a.value is None
+    # SST is still surfaced honestly
+    assert r.environmental.sst is not None and r.environmental.sst.value == pytest.approx(28.7)
+    assert any("unavailable" in x.lower() for x in r.environmental.limitations)
+
+
+async def test_environmental_block_carries_the_mandatory_disclaimer() -> None:
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(),
+        environment=FakeEnvironmentalAgent(4.5),
+    ).run(message=ENV_Q, session_id="p3-disc", now=NOW)
+    assert r.environmental is not None
+    assert r.environmental.disclaimer == (
+        "Chlorophyll-a is an environmental productivity proxy and does not "
+        "indicate fish presence, abundance, or catch."
+    )
+
+
+async def test_productivity_provenance_node_traces_to_root_and_is_environmental_kind() -> None:
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(29.0),
+        environment=FakeEnvironmentalAgent(2.2, days_old=1),
+    ).run(message=ENV_Q, session_id="p3-prov", now=NOW)
+
+    nodes = r.provenance.get("nodes", [])
+    prod = [n for n in nodes if n.get("kind") == "environmental"]
+    assert prod, "no environmental-kind provenance node"
+
+    root = r.provenance.get("root_id", "query")
+    incoming: dict[str, list[str]] = {}
+    for e in r.provenance.get("edges", []):
+        incoming.setdefault(e["dst"], []).append(e["src"])
+
+    def traces(nid: str) -> bool:
+        seen, stack = set(), [nid]
+        while stack:
+            cur = stack.pop()
+            if cur == root:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(incoming.get(cur, []))
+        return False
+
+    for n in prod:
+        assert traces(n["id"]), f"environmental node {n['id']} is orphaned"
+
+
+async def test_sst_and_chl_numbers_in_the_answer_are_grounded() -> None:
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(29.3),
+        environment=FakeEnvironmentalAgent(2.4, days_old=1),
+    ).run(message=ENV_Q, session_id="p3-ground", now=NOW)
+    assert r.environmental is not None
+    assert r.grounded is True   # every number in the explanation traces to evidence
+
+
+def test_environmental_engine_module_has_no_llm_import() -> None:
+    code = (
+        "import sys, app.environmental.engine, app.environmental;"
+        "bad=[m for m in sys.modules if m.split('.')[0] in "
+        "('groq','langgraph','langchain','langchain_core','openai','anthropic','ollama')];"
+        "print('BAD' if bad else 'CLEAN', bad)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert out.startswith("CLEAN"), out
+
+
+def test_environmental_engine_does_not_import_the_safety_chain() -> None:
+    import ast
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1] / "app" / "environmental"
+    banned = ("app.policy", "app.risk.engine", "app.decision", "app.routing",
+              "app.safety")
+    for py in root.glob("*.py"):
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not any(node.module.startswith(b) for b in banned), \
+                    f"{py.name} imports {node.module}"
+
+
+# ==========================================================================
+# Phase 9 Step 4 - the Environmental Comparison Engine + comparison node
+# ==========================================================================
+def _cmp_pipeline(**kw):
+    kw.setdefault("weather", FakeWeatherAgent())
+    kw.setdefault("ocean", _ocean_with_sst(29.1))
+    kw.setdefault("environment", FakeEnvironmentalAgent(1.8))
+    return make_pipeline(**kw)
+
+
+async def test_safety_chain_byte_identical_with_and_without_comparison() -> None:
+    """The most important Step 4 regression: whether the comparison engine +
+    historical agent are enabled, absent, or raising, the safety chain a client
+    sees must be byte-identical."""
+    hist_ok = FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+
+    runs = {
+        "off_engine": _cmp_pipeline(comparison_engine=None, historical_environment_agent=hist_ok),
+        "off_agent": _cmp_pipeline(historical_environment_agent=None),
+        "on": _cmp_pipeline(historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)),
+        "agent_raises": _cmp_pipeline(
+            historical_environment_agent=FakeHistoricalEnvironmentalAgent(fail=True)
+        ),
+    }
+    results = {}
+    for name, pipe in runs.items():
+        results[name] = await pipe.run(message=CMP_Q, session_id=f"s4-{name}", now=NOW)
+
+    baseline = _safety_chain_snapshot(results["off_engine"])
+    for name, r in results.items():
+        assert _safety_chain_snapshot(r) == baseline, f"safety chain moved for {name}"
+
+    # only the additive comparison block differs
+    assert results["off_engine"].environmental.comparison is None
+    assert results["off_agent"].environmental.comparison is None
+    assert results["agent_raises"].environmental.comparison is None
+    assert results["on"].environmental.comparison is not None
+
+
+async def test_comparison_absent_for_a_non_comparative_environmental_query() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent()
+    ).run(message=ENV_Q, session_id="s4-noncmp", now=NOW)
+    assert r.environmental is not None
+    assert r.environmental.comparison is None
+    assert "environmental_comparison:skip" in r.agent_trace
+
+
+async def test_comparison_engine_failure_does_not_fail_the_query() -> None:
+    class BoomEngine:
+        version = "environmental-comparison-0.1.0"
+
+        class _Cfg:
+            reference_window_days = 30
+
+        config = _Cfg()
+
+        def evaluate(self, _inputs):
+            raise RuntimeError("comparison engine exploded")
+
+    r = await _cmp_pipeline(
+        comparison_engine=BoomEngine(),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1),
+    ).run(message=CMP_Q, session_id="s4-boom", now=NOW)
+    assert r.status == "OK"
+    assert r.environmental is None or r.environmental.comparison is None
+    assert r.decision is not None
+
+
+async def test_historical_observations_never_enter_evidence_or_fabric() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+    ).run(message=CMP_Q, session_id="s4-iso", now=NOW)
+    # the comparison ran
+    assert r.environmental.comparison is not None
+    # every evidence record is a CURRENT observation - no "reference" tier / source
+    for ev in r.evidence:
+        assert "history" not in ev.source.lower()
+        assert "reference" not in str(ev.data_tier).lower() or ev.variable in (
+            "water_depth", "coastline_distance",
+        )
+    # only one row per environmental variable (the current one)
+    n_sst = sum(1 for ev in r.evidence if ev.variable == "sea_surface_temperature")
+    n_chl = sum(1 for ev in r.evidence if ev.variable == "chlorophyll_a")
+    assert n_sst <= 1 and n_chl <= 1
+    # provenance carries the reference explicitly, but the fabric does not
+    prov_ids = {n["id"] for n in r.provenance.get("nodes", [])}
+    assert "cmp_obs:sea_surface_temperature:reference" in prov_ids
+    assert "agent:environment_history" in prov_ids
+
+
+def test_risk_engine_input_has_no_comparison_fields() -> None:
+    fields = set(RiskEngineInput.model_fields)
+    for bad in ("reference", "comparison", "absolute_change", "relative_change_pct",
+                "sst_reference", "chl_reference", "historical"):
+        assert bad not in fields
+
+
+async def test_risk_engine_receives_identical_scalars_with_comparison_on_off() -> None:
+    seen: list = []
+
+    def _capture(pipe):
+        orig = pipe.deps.risk_engine.evaluate
+
+        def wrapper(data):
+            seen.append((data.wave_height_m, data.wind_speed_ms,
+                         data.min_pressure_hpa, data.weather_codes))
+            return orig(data)
+
+        pipe.deps.risk_engine.evaluate = wrapper  # type: ignore[assignment]
+        return pipe
+
+    await _capture(_cmp_pipeline(historical_environment_agent=None)).run(
+        message=CMP_Q, session_id="s4-cap1", now=NOW
+    )
+    await _capture(_cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+    )).run(message=CMP_Q, session_id="s4-cap2", now=NOW)
+
+    assert len(seen) == 2 and seen[0] == seen[1]
+
+
+async def test_comparison_provenance_traces_to_root_and_is_the_right_kind() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+    ).run(message=CMP_Q, session_id="s4-prov", now=NOW)
+
+    nodes = r.provenance.get("nodes", [])
+    cmp_nodes = [n for n in nodes if n.get("kind") == "environmental_comparison"]
+    assert cmp_nodes, "no environmental_comparison provenance node"
+
+    root = r.provenance.get("root_id", "query")
+    incoming: dict[str, list[str]] = {}
+    for e in r.provenance.get("edges", []):
+        incoming.setdefault(e["dst"], []).append(e["src"])
+
+    def traces(nid: str) -> bool:
+        seen, stack = set(), [nid]
+        while stack:
+            cur = stack.pop()
+            if cur == root:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(incoming.get(cur, []))
+        return False
+
+    for n in nodes:
+        assert traces(n["id"]), f"provenance node {n['id']} is orphaned"
+
+
+async def test_comparison_numbers_in_the_answer_are_grounded() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+    ).run(message=CMP_Q, session_id="s4-ground", now=NOW)
+    assert r.environmental.comparison is not None
+    assert r.grounded is True
+
+
+async def test_insufficient_history_is_reported_honestly() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=None, chl=None)
+    ).run(message=CMP_Q, session_id="s4-nohist", now=NOW)
+    c = r.environmental.comparison
+    assert c is not None
+    assert c.sst.status == "insufficient_history"
+    assert c.chlorophyll_a.status == "insufficient_history"
+    assert c.sst.reference is None and c.chlorophyll_a.reference is None
+
+
+async def test_comparison_answer_makes_no_biological_or_trend_claim() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=0.8)
+    ).run(message=CMP_Q, session_id="s4-nobio", now=NOW)
+    low = r.answer.lower()
+    for bad in ("more fish", "fewer fish", "better fishing", "worse fishing",
+                "higher catch", "lower catch", "yield", "bloom", "rising trend",
+                "declining trend", "trending up", "trending down"):
+        assert bad not in low
+
+
+def test_comparison_modules_have_no_llm_import() -> None:
+    code = (
+        "import sys, app.environmental.comparison, app.agents.historical_environment;"
         "bad=[m for m in sys.modules if m.split('.')[0] in "
         "('groq','langgraph','langchain','langchain_core','openai','anthropic','ollama')];"
         "print('BAD' if bad else 'CLEAN', bad)"

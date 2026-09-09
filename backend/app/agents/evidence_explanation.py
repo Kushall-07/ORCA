@@ -13,13 +13,22 @@ import json
 
 from app.core.logging import get_logger
 from app.i18n.messages import (
+    chlorophyll_class_label,
+    comparison_direction_label,
     decision_sentence,
     frag,
+    productivity_label,
     risk_label,
     suitability_label,
 )
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult, DecisionStatus
+from app.models.environmental import (
+    ComparisonDirection,
+    EnvironmentalComparisonResult,
+    EnvironmentalProductivityResult,
+    ProductivityPotential,
+)
 from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
 from app.models.provenance import ProvenanceGraph
@@ -45,10 +54,37 @@ Hard rules:
 - Thunderstorm/lightning and cyclone indications are model-derived PROXIES, not
   certified real-time detection. Say so if you mention them.
 - Keep source names (Open-Meteo, INCOIS, RSMC, GEBCO, Natural Earth, Marine
-  Regions) in English, untranslated.
+  Regions, NOAA CoastWatch) in English, untranslated.
 - Fishing suitability is NOT operational safety - keep them distinct.
+- Chlorophyll-a is an environmental productivity PROXY. It does NOT indicate fish
+  presence, abundance, catch, or fishing success. NEVER say fish are present, how
+  many fish there are, or what the catch will be. Environmental productivity
+  potential is derived from chlorophyll-a only; sea-surface temperature is
+  context, not a driver.
+- If a temporal comparison is present: say ONLY that the current value is
+  "higher than", "lower than" or "unchanged from" the ORCA-computed reference.
+  NEVER say rising, declining, increasing trend, decreasing trend, trend, bloom,
+  better/worse fishing, more/fewer fish, higher/lower catch, yield or fishing
+  success. The reference is an ORCA-computed value over a recent past window, NOT
+  a climatological normal; one difference is NOT a trend.
 - Respond in the requested language only. Be concise (3-6 sentences).
 Return plain text, no markdown headings."""
+
+# An explanation for a query with an environmental / comparison block must not
+# make a biological / catch claim, nor imply a trend or a "bloom". If the model
+# does, the text is regenerated once then replaced by the deterministic template.
+_BIOLOGICAL_CLAIMS = (
+    "more fish", "fewer fish", "fish are present", "fish will be", "plenty of fish",
+    "fish abundance", "abundant fish", "expected catch", "catch will",
+    "catch is up", "catch is down", "good catch", "high catch", "higher catch",
+    "lower catch", "fishing success", "guaranteed", "you will catch",
+    "fish are there", "fish population", "better fishing", "worse fishing",
+    "fishing improved", "fishing has improved", "yield",
+    # forbidden trend / bloom language for a single-difference comparison
+    "rising trend", "declining trend", "increasing trend", "decreasing trend",
+    "upward trend", "downward trend", "is rising", "is declining", "is increasing",
+    "is decreasing", "trending up", "trending down", "bloom",
+)
 
 
 class ExplanationAgent:
@@ -69,6 +105,8 @@ class ExplanationAgent:
         alerts: tuple[Alert, ...],
         fabric: MarineDataFabric | None,
         provenance: ProvenanceGraph | None,
+        productivity: EnvironmentalProductivityResult | None = None,
+        comparison: EnvironmentalComparisonResult | None = None,
     ) -> Explanation:
         template = render_template(
             language=language,
@@ -79,6 +117,8 @@ class ExplanationAgent:
             conflicts=conflicts,
             route=route,
             fabric=fabric,
+            productivity=productivity,
+            comparison=comparison,
         )
 
         notes = _structured_notes(
@@ -90,7 +130,8 @@ class ExplanationAgent:
 
         # ---- LLM path with grounding ----
         context = json.dumps(
-            _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric),
+            _llm_context(language, understanding, decision, risk, suitability,
+                         conflicts, route, fabric, productivity, comparison),
             ensure_ascii=False,
         )
         user = f"CONTEXT (authoritative, do not change):\n{context}\n\nExplain this decision."
@@ -106,10 +147,14 @@ class ExplanationAgent:
                 break
             report = ground_text(
                 text, provenance=provenance, decision=decision, risk=risk,
-                suitability=suitability, route=route,
+                suitability=suitability, route=route, environmental=productivity,
+                comparison=comparison,
             )
             contradiction = _contradicts_decision(text, decision)
-            if report.grounded and not contradiction:
+            biological = (
+                productivity is not None or comparison is not None
+            ) and _contains_biological_claim(text)
+            if report.grounded and not contradiction and not biological:
                 return Explanation(
                     text=text.strip(),
                     language=language,
@@ -127,6 +172,9 @@ class ExplanationAgent:
                 "it contradicted the decision (do not assert safety when the "
                 "decision is negative)"
                 if contradiction
+                else "it made a biological / catch claim - chlorophyll-a is only a "
+                "productivity proxy, never say fish are present or predict catch"
+                if biological
                 else "it contained unsupported number(s): " + ", ".join(report.unsupported)
             )
             system = _SYSTEM + f"\nYour previous reply was rejected because {reason}. Fix it."
@@ -146,6 +194,8 @@ def render_template(
     conflicts: tuple[Conflict, ...],
     route: RouteResult | None,
     fabric: MarineDataFabric | None,
+    productivity: EnvironmentalProductivityResult | None = None,
+    comparison: EnvironmentalComparisonResult | None = None,
 ) -> Explanation:
     parts: list[str] = []
     notes = _structured_notes(decision, risk, suitability, conflicts, route, (), fabric)
@@ -198,6 +248,43 @@ def render_template(
     if fabric is not None and any(r.validity.value == "STALE" for r in fabric.records):
         parts.append(frag(language, "stale"))
 
+    # ---- environmental productivity (never affects any statement above) ----
+    if productivity is not None:
+        sst = productivity.sst
+        chl = productivity.chlorophyll_a
+        if sst is not None and sst.value is not None and sst.validity in ("VALID", "STALE"):
+            parts.append(frag(language, "env_sst",
+                              sst=f"{sst.value:.1f}", validity=sst.validity))
+        elif sst is None or sst.value is None:
+            parts.append(frag(language, "env_sst_missing"))
+        if (
+            productivity.productivity_potential is not ProductivityPotential.UNKNOWN
+            and chl is not None and chl.value is not None
+            and productivity.chlorophyll_class is not None
+        ):
+            parts.append(frag(
+                language, "env_chl",
+                chl=f"{chl.value:.2f}",
+                cls=chlorophyll_class_label(language, productivity.chlorophyll_class),
+                validity=chl.validity,
+            ))
+            parts.append(frag(
+                language, "env_productivity",
+                level=productivity_label(language, productivity.productivity_potential),
+            ))
+        else:
+            parts.append(frag(language, "env_chl_missing"))
+            parts.append(frag(language, "env_productivity_unknown"))
+        parts.append(frag(language, "env_disclaimer"))
+
+    # ---- environmental temporal comparison (Phase 9 Step 4) ----
+    if comparison is not None and (
+        comparison.sst is not None or comparison.chlorophyll_a is not None
+    ):
+        _render_comparison(parts, language, comparison)
+        if productivity is None:
+            parts.append(frag(language, "env_disclaimer"))
+
     proxy_mentioned = risk is not None and any(
         f.name in ("lightning_proxy", "cyclone_proxy") and (f.normalized_score or 0) > 0.1
         for f in risk.factors
@@ -239,6 +326,61 @@ def _contradicts_decision(text: str, decision: DecisionResult | None) -> bool:
     return any(phrase in low for phrase in _UNSAFE_ASSERTIONS)
 
 
+def _contains_biological_claim(text: str) -> bool:
+    """Deterministic guard: an environmental / comparison explanation must never
+    claim fish presence, abundance, catch, fishing success, or imply a trend /
+    bloom."""
+    low = text.lower()
+    return any(phrase in low for phrase in _BIOLOGICAL_CLAIMS)
+
+
+def _render_comparison(parts, language, comparison) -> None:  # type: ignore[no-untyped-def]
+    """Append deterministic current-vs-reference sentences (EN / HI / KN). Only
+    'higher than' / 'lower than' / 'unchanged from' - never a trend."""
+    for cmp in (comparison.sst, comparison.chlorophyll_a):
+        if cmp is None:
+            continue
+        is_sst = cmp.variable == "sea_surface_temperature"
+        var_label = frag(language, "env_var_sst" if is_sst else "env_var_chl")
+
+        if cmp.absolute_change is None or cmp.status != "ok" or cmp.reference is None:
+            reason = cmp.limitations[0] if cmp.limitations else cmp.status.replace("_", " ")
+            parts.append(frag(language, "env_cmp_unavailable", var=var_label, reason=reason))
+            continue
+
+        window = cmp.reference_window
+        ref_fmt = f"{cmp.reference.value:.1f}" if is_sst else f"{cmp.reference.value:.2f}"
+
+        if cmp.direction is ComparisonDirection.UNCHANGED:
+            parts.append(frag(
+                language,
+                "env_cmp_sst_unchanged" if is_sst else "env_cmp_chl_unchanged",
+                ref=ref_fmt, window=window,
+            ))
+            continue
+
+        rel = comparison_direction_label(language, cmp.direction)
+        delta_fmt = f"{abs(cmp.absolute_change):.1f}" if is_sst else f"{abs(cmp.absolute_change):.2f}"
+        if is_sst:
+            parts.append(frag(
+                language, "env_cmp_sst",
+                delta=delta_fmt, rel=rel, ref=ref_fmt, window=window,
+            ))
+        elif cmp.relative_change_pct is not None:
+            parts.append(frag(
+                language, "env_cmp_chl",
+                delta=delta_fmt, pct=f"{abs(cmp.relative_change_pct):.0f}",
+                rel=rel, ref=ref_fmt, window=window,
+            ))
+        else:
+            parts.append(frag(
+                language, "env_cmp_chl_nopct",
+                delta=delta_fmt, rel=rel, ref=ref_fmt, window=window,
+            ))
+
+    parts.append(frag(language, "env_cmp_note"))
+
+
 def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fabric) -> dict:  # type: ignore[no-untyped-def]
     reasoning = " | ".join(decision.reasons[:4]) if decision else "no decision"
     evidence_refs = tuple(
@@ -273,7 +415,7 @@ def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fab
     }
 
 
-def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric) -> dict:  # type: ignore[no-untyped-def]
+def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None) -> dict:  # type: ignore[no-untyped-def]
     ctx: dict = {"language": language.value if hasattr(language, "value") else str(language)}
     if understanding is not None:
         ctx["intent"] = understanding.intent.value
@@ -329,4 +471,67 @@ def _llm_context(language, understanding, decision, risk, suitability, conflicts
              "data_tier": r.source_status.tier.value}
             for r in fabric.records if r.value is not None
         ][:12]
+    if productivity is not None:
+        env: dict = {
+            "productivity_potential": productivity.productivity_potential.value,
+            "chlorophyll_class": (
+                productivity.chlorophyll_class.value
+                if productivity.chlorophyll_class is not None else None
+            ),
+            "data_sufficiency": productivity.data_sufficiency.value,
+            "confidence": productivity.confidence.value,
+            "limitations": list(productivity.limitations),
+            "disclaimer": productivity.disclaimer,
+            "note": (
+                "Chlorophyll-a is a phytoplankton-biomass proxy ONLY. Never claim "
+                "fish presence, abundance, catch, or fishing success. SST is "
+                "context, not a driver."
+            ),
+        }
+        if productivity.sst is not None:
+            env["sst"] = {"value": productivity.sst.value, "unit": productivity.sst.unit,
+                          "validity": productivity.sst.validity,
+                          "source": productivity.sst.source}
+        if productivity.chlorophyll_a is not None:
+            env["chlorophyll_a"] = {
+                "value": productivity.chlorophyll_a.value,
+                "unit": productivity.chlorophyll_a.unit,
+                "validity": productivity.chlorophyll_a.validity,
+                "source": productivity.chlorophyll_a.source,
+            }
+        ctx["environmental"] = env
+
+    if comparison is not None and (
+        comparison.sst is not None or comparison.chlorophyll_a is not None
+    ):
+        def _cmp_ctx(c):  # type: ignore[no-untyped-def]
+            if c is None:
+                return None
+            return {
+                "variable": c.variable,
+                "current_value": c.current.value if c.current is not None else None,
+                "reference_value": c.reference.value if c.reference is not None else None,
+                "reference_window": c.reference_window,
+                "absolute_change": c.absolute_change,
+                "relative_change_pct": c.relative_change_pct,
+                "direction": c.direction.value,
+                "status": c.status,
+                "data_sufficiency": c.data_sufficiency.value,
+                "confidence": c.confidence.value,
+                "limitations": list(c.limitations),
+            }
+
+        ctx["environmental_comparison"] = {
+            "sst": _cmp_ctx(comparison.sst),
+            "chlorophyll_a": _cmp_ctx(comparison.chlorophyll_a),
+            "reference_window": comparison.reference_window,
+            "disclaimer": comparison.disclaimer,
+            "note": (
+                "Say ONLY 'higher than', 'lower than' or 'unchanged from' the "
+                "ORCA-computed reference. NEVER say rising/declining/trend/bloom/"
+                "better fishing/more fish/catch/yield. The reference is an "
+                "ORCA-computed value over a recent past window, NOT a "
+                "climatological normal; one difference is NOT a trend."
+            ),
+        }
     return ctx

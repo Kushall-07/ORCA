@@ -132,8 +132,29 @@ never labelled LIVE (`DataTier.CACHE`, `source_tier=CACHED`).
 * **INCOIS** dataset ids remain unverified; INCOIS is disabled by default and is
   never a required dependency.
 * **Response surfacing.** SST/CHL flow into the existing `evidence[]` and
-  `provenance` automatically. A dedicated `sst` / `chlorophyll` response block
-  and the frontend map layers are Phase 9 Step 3.
+  `provenance` automatically. **Done in Step 3:** the additive optional
+  `QueryResponse.environmental` block, the deterministic Environmental
+  Productivity Engine that fills it, the `environmental_conditions` intent, the
+  `EnvironmentalPanel`, and a single neutral chlorophyll-class point marker on
+  the map (no heatmap / interpolation / polygon). See
+  [`phase9-step3-environmental-intelligence.md`](phase9-step3-environmental-intelligence.md).
+* **Done in Step 4:** a deterministic **current-vs-reference comparison** for SST
+  and chlorophyll-a. The reference is an ORCA-computed lower-median over a recent
+  past window (default 30 days) of the **same product** — SST via Open-Meteo
+  Marine `past_days`, chlorophyll-a via one ranged NOAA CoastWatch ERDDAP
+  request (≤ 2 extra HTTP calls total, anti-`[last]` guarded). It is fetched
+  inside the `environmental_comparison` node and **never** enters the fabric /
+  fusion / arbitration / risk. Output: `absolute_change` (SST + CHL),
+  `relative_change_pct` (CHL only, near-zero-denominator guarded), and a
+  `direction` of higher / lower / unchanged / unknown — a sign classification of
+  one difference, exposed in the additive
+  `QueryResponse.environmental.comparison` block. See
+  [`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
+* **Still deferred.** A true multi-year **climatological normal**, seasonal
+  climatology tables, environmental **trend / time-series** analysis, slopes,
+  regression and forecasting are *not* implemented. The Step 4 reference is a
+  recent prior-window summary, not a long-term expectation, and a single
+  difference is not a trend.
 
 ---
 

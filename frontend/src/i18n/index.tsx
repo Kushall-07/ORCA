@@ -7,7 +7,9 @@ import {
 } from "react";
 import type { LanguageCode } from "../types/api";
 import {
+  CHL_CLASS_LABEL,
   DECISION_LABEL,
+  PRODUCTIVITY_LABEL,
   RISK_LABEL,
   STRINGS,
   SUITABILITY_LABEL,
@@ -30,6 +32,8 @@ interface I18nValue {
   riskLabel: (level: string) => string;
   suitabilityLabel: (level: string) => string;
   tierLabel: (tier: string) => string;
+  chlClassLabel: (cls: string) => string;
+  productivityLabel: (level: string) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -75,6 +79,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       suitabilityLabel: (level) =>
         SUITABILITY_LABEL[lang][level] ?? level.toUpperCase(),
       tierLabel: (tier) => TIER_LABEL[lang][tier] ?? tier,
+      chlClassLabel: (cls) => CHL_CLASS_LABEL[lang][cls] ?? cls,
+      productivityLabel: (level) =>
+        PRODUCTIVITY_LABEL[lang][level] ?? level.toUpperCase(),
     };
   }, [lang]);
 

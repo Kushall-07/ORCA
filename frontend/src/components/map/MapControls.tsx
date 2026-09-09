@@ -22,6 +22,7 @@ export function buildLayerToggles(
     (resp?.gis?.protected_areas?.length ?? 0) > 0 ||
     (resp?.gis?.hard_geofence_ids?.length ?? 0) > 0;
   const pfzReady = (resp?.reference ?? []).some((r) => r.kind === "PFZ");
+  const envReady = resp?.environmental?.chlorophyll_a?.value != null;
 
   return [
     { id: "coastline", labelKey: "layer.coastline", available: has("coastline"), provenance: "reference" },
@@ -38,6 +39,12 @@ export function buildLayerToggles(
     { id: "pfz", labelKey: "layer.pfz", available: pfzReady, provenance: "reference" },
     { id: "sst", labelKey: "layer.sst", available: false, provenance: "missing" },
     { id: "chlorophyll", labelKey: "layer.chlorophyll", available: false, provenance: "missing" },
+    {
+      id: "environmental",
+      labelKey: "env.mapPoint",
+      available: envReady,
+      provenance: "derived",
+    },
   ];
 }
 

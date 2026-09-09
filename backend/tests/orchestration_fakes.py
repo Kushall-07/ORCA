@@ -14,6 +14,10 @@ from app.models.fabric import DataTier, SourceStatus
 from app.models.gis_agent import EezResult, GisQueryResult, LayerKind, ProtectedAreaHit
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType, LayerAuthority
 from app.models.observations import MarineObservation
+from app.models.environmental import EnvironmentalObservation
+from app.environmental.comparison import EnvironmentalComparisonEngine
+from app.environmental.engine import EnvironmentalProductivityEngine
+from app.agents.historical_environment import HistoricalReference
 from app.orchestration.deps import OrcaDeps
 from app.orchestration.pipeline import OrcaPipeline
 from app.reasoning.arbitration import HierarchyArbitrator
@@ -23,6 +27,8 @@ from app.suitability.engine import SuitabilityEngine
 
 NOW = datetime(2026, 9, 7, 7, 0, tzinfo=timezone.utc)
 MANGALORE = Coordinate(latitude=12.87, longitude=74.84)
+
+_UNSET = object()  # make_pipeline: default -> a real deterministic productivity engine
 
 
 def obs(variable: str, value: float, unit: str, source: str, *, when: datetime = NOW,
@@ -159,12 +165,68 @@ class FakeEnvironmentalAgent:
         )
 
 
+class FakeHistoricalEnvironmentalAgent:
+    """Deterministic reference-fetch stand-in for the graph tests.
+
+    ``sst`` / ``chl`` None -> that variable's reference is absent (honest
+    insufficient history). ``fail=True`` raises inside fetch_reference to prove
+    the comparison node still does not break the graph.
+    """
+
+    def __init__(
+        self,
+        *,
+        sst: float | None = 27.9,
+        chl: float | None = 1.1,
+        sst_validity: str = "VALID",
+        chl_validity: str = "VALID",
+        window_label: str = "ORCA-computed reference over the last 30 days",
+        fail: bool = False,
+    ) -> None:
+        self._sst = sst
+        self._chl = chl
+        self._sst_validity = sst_validity
+        self._chl_validity = chl_validity
+        self._window = window_label
+        self._fail = fail
+
+    async def fetch_reference(self, coordinate, *, current_time, window_days):
+        if self._fail:
+            raise RuntimeError("historical environment agent blew up")
+        sst_obs = None
+        if self._sst is not None:
+            sst_obs = EnvironmentalObservation(
+                variable="sea_surface_temperature", value=float(self._sst), unit="°C",
+                validity=self._sst_validity, data_tier="REFERENCE",
+                source="open-meteo-marine (median over 120 model values, 30-day history)",
+                source_tier=3,
+                observed_at=(current_time - timedelta(days=15)).isoformat(),
+                role="reference",
+            )
+        chl_obs = None
+        if self._chl is not None:
+            chl_obs = EnvironmentalObservation(
+                variable="chlorophyll_a", value=float(self._chl), unit="mg m-3",
+                validity=self._chl_validity, data_tier="REFERENCE",
+                source="noaa-coastwatch-erddap (median of 6 cloud-free composites, 30-day history)",
+                source_tier=3,
+                observed_at=(current_time - timedelta(days=14)).isoformat(),
+                distance_m=1800.0, role="reference",
+            )
+        return HistoricalReference(
+            sst=sst_obs, chlorophyll_a=chl_obs, reference_window=self._window,
+        )
+
+
 def make_pipeline(
     *,
     weather=None,
     ocean=None,
     gis=None,
     environment=None,
+    productivity_engine=_UNSET,
+    comparison_engine=_UNSET,
+    historical_environment_agent=None,
     qu_llm=None,
     explain_llm=None,
     hard_geofences=(),
@@ -186,5 +248,16 @@ def make_pipeline(
         references=tuple(references),
         hard_geofences=tuple(hard_geofences),
         environment_agent=environment,
+        productivity_engine=(
+            EnvironmentalProductivityEngine()
+            if productivity_engine is _UNSET
+            else productivity_engine
+        ),
+        comparison_engine=(
+            EnvironmentalComparisonEngine()
+            if comparison_engine is _UNSET
+            else comparison_engine
+        ),
+        historical_environment_agent=historical_environment_agent,
     )
     return OrcaPipeline(deps)

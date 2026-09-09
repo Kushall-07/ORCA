@@ -30,6 +30,8 @@ class ProvNodeKind(str, Enum):
     DECISION = "decision"
     ROUTE = "route"
     ALERT = "alert"
+    ENVIRONMENTAL = "environmental"   # Phase 9 Step 3: productivity calculation
+    ENVIRONMENTAL_COMPARISON = "environmental_comparison"  # Phase 9 Step 4: temporal comparison
     EXPLANATION = "explanation"
 
 

@@ -443,7 +443,7 @@ async def route_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
     return updates
 
 
-# ---- alerts / provenance / explanation ------------------------------
+# ---- alerts / productivity / provenance / explanation ------------------
 async def alerts_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     from app.alerts.engine import generate_alerts
 
@@ -456,6 +456,170 @@ async def alerts_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         conflicts=tuple(state.get("conflicts", ())),
     )
     return {"alerts": alerts, "agent_trace": ["alerts"]}
+
+
+_ENV_VARS = ("sea_surface_temperature", "chlorophyll_a")
+
+
+def _env_observation(state: OrcaGraphState, fabric, variable: str, *, role: str | None = None):
+    """Build one EnvironmentalObservation for the productivity / comparison
+    engines from the gated fabric records (never fabricates a value)."""
+    from app.models.environmental import EnvironmentalObservation
+
+    records = fabric.for_variable(variable) if fabric is not None else ()
+    if not records:
+        return None
+
+    # "Conflicted" here means the audit's *equal-authority sources disagree and
+    # it is unresolved* case (-> productivity UNKNOWN, never averaged). A lone
+    # observation flagged only for temporal/spatial alignment is NOT a source
+    # disagreement and must not suppress the interpretation.
+    distinct_values = {r.value for r in records if r.value is not None}
+    conflicted = any(
+        c.variable == variable
+        and c.resolution_status.value == "unresolved"
+        and c.conflict_type.value in ("source_disagreement", "stale_vs_current")
+        and len(distinct_values) > 1
+        for c in state.get("conflicts", ())
+    )
+    arb = state.get("arbitration")
+    if arb is not None:
+        va = arb.for_variable(variable)
+        if va is not None and not va.resolved and len(distinct_values) > 1:
+            conflicted = True
+
+    # primary record: the arbitration-chosen value, else the first usable, else the first.
+    chosen_value = arb.value(variable) if arb is not None else None
+    primary = None
+    if chosen_value is not None:
+        primary = next((r for r in records if r.value == chosen_value), None)
+    if primary is None:
+        primary = next((r for r in records if r.is_usable), None) or records[0]
+
+    o = primary.observation
+    return EnvironmentalObservation(
+        variable=variable,
+        value=primary.value,
+        unit=o.unit,
+        validity=primary.validity.value,
+        data_tier=primary.source_status.tier.value,
+        source=primary.source,
+        source_tier=int(o.source_tier),
+        observed_at=o.observed_at.isoformat() if o.observed_at is not None else None,
+        conflicted=conflicted,
+        role=role,
+    )
+
+
+def _has_usable_env_record(fabric) -> bool:  # type: ignore[no-untyped-def]
+    if fabric is None:
+        return False
+    return any(r.is_usable for v in _ENV_VARS for r in fabric.usable_for_variable(v))
+
+
+async def productivity_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 3: deterministic environmental productivity potential.
+
+    Runs downstream of decision. Strictly non-blocking and completely isolated
+    from Risk / Safety / Decision / Suitability / geofencing / routing / alerts.
+    Computed only for an environmental_conditions query, or whenever a usable
+    SST / chlorophyll-a observation exists.
+    """
+    from app.models.environmental import EnvironmentalInputs
+
+    engine = getattr(deps, "productivity_engine", None)
+    u = state.get("understanding")
+    fabric = state.get("fabric")
+    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+
+    if engine is None or (not is_env_intent and not _has_usable_env_record(fabric)):
+        return {"productivity_result": None, "agent_trace": ["productivity:skip"]}
+
+    try:
+        result = engine.evaluate(
+            EnvironmentalInputs(
+                sst=_env_observation(state, fabric, "sea_surface_temperature"),
+                chlorophyll_a=_env_observation(state, fabric, "chlorophyll_a"),
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise, but be defensive
+        logger.warning("productivity engine error: %s", exc)
+        return {"productivity_result": None, "agent_trace": ["productivity:skip"]}
+
+    return {"productivity_result": result, "agent_trace": ["productivity"]}
+
+
+async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 4: deterministic researcher temporal comparison.
+
+    Runs strictly downstream of decision / alerts / productivity. It fetches an
+    ORCA-computed reference observation LOCALLY (at most two extra HTTP calls)
+    and compares it with the current observation. Non-blocking: any failure
+    returns ``None`` and the query completes. It NEVER touches the Marine Data
+    Fabric, fusion, arbitration, conflict detection, the Temporal Validity Gate's
+    gated set, ``RiskEngineInput``, risk, safety, decision, routing or alerts.
+
+    Gated: only runs for an ``environmental_conditions`` query whose
+    ``wants_comparison`` flag is set.
+    """
+    from app.models.environmental import EnvironmentalComparisonInputs
+
+    engine = getattr(deps, "comparison_engine", None)
+    hist_agent = getattr(deps, "historical_environment_agent", None)
+    u = state.get("understanding")
+    fabric = state.get("fabric")
+    coord = state.get("resolved_origin")
+
+    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    wants = bool(getattr(u, "wants_comparison", False)) if u is not None else False
+
+    if (
+        engine is None
+        or hist_agent is None
+        or coord is None
+        or not (is_env_intent and wants)
+    ):
+        return {
+            "environmental_comparison": None,
+            "agent_trace": ["environmental_comparison:skip"],
+        }
+
+    sst_current = _env_observation(state, fabric, "sea_surface_temperature", role="current")
+    chl_current = _env_observation(state, fabric, "chlorophyll_a", role="current")
+
+    window_days = engine.config.reference_window_days
+    try:
+        reference = await hist_agent.fetch_reference(
+            coord, current_time=state["decision_time"], window_days=window_days
+        )
+    except Exception as exc:  # noqa: BLE001 - the agent should not raise; be defensive
+        logger.warning("historical environment agent error: %s", type(exc).__name__)
+        return {
+            "environmental_comparison": None,
+            "agent_trace": ["environmental_comparison:skip"],
+        }
+
+    try:
+        result = engine.evaluate(
+            EnvironmentalComparisonInputs(
+                sst_current=sst_current,
+                sst_reference=reference.sst,
+                chl_current=chl_current,
+                chl_reference=reference.chlorophyll_a,
+                reference_window=reference.reference_window,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise; be defensive
+        logger.warning("comparison engine error: %s", type(exc).__name__)
+        return {
+            "environmental_comparison": None,
+            "agent_trace": ["environmental_comparison:skip"],
+        }
+
+    return {
+        "environmental_comparison": result,
+        "agent_trace": ["environmental_comparison"],
+    }
 
 
 async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
@@ -474,6 +638,9 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         safety=state.get("safety_result"),
         decision=state.get("decision"),
         route=state.get("route_result"),
+        productivity=state.get("productivity_result"),
+        comparison=state.get("environmental_comparison"),
+        environment_tier=_tier(state.get("environment_result")),
     )
     return {"provenance": prov, "agent_trace": ["provenance"]}
 
@@ -492,6 +659,8 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         alerts=tuple(state.get("alerts", ())),
         fabric=state.get("fabric"),
         provenance=state.get("provenance"),
+        productivity=state.get("productivity_result"),
+        comparison=state.get("environmental_comparison"),
     )
     return {"explanation": expl, "agent_trace": ["explain"]}
 

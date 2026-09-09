@@ -25,7 +25,19 @@ export type LayerId =
   | "risk"
   | "pfz"
   | "sst"
-  | "chlorophyll";
+  | "chlorophyll"
+  | "environmental";
+
+// Phase 9 Step 3 - NEUTRAL greyscale-blue ramp for the descriptive chlorophyll-a
+// trophic band. Deliberately NOT a red/green "good vs bad fishing" palette:
+// chlorophyll-a is not a catch indicator.
+const CHL_CLASS_COLOR: Record<string, string> = {
+  oligotrophic: "#d0d7de",
+  low: "#a5c8d8",
+  moderate: "#6fa8c7",
+  elevated: "#3d7ea6",
+  high: "#255d82",
+};
 
 const RISK_COLOR: Record<RiskLevel, string> = {
   low: "#2f9e44",
@@ -171,6 +183,36 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
           </Tooltip>
         </CircleMarker>
       )}
+
+      {activeLayers.has("environmental") &&
+        origin &&
+        resp?.environmental?.chlorophyll_a?.value != null && (
+          <CircleMarker
+            center={origin}
+            radius={11}
+            pathOptions={{
+              color: "#ffffff",
+              weight: 2,
+              fillColor:
+                CHL_CLASS_COLOR[resp.environmental.chlorophyll_class ?? ""] ??
+                "#8aa0ad",
+              fillOpacity: 0.85,
+            }}
+          >
+            <Tooltip>
+              {t("env.mapPoint")}
+              {" — "}
+              {t("env.chlorophyll")}: {resp.environmental.chlorophyll_a.value}{" "}
+              {resp.environmental.chlorophyll_a.unit}
+              {resp.environmental.chlorophyll_class
+                ? ` (${resp.environmental.chlorophyll_class})`
+                : ""}
+              {resp.environmental.sst?.value != null
+                ? ` · ${t("env.sst")}: ${resp.environmental.sst.value} ${resp.environmental.sst.unit}`
+                : ""}
+            </Tooltip>
+          </CircleMarker>
+        )}
 
       {activeLayers.has("risk") && origin && riskLevel && (
         <CircleMarker

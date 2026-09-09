@@ -8,6 +8,10 @@ from __future__ import annotations
 
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
+from app.models.environmental import (
+    EnvironmentalComparisonResult,
+    EnvironmentalProductivityResult,
+)
 from app.models.fabric import MarineDataFabric
 from app.models.gis_agent import GisQueryResult
 from app.models.provenance import (
@@ -33,6 +37,7 @@ def build_provenance(
     understanding: QueryUnderstanding | None,
     weather_tier: str | None = None,
     ocean_tier: str | None = None,
+    environment_tier: str | None = None,
     gis: GisQueryResult | None = None,
     fabric: MarineDataFabric | None = None,
     fusion: FusionResult | None = None,
@@ -43,6 +48,8 @@ def build_provenance(
     safety: SafetyGuardResult | None = None,
     decision: DecisionResult | None = None,
     route: RouteResult | None = None,
+    productivity: EnvironmentalProductivityResult | None = None,
+    comparison: EnvironmentalComparisonResult | None = None,
 ) -> ProvenanceGraph:
     nodes: list[ProvNode] = []
     edges: list[ProvEdge] = []
@@ -84,6 +91,10 @@ def build_provenance(
     if gis is not None:
         add(ProvNode(id="agent:gis", kind=_AGENT_RESULT, label="GIS & geofencing agent",
                      value=gis.backend, source=gis.source_status.source), parent_for_data)
+    if environment_tier:
+        add(ProvNode(id="agent:environment", kind=_AGENT_RESULT,
+                     label="environmental (ocean-colour) agent",
+                     value=environment_tier, source="noaa-coastwatch-erddap"), parent_for_data)
 
     # ---- observations + validity ----
     obs_ids: dict[str, list[str]] = {}
@@ -94,6 +105,9 @@ def build_provenance(
             src_agent = (
                 "agent:weather" if o.source == "open-meteo-forecast"
                 else "agent:ocean" if o.source == "open-meteo-marine"
+                else "agent:environment" if str(o.source).startswith(
+                    ("noaa-coastwatch-erddap", "incois-erddap", "orca-demo-environmental")
+                ) and any(n.id == "agent:environment" for n in nodes)
                 else "agent:gis" if any(n.id == "agent:gis" for n in nodes)
                 else parent_for_data
             )
@@ -189,6 +203,145 @@ def build_provenance(
             ),
             *[arb_ids.get(v, parent_for_data) for v in ("wave_height", "wind_speed")],
         )
+
+    # ---- environmental productivity (Phase 9 Step 3; never feeds safety) ----
+    if productivity is not None:
+        def _env_parent(variable: str) -> str:
+            if variable in arb_ids:
+                return arb_ids[variable]
+            ids = obs_ids.get(variable)
+            return ids[-1] if ids else parent_for_data
+
+        detail = {
+            "productivity_potential": productivity.productivity_potential.value,
+            "data_sufficiency": productivity.data_sufficiency.value,
+            "confidence": productivity.confidence.value,
+            "engine_version": productivity.engine_version,
+            "disclaimer": productivity.disclaimer,
+        }
+        if productivity.chlorophyll_class is not None:
+            detail["chlorophyll_class"] = productivity.chlorophyll_class.value
+        if productivity.chlorophyll_a is not None and productivity.chlorophyll_a.value is not None:
+            detail["chlorophyll_a"] = f"{productivity.chlorophyll_a.value}"
+        if productivity.sst is not None and productivity.sst.value is not None:
+            detail["sea_surface_temperature"] = f"{productivity.sst.value}"
+        env_parents = list(dict.fromkeys(
+            [_env_parent("chlorophyll_a"), _env_parent("sea_surface_temperature")]
+        ))
+        add(
+            ProvNode(
+                id="productivity", kind=ProvNodeKind.ENVIRONMENTAL,
+                label="environmental productivity potential (ORCA-derived)",
+                value=productivity.productivity_potential.value,
+                detail=detail,
+            ),
+            *env_parents,
+        )
+
+    # ---- environmental temporal comparison (Phase 9 Step 4; never feeds safety) ----
+    if comparison is not None and (
+        comparison.sst is not None or comparison.chlorophyll_a is not None
+    ):
+        history_id = add(
+            ProvNode(
+                id="agent:environment_history", kind=_AGENT_RESULT,
+                label="historical environmental agent (ORCA-computed reference)",
+                value=comparison.reference_window or "reference window",
+                source="open-meteo-marine + noaa-coastwatch-erddap (past window)",
+            ),
+            parent_for_data,
+        )
+
+        def _cmp_obs_node(var: str, o, role: str, parent: str) -> str:
+            oid = f"cmp_obs:{var}:{role}"
+            add(
+                ProvNode(
+                    id=oid, kind=ProvNodeKind.OBSERVATION,
+                    label=f"{var} ({role})",
+                    value=o.value, unit=o.unit,
+                    source=o.source, source_tier=int(o.source_tier),
+                    validity=o.validity,
+                    detail={
+                        "data_tier": o.data_tier, "role": role,
+                        "conflicted": str(o.conflicted),
+                        "observed_at": o.observed_at or "",
+                    },
+                ),
+                parent,
+            )
+            add(
+                ProvNode(
+                    id=f"cmp_validity:{var}:{role}", kind=ProvNodeKind.VALIDITY,
+                    label=f"{var} {role} -> {o.validity}",
+                    value=o.validity,
+                ),
+                oid,
+            )
+            return oid
+
+        for var, cmp in (
+            ("sea_surface_temperature", comparison.sst),
+            ("chlorophyll_a", comparison.chlorophyll_a),
+        ):
+            if cmp is None:
+                continue
+            cmp_parents: list[str] = []
+            if cmp.current is not None and cmp.current.value is not None:
+                cur_parent = arb_ids.get(var)
+                if cur_parent is None:
+                    ids = obs_ids.get(var)
+                    cur_parent = ids[-1] if ids else None
+                if cur_parent is None:
+                    cur_parent = (
+                        "agent:environment"
+                        if any(n.id == "agent:environment" for n in nodes)
+                        else parent_for_data
+                    )
+                cmp_parents.append(
+                    _cmp_obs_node(var, cmp.current, "current", cur_parent)
+                )
+            if cmp.reference is not None and cmp.reference.value is not None:
+                cmp_parents.append(
+                    _cmp_obs_node(var, cmp.reference, "reference", history_id)
+                )
+            if not cmp_parents:
+                cmp_parents = [history_id]
+
+            cdetail = {
+                "variable": var,
+                "status": cmp.status,
+                "direction": cmp.direction.value,
+                "reference_window": cmp.reference_window,
+                "data_sufficiency": cmp.data_sufficiency.value,
+                "confidence": cmp.confidence.value,
+                "engine_version": cmp.engine_version,
+                "disclaimer": cmp.disclaimer,
+            }
+            if cmp.current is not None and cmp.current.value is not None:
+                cdetail["current_value"] = f"{cmp.current.value}"
+            if cmp.reference is not None and cmp.reference.value is not None:
+                cdetail["reference_value"] = f"{cmp.reference.value}"
+            if cmp.relative_change_pct is not None:
+                cdetail["relative_change_pct"] = f"{cmp.relative_change_pct}"
+            add(
+                ProvNode(
+                    id=f"comparison:{var}",
+                    kind=ProvNodeKind.ENVIRONMENTAL_COMPARISON,
+                    label=f"{var} current vs ORCA-computed reference",
+                    value=(
+                        cmp.absolute_change
+                        if cmp.absolute_change is not None
+                        else cmp.status
+                    ),
+                    unit=(
+                        cmp.current.unit
+                        if cmp.current is not None and cmp.absolute_change is not None
+                        else None
+                    ),
+                    detail=cdetail,
+                ),
+                *dict.fromkeys(cmp_parents),
+            )
 
     # ---- risk ----
     risk_id = None

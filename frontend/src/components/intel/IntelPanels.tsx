@@ -87,6 +87,7 @@ const STAGES: { token: string; label: string }[] = [
   { token: "decision", label: "Decision Engine" },
   { token: "route", label: "Route agent (A*)" },
   { token: "alerts", label: "Alert synthesis" },
+  { token: "productivity", label: "Environmental productivity" },
   { token: "provenance", label: "Provenance graph" },
   { token: "explain", label: "Evidence & Explanation" },
   { token: "assemble", label: "Assemble response" },

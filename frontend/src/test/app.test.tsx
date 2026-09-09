@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { makeNoRouteResponse, makeNoSafeResponse, makeResponse } from "./fixtures";
+import {
+  makeComparisonResponse,
+  makeEnvironmentalResponse,
+  makeNoRouteResponse,
+  makeNoSafeResponse,
+  makeResponse,
+} from "./fixtures";
 
 const postQuery = vi.fn();
 const fetchHealth = vi.fn();
@@ -264,5 +270,176 @@ describe("ORCA workspace", () => {
     expect(sst.disabled).toBe(true);
     const coastline = screen.getByLabelText(/Coastline/i) as HTMLInputElement;
     expect(coastline.disabled).toBe(false);
+  });
+
+  // ---- Phase 9 Step 3: researcher environmental panel ------------------
+  it("renders the environmental panel with SST, chlorophyll and its disclaimer", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse());
+    render(<App />);
+    await sendQuery("chlorophyll and sea surface temperature near Mangalore");
+    expect(await screen.findByText("Environmental Context")).toBeInTheDocument();
+    expect(screen.getByText("Sea-surface temperature")).toBeInTheDocument();
+    expect(screen.getAllByText(/Chlorophyll-a/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        /does not indicate fish presence, abundance, or catch/i,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("environmental panel never asserts fish presence, catch or yield", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse());
+    render(<App />);
+    await sendQuery("environmental productivity near Mangalore");
+    const panel = (await screen.findByText("Environmental Context")).closest(
+      ".panel",
+    ) as HTMLElement;
+    const text = panel.textContent ?? "";
+    for (const bad of [
+      "more fish",
+      "expected catch",
+      "catch will",
+      "good catch",
+      "fish abundance",
+      "fishing success",
+      "yield",
+      "guaranteed",
+    ]) {
+      expect(text.toLowerCase()).not.toContain(bad);
+    }
+  });
+
+  it("hides the environmental panel when the backend omits it", async () => {
+    postQuery.mockResolvedValue(makeResponse()); // no `environmental`
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+    expect(screen.queryByText("Environmental Context")).not.toBeInTheDocument();
+  });
+
+  it("shows honest UNKNOWN productivity when chlorophyll is unavailable", async () => {
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({
+        environmental: {
+          sst: {
+            value: 28.7,
+            unit: "°C",
+            validity: "VALID",
+            data_tier: "LIVE",
+            source: "open-meteo-marine",
+            source_tier: "3",
+            observed_at: null,
+            conflicted: false,
+          },
+          chlorophyll_a: null,
+          chlorophyll_class: null,
+          productivity_potential: "unknown",
+          data_sufficiency: "insufficient",
+          confidence: "none",
+          limitations: [
+            "Chlorophyll-a is unavailable for this location and time (satellite cloud cover or data gap).",
+          ],
+          disclaimer:
+            "Chlorophyll-a is an environmental productivity proxy and does not indicate fish presence, abundance, or catch.",
+          engine_version: "environmental-0.1.0",
+        },
+      }),
+    );
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(screen.getAllByText(/UNKNOWN/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/satellite cloud cover or data gap/i)).toBeInTheDocument();
+  });
+
+  it("keeps environmental numbers when the UI language switches", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse());
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[1], "hi");
+    expect(screen.getByText("पर्यावरणीय संदर्भ")).toBeInTheDocument();
+    // the numeric values are not translated
+    expect(screen.getAllByText(/29(\.0)? °C/).length).toBeGreaterThan(0);
+  });
+
+  // ---- Phase 9 Step 4: temporal comparison sub-block ------------------
+  it("renders the comparison sub-block with current, reference, delta and window", async () => {
+    postQuery.mockResolvedValue(makeComparisonResponse());
+    render(<App />);
+    await sendQuery("compare chlorophyll near Mangalore with last month");
+    expect(
+      await screen.findByText("Compared with an earlier observation"),
+    ).toBeInTheDocument();
+    const panel = screen
+      .getByText("Compared with an earlier observation")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    expect(text).toContain("29.0 °C");      // current SST (1-dp for temperature)
+    expect(text).toContain("27.9 °C");      // reference SST
+    expect(text).toMatch(/\+1\.2 °C/);      // absolute delta
+    expect(text).toContain("higher than reference");
+    expect(text).toContain("ORCA-computed reference over the last 30 days");
+    expect(text).toContain("not a climatological normal");
+  });
+
+  it("comparison sub-block shows CHL percentage but not SST percentage", async () => {
+    postQuery.mockResolvedValue(makeComparisonResponse());
+    render(<App />);
+    await sendQuery("compare chlorophyll near Mangalore with last month");
+    const panel = (
+      await screen.findByText("Compared with an earlier observation")
+    ).closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    expect(text).toMatch(/\+64%/);          // CHL relative change
+    // the SST row must not carry a percentage
+    const sstLine = Array.from(panel.querySelectorAll(".env-cmp__row")).find((li) =>
+      (li.textContent ?? "").includes("Sea-surface temperature"),
+    );
+    expect(sstLine?.textContent ?? "").not.toMatch(/%/);
+  });
+
+  it("comparison sub-block never implies a trend or fishing outcome", async () => {
+    postQuery.mockResolvedValue(makeComparisonResponse());
+    render(<App />);
+    await sendQuery("compare chlorophyll near Mangalore with last month");
+    const panel = (
+      await screen.findByText("Compared with an earlier observation")
+    ).closest(".panel") as HTMLElement;
+    const text = (panel.textContent ?? "").toLowerCase();
+    for (const bad of [
+      "rising", "declining", "increasing trend", "decreasing trend", "trending",
+      "bloom", "more fish", "fewer fish", "better fishing", "worse fishing",
+      "higher catch", "lower catch", "yield", "fishing success",
+    ]) {
+      expect(text).not.toContain(bad);
+    }
+  });
+
+  it("hides the comparison sub-block when comparison is null", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no comparison
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(
+      screen.queryByText("Compared with an earlier observation"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("comparison keeps numbers and units across a language switch", async () => {
+    postQuery.mockResolvedValue(makeComparisonResponse());
+    render(<App />);
+    await sendQuery("compare chlorophyll near Mangalore with last month");
+    await screen.findByText("Compared with an earlier observation");
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[1], "kn");
+    const panel = screen
+      .getByText("ಹಿಂದಿನ ವೀಕ್ಷಣೆಯೊಂದಿಗೆ ಹೋಲಿಕೆ")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    expect(text).toContain("27.9 °C");
+    expect(text).toMatch(/\+1\.2 °C/);
+    expect(text).toMatch(/\+64%/);
   });
 });

@@ -435,6 +435,90 @@ async def fetch_chlorophyll(
             await active.aclose()
 
 
+async def fetch_chlorophyll_series(
+    latitude: float,
+    longitude: float,
+    start: datetime,
+    end: datetime,
+    *,
+    settings: Settings,
+    client: httpx.AsyncClient | None = None,
+) -> list[ChlorophyllResult]:
+    """Phase 9 Step 4 - ONE ranged NOAA CoastWatch griddap request for every
+    daily chlorophyll-a composite in ``[start, end]`` at the requested point.
+
+    Used only by the researcher temporal-comparison node to build an
+    ORCA-computed reference (median of the cloud-free composites). It does NOT
+    touch INCOIS (keeps a comparative query to at most two extra HTTP calls),
+    never enters the Marine Data Fabric, and never feeds risk / safety /
+    decision / routing. Returns every spatially (<= ``MAX_PIXEL_DISTANCE_M``) and
+    temporally (``start`` <= composite <= ``end``) acceptable result, newest
+    last. Raises a typed :class:`OceanColorError` on transport / schema failure;
+    an empty list means "reached the server, no acceptable composite".
+    """
+    if not settings.oceancolor_enabled:
+        raise OceanColorNotConfigured("ocean-colour integration is disabled")
+
+    base_url = settings.oceancolor_noaa_erddap_url
+    dataset = settings.oceancolor_noaa_chl_dataset
+    variable = settings.oceancolor_noaa_chl_variable
+    source_label = "noaa-coastwatch-erddap"
+    timeout_s = settings.oceancolor_timeout_seconds
+
+    owns_client = client is None
+    active = client or httpx.AsyncClient(timeout=timeout_s, headers=_ERDDAP_HEADERS)
+    try:
+        axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=active)
+        start_u, end_u = _as_utc(start), _as_utc(end)
+        range_expr = f"[({_iso_z(start_u)}):({_iso_z(end_u)})]"
+        url = (
+            f"{base_url.rstrip('/')}/griddap/{dataset}.json?{variable}"
+            + _constraint(axes, latitude, longitude, range_expr)
+        )
+        try:
+            payload = await get_json(url, timeout_s=timeout_s, retries=1, client=active)
+        except HttpDecodeError as exc:
+            raise SchemaValidationError(
+                f"{source_label}: non-JSON ERDDAP response"
+            ) from exc
+        except HttpStatusError as exc:
+            if exc.status_code == 404:
+                return []  # window entirely outside the dataset's time axis
+            raise OceanColorUnavailable(
+                f"{source_label}: HTTP {exc.status_code}"
+            ) from exc
+        except HttpClientError as exc:
+            raise OceanColorUnavailable(f"{source_label}: {exc}") from exc
+
+        rows = _extract_rows(payload, variable)
+        out: list[ChlorophyllResult] = []
+        for row in rows:
+            if not (start_u <= _as_utc(row.observed_at) <= end_u):
+                continue  # never trust a composite outside the requested window
+            dist = geodesic_distance_m(
+                latitude, longitude, row.latitude, row.longitude
+            )
+            if dist > MAX_PIXEL_DISTANCE_M:
+                continue
+            out.append(
+                ChlorophyllResult(
+                    value=row.value,
+                    unit=CHL_UNIT,
+                    observed_at=row.observed_at,
+                    pixel_latitude=row.latitude,
+                    pixel_longitude=row.longitude,
+                    distance_m=round(dist, 1),
+                    source=f"{source_label}:{dataset}",
+                    dataset=dataset,
+                )
+            )
+        out.sort(key=lambda r: r.observed_at)
+        return out
+    finally:
+        if owns_client:
+            await active.aclose()
+
+
 def oceancolor_status(settings: Settings) -> dict[str, Any]:
     """Introspection for the health endpoint - mirrors ``mosdac_status``."""
     incois_configured = bool(

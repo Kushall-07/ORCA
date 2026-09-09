@@ -16,7 +16,11 @@ from app.agents.evidence_explanation import ExplanationAgent
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
 from app.core.config import get_settings
+from app.environmental.comparison import EnvironmentalComparisonEngine
+from app.environmental.engine import EnvironmentalProductivityEngine
+from app.agents.historical_environment import HistoricalReference
 from app.models.common import Coordinate, SignalKind, SourceTier
+from app.models.environmental import EnvironmentalObservation
 from app.models.fabric import DataTier, SourceStatus
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType, LayerAuthority
 from app.models.gis_agent import EezResult, GisQueryResult, LayerKind, ProtectedAreaHit
@@ -120,6 +124,77 @@ class ScenarioOceanAgent:
             observations=tuple(self._obs) if self._obs is not None else default,
             source_status=SourceStatus(tier=self._tier, source="open-meteo-marine", retrieved_at=when),
         )
+
+
+class ScenarioEnvironmentalAgent:
+    """Deterministic ocean-colour (chlorophyll-a) stand-in - Phase 9 Step 3.
+
+    ``chlorophyll`` None -> a MISSING result (non-blocking); the productivity
+    engine then honestly reports ``unknown``. Never enters the safety chain.
+    """
+
+    def __init__(self, chlorophyll: float | None = 0.28, *, days_old: int = 1,
+                 tier: DataTier = DataTier.LIVE) -> None:
+        self._value = chlorophyll
+        self._days_old = days_old
+        self._tier = tier
+
+    async def fetch(self, coordinate, when, **_):
+        if self._value is None:
+            from app.agents.base import missing_result
+
+            return missing_result("environmental", coordinate, when,
+                                  "scenario: no chlorophyll pixel")
+        chl = MarineObservation(
+            variable="chlorophyll_a", value=float(self._value), unit="mg m-3",
+            coordinate=coordinate,
+            observed_at=when - timedelta(days=self._days_old),
+            retrieved_at=when,
+            source="orca-demo-environmental:scenario",
+            source_tier=SourceTier.MODEL, signal_kind=SignalKind.MODEL_DERIVED,
+        )
+        return AgentResult(
+            kind="environmental", coordinate=coordinate, query_time=when,
+            observations=(chl,),
+            source_status=SourceStatus(
+                tier=self._tier, source="orca-demo-environmental:scenario",
+                retrieved_at=when,
+            ),
+        )
+
+
+class ScenarioHistoricalEnvironmentalAgent:
+    """Deterministic reference-fetch stand-in - Phase 9 Step 4. Never enters the
+    Marine Data Fabric; feeds only the comparison engine -> provenance /
+    explanation. ``sst`` / ``chl`` None -> honest insufficient history."""
+
+    def __init__(self, *, sst: float | None = 27.9, chl: float | None = 1.1) -> None:
+        self._sst = sst
+        self._chl = chl
+
+    async def fetch_reference(self, coordinate, *, current_time, window_days):
+        window = f"ORCA-computed reference over the {window_days} days before {current_time.date().isoformat()}"
+        sst_obs = None
+        if self._sst is not None:
+            sst_obs = EnvironmentalObservation(
+                variable="sea_surface_temperature", value=float(self._sst), unit="°C",
+                validity="VALID", data_tier="REFERENCE",
+                source="open-meteo-marine (median over 120 model values, 30-day history)",
+                source_tier=3,
+                observed_at=(current_time - timedelta(days=15)).isoformat(),
+                role="reference",
+            )
+        chl_obs = None
+        if self._chl is not None:
+            chl_obs = EnvironmentalObservation(
+                variable="chlorophyll_a", value=float(self._chl), unit="mg m-3",
+                validity="VALID", data_tier="REFERENCE",
+                source="noaa-coastwatch-erddap (median of 6 cloud-free composites, 30-day history)",
+                source_tier=3,
+                observed_at=(current_time - timedelta(days=14)).isoformat(),
+                distance_m=1800.0, role="reference",
+            )
+        return HistoricalReference(sst=sst_obs, chlorophyll_a=chl_obs, reference_window=window)
 
 
 class ScenarioGisAgent:
@@ -255,6 +330,42 @@ _FIXTURES = {
             _hard_zone("restricted", "POLYGON((75.30 8.0, 75.45 8.0, 75.45 14.0, 75.30 14.0, 75.30 8.0))"),
         ],
     ),
+    # Phase 9 Step 3 - researcher environmental-context fixtures. SST rides the
+    # ocean agent; chlorophyll-a comes from the ocean-colour agent. Neither
+    # feeds risk / safety / decision / routing.
+    "researcher_env": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 28.6, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),  # -> moderate class
+    ),
+    "researcher_env_missing": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 28.6, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(None),  # chlorophyll unavailable
+    ),
+    # Phase 9 Step 4 - researcher temporal comparison fixtures. The historical
+    # reference is fetched LOCALLY by the comparison node; it never enters the
+    # fabric / fusion / arbitration / risk.
+    "researcher_env_compare": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),
+        historical_environment_agent=ScenarioHistoricalEnvironmentalAgent(sst=27.9, chl=1.1),
+    ),
+    "researcher_env_compare_nohist": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),
+        historical_environment_agent=ScenarioHistoricalEnvironmentalAgent(sst=None, chl=None),
+    ),
 }
 
 
@@ -267,6 +378,8 @@ def make_scenario_pipeline(
     weather=None,
     ocean=None,
     gis=None,
+    environment=None,
+    historical_environment_agent=None,
     hard_geofences=(),
     references=(),
 ) -> OrcaPipeline:
@@ -291,6 +404,10 @@ def make_scenario_pipeline(
         session_store=InMemorySessionStore(settings.session_max_turns),
         references=tuple(references),
         hard_geofences=tuple(hard_geofences),
+        environment_agent=environment,
+        productivity_engine=EnvironmentalProductivityEngine(),
+        comparison_engine=EnvironmentalComparisonEngine(),
+        historical_environment_agent=historical_environment_agent,
     )
     return OrcaPipeline(deps)
 

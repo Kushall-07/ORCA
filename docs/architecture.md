@@ -420,12 +420,25 @@ slot a validated model). 19 nodes:
 ```
 START → understand → (failed/clarify ⇒ explain)
       → normalize   → (no location ⇒ explain)
-      → [collect_weather ‖ collect_ocean ‖ collect_gis]      (parallel)
+      → [collect_weather ‖ collect_ocean ‖ collect_gis ‖ collect_environment]  (parallel)
       → fabric → temporal → fusion → arbitration → conflicts
       → suitability (only for fishing intents) → risk → policy → decision
       → (route requested & routing_allowed & O/D resolved ⇒ route)
-      → alerts → provenance → explain → assemble → END
+      → alerts → productivity → environmental_comparison
+      → provenance → explain → assemble → END
 ```
+
+The **`productivity`** node (Phase 9 Step 3) and the **`environmental_comparison`**
+node (Phase 9 Step 4) are deterministic, non-blocking, and strictly downstream of
+the decision. `productivity` runs the **Environmental Productivity Engine** on the
+already-collected SST + chlorophyll-a observations. `environmental_comparison`
+runs the **Environmental Comparison Engine** on the current observation plus an
+ORCA-computed reference it fetches **locally** (at most two extra HTTP calls) —
+that historical data never enters the Marine Data Fabric, fusion, arbitration,
+conflict detection, the Temporal Validity Gate's gated set, or `RiskEngineInput`.
+Neither node feeds Risk / Safety / Decision / Suitability / geofencing / Routing /
+Alerts — risk/safety/decision/routing output is byte-identical with and without
+them. `collect_environment` (Step 2) is the parallel ocean-colour branch.
 
 Conditional edges skip unnecessary work (a weather-only query never routes or
 scores suitability). Data collection runs in parallel LangGraph branches and
@@ -531,8 +544,11 @@ nodes and shows a bar **plus** text labels (`LOW` / `MODERATE` / `HIGH` /
 proxy"). **Agent activity** maps `agent_trace` tokens onto the frozen stage list
 (done / skipped / error / pending) with no invented timings.
 
-**SST / chlorophyll.** Not ingested. Disabled layer toggles + a documented
-placeholder only; no values shown or implied.
+**SST / chlorophyll.** *(Phase 6 state; superseded by Phase 9.)* Originally not
+ingested — disabled layer toggles + a documented placeholder only. Phase 9 Step 2
+ingests both; Step 3 adds the `EnvironmentalPanel`, an `environmental` report
+section, and a single neutral chlorophyll-class point marker on the map (no
+heatmap / interpolation / polygon). See §6f.
 
 **Tests.** `frontend/src/test/` (Vitest + Testing Library, API client mocked) —
 17 component tests covering shell load, query round-trip, every panel,
@@ -603,6 +619,114 @@ touches any deterministic reasoning, safety, risk, geofence or routing code.
 
 ---
 
+## 6f. Environmental intelligence — Phase 9 (implemented)
+
+**Step 2** integrated the raw observations: `sea_surface_temperature` rides the
+existing Open-Meteo Marine path as a normal `MarineObservation` (tier `MODEL`,
+`signal_kind MODEL_DERIVED`); `chlorophyll_a` comes from a new non-blocking
+`EnvironmentalAgent` over NOAA CoastWatch ERDDAP (`app/services/oceancolor.py`).
+Both flow through the Phase 4 Fabric / Temporal Gate / Fusion / Arbitration
+unchanged, appear in `evidence[]` and as provenance `observation` nodes, and
+**never enter `RiskEngineInput`**.
+
+**Step 3** adds interpretation only — a deterministic **Environmental
+Productivity Engine** (`app/environmental/engine.py`, sibling to the Suitability
+Engine; imports nothing from `app.policy` / `app.risk.engine` / `app.decision` /
+`app.routing`). Auditable boundaries in
+`app/environmental/environmental_config.yaml`:
+
+* chlorophyll-a → descriptive **trophic class**
+  (`oligotrophic <0.1 ≤ low <1 ≤ moderate <3 ≤ elevated <10 ≤ high`, mg m⁻³) —
+  magnitude bands, **not** fish-abundance / catch thresholds;
+* **`productivity_potential`** (`unknown | low | moderate | elevated`) derived
+  from **chlorophyll-a alone** — SST is context and never changes it;
+* `confidence` (`none | low | moderate`); equal-authority disagreement is never
+  averaged → `unknown`;
+* chlorophyll-a is **required** for a non-`unknown` result; missing / stale /
+  invalid CHL, missing SST and conflicts are surfaced as `limitations`, never
+  fabricated;
+* mandatory disclaimer on every result: *"Chlorophyll-a is an environmental
+  productivity proxy and does not indicate fish presence, abundance, or catch."*
+
+**Pipeline.** New non-blocking `productivity` node, `alerts → productivity →
+provenance`. Query Understanding gains one intent, `environmental_conditions`
+(rule + Groq schema; the LLM still only classifies). Provenance gains
+`ProvNodeKind.ENVIRONMENTAL` and an `agent:environment` result node; numeric
+SST/CHL claims in explanations are grounded against both provenance and the
+engine result. The Evidence & Explanation Agent explains SST / chlorophyll /
+class / productivity / limitations / disclaimer in EN / HI / KN and a
+deterministic guard rejects any biological / catch claim.
+
+**API.** Additive optional `QueryResponse.environmental`
+(`EnvironmentalInfo` / `EnvironmentalObservationInfo`); `null` when no
+interpretation was produced, so every pre-Phase-9 response is unchanged and
+`extra="forbid"` still holds.
+
+**Frontend.** `EnvironmentalPanel` (decision tab, after suitability; hidden when
+`environmental` is `null`), an "Environmental Context" report section, and a
+**single** neutral chlorophyll-class point marker on the map — no heatmap,
+interpolation, polygon, or spatial extrapolation.
+
+**Invariant.** Risk / Safety / Decision / Routing output is **byte-identical
+with and without** environmental intelligence; the 16 frozen Phase 7 scenarios
+are unchanged (scenarios 17–18 are additive researcher cases). See
+[`phase9-step3-environmental-intelligence.md`](phase9-step3-environmental-intelligence.md).
+
+### Step 4 — researcher temporal & comparative intelligence (implemented)
+
+A second deterministic engine, the **Environmental Comparison Engine**
+(`app/environmental/comparison.py`, boundaries in
+`app/environmental/comparison_config.yaml`), compares a current SST /
+chlorophyll-a observation with an **ORCA-computed reference** — the median of the
+values the source actually returned over a recent past window (default 30 days,
+configurable). **Not a climatological normal.**
+
+* SST → `absolute_change` only (percentage change on a Celsius temperature is not
+  meaningful). Chlorophyll-a → `absolute_change` + `relative_change_pct`, the
+  latter only when the reference magnitude ≥ a configured denominator epsilon.
+* `direction` ∈ `higher | lower | unchanged | unknown` — a sign classification of
+  **one** difference. `unchanged` uses an auditable reporting-resolution tie
+  epsilon (rounded to 1e-6 first, purely to defend against float noise). **No**
+  slope, regression, trend, forecast, interpolation, climatology or spatial field.
+* Missing current → `current_unavailable`; missing / insufficient history →
+  `insufficient_history` (no fabricated baseline); stale side → still computed but
+  `insufficient` / `low` confidence; conflicted side → raw values preserved,
+  `unknown`, never averaged; near-zero CHL reference → absolute kept, percentage
+  dropped with a limitation; unit/variable mismatch → `incomparable`.
+
+**Historical fetch** is a new deterministic `HistoricalEnvironmentalAgent`
+(`app/agents/historical_environment.py`, no LLM): SST via a new Open-Meteo Marine
+`past_days` call, chlorophyll-a via **one** ranged NOAA CoastWatch ERDDAP griddap
+request (`oceancolor.fetch_chlorophyll_series`) with a client-side median. At most
+**two** extra HTTP calls per comparative query. An anti-`[last]` guard rejects any
+composite that is nearer to "now" than to the requested past window. It runs
+**inside** the `environmental_comparison` node — historical observations never
+enter `build_fabric`, fusion, arbitration, conflict detection or `RiskEngineInput`.
+
+**Query Understanding** gains an additive `wants_comparison: bool` (rule keywords
++ Groq schema); **no new `QueryIntent`**. **Provenance** gains
+`ProvNodeKind.ENVIRONMENTAL_COMPARISON`, an `agent:environment_history` node, and
+`cmp_obs:<var>:current` / `:reference` + validity + `comparison:<var>` nodes; the
+current/reference/delta/percentage numbers are grounded against both provenance
+and the engine result. **Explanation** adds EN/HI/KN comparison sentences (only
+"higher than / lower than / unchanged from the reference"); the deterministic
+biological-claim guard is extended to also reject trend / bloom / better-fishing
+wording. **API**: additive optional `EnvironmentalInfo.comparison`
+(`EnvironmentalComparisonInfo`), `null` unless the query was comparative and a
+reference was computed. **Frontend**: a comparison sub-block inside the existing
+`EnvironmentalPanel` (current · reference · signed delta · window · validity ·
+confidence · limitations), a line in the report section — neutral only, no
+colour-coded good/bad, no arrows, no charts, no map markers.
+
+**Invariant.** Risk / Safety / Decision / Route output is **byte-identical**
+whether the comparison engine + historical agent are enabled, absent, or raising;
+historical observations never appear in `resp.evidence` or the fabric;
+`RiskEngineInput` gains no field. Scenarios 01–16 remain the frozen Phase 7 set;
+17–18 are the Step 3 cases; 19–20 are additive Step 4 cases. See
+[`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
@@ -614,9 +738,16 @@ touches any deterministic reasoning, safety, risk, geofence or routing code.
 | 5 | ✅ LangGraph orchestration (19-node typed graph), Query Understanding Agent (Groq + rule fallback, schema-validated, one retry), Evidence Arbitration (`HierarchyArbitrator`), Conflict Detection, Route Agent (conditional + guard re-check), Decision Provenance Graph, numeric grounding, Evidence & Explanation Agent, en/hi/kn, 3–5 turn sessions, `POST /query` |
 | 6 | ✅ Operator frontend (chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers via read-only `/gis/*` + `/reference/*`, data-provenance legend, en/hi/kn UI, stakeholder context, print/export). Additive backward-compatible response fields. Provenance graph + grounding + explanation + alerts were delivered in Phase 5. |
 | 7 | ✅ Demo hardening & observability: real-timed `node_trace` (additive to the frozen `agent_trace`), end-to-end `request_id` correlation, deterministic Scenario Engine (`python -m app.scenario.run`) with 16 scenarios through the real pipeline, `--perf` measurement (min/median/p95/max), data-failure / conflict / determinism / provenance matrices, structured logging fields, frontend timing view. Reasoning semantics unchanged. |
-| 8 | Deeper provenance exports, satellite SST + chlorophyll ingestion, regional spatial risk aggregation |
+| 8 | ✅ Live integration & full-stack validation |
+| 9 | ✅ Environmental intelligence — Step 1 feasibility, Step 2 SST + chlorophyll-a ingestion, Step 3 deterministic Environmental Productivity Engine + `environmental_conditions` intent + `EnvironmentalPanel`, Step 4 deterministic Environmental Comparison Engine + `HistoricalEnvironmentalAgent` + `wants_comparison` flag (researcher current-vs-reference context; never affects risk / safety / decision / routing) |
+| 8+ | Deeper provenance exports, regional spatial risk aggregation, multi-year climatology tables, environmental trend/time-series analysis (not started) |
 
-Current status: **Phase 7 complete** (demo hardening & observability; 424 backend
-tests + 17 frontend tests passing; 16/16 scenarios green through the real
-pipeline). Docker runtime E2E not executed — CLI unavailable in the dev
-environment; compose validated by inspection.
+Current status: **Phase 9 Step 4 complete** (deterministic Environmental
+Comparison Engine + local historical reference fetch + researcher comparison UI;
+temporal comparison never affects risk / safety / decision / routing — proven
+byte-identical with the engine/agent enabled, absent, or raising; historical
+observations proven never to enter the fabric or `RiskEngineInput`). Backend
+(650 tests) + frontend (27 tests) suites green; 20/20 scenarios (16 frozen
+Phase 7 + 2 Step 3 + 2 Step 4) pass through the real pipeline. Docker runtime E2E
+not executed — CLI unavailable in the dev environment; compose validated by
+inspection.

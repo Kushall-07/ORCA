@@ -96,6 +96,171 @@ def test_query_response_exposes_map_and_reference_fields(client) -> None:
     assert "PFZ" in kinds
 
 
+def test_query_response_omits_environmental_block_when_no_env_data(client) -> None:
+    # a plain fishing query with no SST/chlorophyll -> no environmental field
+    query_api.set_pipeline(make_pipeline())
+    body = client.post("/query", json={
+        "session_id": "api-noenv", "message": "Is it safe to go fishing from Mangalore now?",
+    }).json()
+    assert body["environmental"] is None
+
+
+def test_environmental_query_exposes_the_environmental_contract(client) -> None:
+    from tests.orchestration_fakes import (
+        FakeEnvironmentalAgent, FakeOceanAgent, make_pipeline, obs,
+    )
+
+    ocean = FakeOceanAgent(observations=(
+        obs("wave_height", 1.1, "m", "open-meteo-marine"),
+        obs("sea_surface_temperature", 29.0, "°C", "open-meteo-marine"),
+    ))
+    query_api.set_pipeline(make_pipeline(
+        ocean=ocean, environment=FakeEnvironmentalAgent(2.1, days_old=1),
+    ))
+    body = client.post("/query", json={
+        "session_id": "api-env",
+        "message": "chlorophyll-a and sea surface temperature near Mangalore for research",
+    }).json()
+
+    assert body["intent"] == "environmental_conditions"
+    env = body["environmental"]
+    assert env is not None
+    # every documented field is present
+    for key in ("sst", "chlorophyll_a", "chlorophyll_class", "productivity_potential",
+                "data_sufficiency", "confidence", "limitations", "disclaimer",
+                "engine_version"):
+        assert key in env
+    assert env["productivity_potential"] in ("unknown", "low", "moderate", "elevated")
+    assert env["disclaimer"] == (
+        "Chlorophyll-a is an environmental productivity proxy and does not "
+        "indicate fish presence, abundance, or catch."
+    )
+    assert env["sst"]["value"] == pytest.approx(29.0)
+    assert env["chlorophyll_a"]["value"] == pytest.approx(2.1)
+    assert env["chlorophyll_class"] == "moderate"
+    # the safety chain is still fully present and unaffected
+    assert body["decision"]["status"] in (
+        "PROCEED", "PROCEED_WITH_CAUTION", "DO_NOT_PROCEED", "NO_SAFE_RECOMMENDATION"
+    )
+    # answer must not talk about fish presence / catch
+    low = body["answer"].lower()
+    for bad in ("more fish", "expected catch", "catch will", "fish abundance",
+                "fishing success", "guaranteed catch"):
+        assert bad not in low
+
+
+def test_environmental_field_is_additive_no_existing_field_removed(client) -> None:
+    query_api.set_pipeline(make_pipeline())
+    body = client.post("/query", json={
+        "session_id": "api-shape", "message": "Is it safe to go fishing from Mangalore now?",
+    }).json()
+    # Phase 6/7/8 fields all still there
+    for key in ("session_id", "request_id", "turn", "status", "language", "intent",
+                "answer", "location", "decision", "risk", "suitability", "route",
+                "gis", "reference", "alerts", "conflicts", "evidence", "provenance",
+                "grounded", "data_quality", "agent_trace", "node_trace", "errors"):
+        assert key in body, f"missing pre-existing field {key!r}"
+    assert "environmental" in body
+
+
+def test_query_rejects_unknown_response_field_extra_forbid() -> None:
+    from app.models.api import QueryResponse
+
+    with pytest.raises(Exception):
+        QueryResponse(
+            session_id="x", turn=1, status="OK", language="en", intent="general",
+            answer="hi", surprise_field=True,   # extra="forbid"
+        )
+
+
+# ---- Phase 9 Step 4: environmental.comparison additive contract ----------
+def test_comparison_absent_for_non_comparative_query(client) -> None:
+    from tests.orchestration_fakes import (
+        FakeEnvironmentalAgent, FakeOceanAgent, make_pipeline, obs,
+    )
+
+    ocean = FakeOceanAgent(observations=(
+        obs("wave_height", 1.1, "m", "open-meteo-marine"),
+        obs("sea_surface_temperature", 29.0, "°C", "open-meteo-marine"),
+    ))
+    query_api.set_pipeline(make_pipeline(
+        ocean=ocean, environment=FakeEnvironmentalAgent(2.1, days_old=1),
+    ))
+    body = client.post("/query", json={
+        "session_id": "api-cmp-off",
+        "message": "chlorophyll-a and sea surface temperature near Mangalore",
+    }).json()
+    assert body["environmental"] is not None
+    assert body["environmental"]["comparison"] is None
+
+
+def test_comparative_query_exposes_the_comparison_contract(client) -> None:
+    from datetime import datetime, timezone
+
+    from tests.orchestration_fakes import (
+        FakeEnvironmentalAgent, FakeHistoricalEnvironmentalAgent, FakeOceanAgent,
+        make_pipeline, obs,
+    )
+
+    fresh = datetime.now(timezone.utc)
+    ocean = FakeOceanAgent(observations=(
+        obs("wave_height", 1.1, "m", "open-meteo-marine", when=fresh),
+        obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine", when=fresh),
+    ))
+    query_api.set_pipeline(make_pipeline(
+        ocean=ocean,
+        environment=FakeEnvironmentalAgent(1.8, days_old=1),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1),
+    ))
+    body = client.post("/query", json={
+        "session_id": "api-cmp-on",
+        "message": "compare the current chlorophyll and sea surface temperature "
+                   "near Mangalore with last month",
+    }).json()
+
+    assert body["intent"] == "environmental_conditions"
+    cmp = body["environmental"]["comparison"]
+    assert cmp is not None
+    for key in ("sst", "chlorophyll_a", "reference_window", "data_sufficiency",
+                "limitations", "disclaimer", "engine_version"):
+        assert key in cmp
+    sst = cmp["sst"]
+    for key in ("variable", "current", "reference", "reference_window",
+                "absolute_change", "relative_change_pct", "direction", "status",
+                "data_sufficiency", "confidence", "limitations", "disclaimer",
+                "engine_version"):
+        assert key in sst
+    assert sst["status"] == "ok"
+    assert sst["direction"] in ("higher", "lower", "unchanged", "unknown")
+    assert sst["relative_change_pct"] is None            # SST: absolute only
+    assert cmp["chlorophyll_a"]["relative_change_pct"] is not None
+    assert cmp["disclaimer"] == (
+        "Chlorophyll-a is an environmental productivity proxy and does not "
+        "indicate fish presence, abundance, or catch."
+    )
+    # safety chain still fully present
+    assert body["decision"]["status"] in (
+        "PROCEED", "PROCEED_WITH_CAUTION", "DO_NOT_PROCEED", "NO_SAFE_RECOMMENDATION"
+    )
+    low = body["answer"].lower()
+    for bad in ("more fish", "better fishing", "higher catch", "yield", "bloom",
+                "rising trend", "declining trend"):
+        assert bad not in low
+
+
+def test_comparison_field_is_additive_extra_forbid_still_holds() -> None:
+    from app.models.api import EnvironmentalInfo, QueryResponse
+
+    # EnvironmentalInfo default: comparison is None
+    assert EnvironmentalInfo().comparison is None
+    # QueryResponse still forbids unknown fields
+    with pytest.raises(Exception):
+        QueryResponse(
+            session_id="x", turn=1, status="OK", language="en", intent="general",
+            answer="hi", another_surprise=1,
+        )
+
+
 def test_route_query_returns_waypoint_geometry(client) -> None:
     from tests.orchestration_fakes import make_pipeline
 

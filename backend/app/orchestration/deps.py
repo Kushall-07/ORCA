@@ -12,12 +12,15 @@ from dataclasses import dataclass, field
 
 from app.agents.environmental import EnvironmentalAgent
 from app.agents.evidence_explanation import ExplanationAgent
+from app.agents.historical_environment import HistoricalEnvironmentalAgent
 from app.agents.gis_geofencing import GisGeofencingAgent
 from app.agents.oceanographic import OceanographicAgent
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
 from app.agents.weather import WeatherAgent
 from app.core.config import Settings, get_settings
+from app.environmental.comparison import EnvironmentalComparisonEngine
+from app.environmental.engine import EnvironmentalProductivityEngine
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
@@ -51,6 +54,15 @@ class OrcaDeps:
     # Phase 9: environmental (chlorophyll-a) agent. Optional / non-blocking; when
     # absent the collect_environment node simply skips.
     environment_agent: object = None  # EnvironmentalAgent-like: async fetch(coord, when)
+    # Phase 9 Step 3: deterministic Environmental Productivity Engine. Optional;
+    # when absent the productivity node simply skips (non-blocking).
+    productivity_engine: EnvironmentalProductivityEngine | None = None
+    # Phase 9 Step 4: deterministic Environmental Comparison Engine + the
+    # historical (reference) fetch agent. Both optional; when either is absent
+    # the environmental_comparison node simply skips (non-blocking). Neither ever
+    # feeds risk / safety / decision / routing.
+    comparison_engine: EnvironmentalComparisonEngine | None = None
+    historical_environment_agent: object = None  # HistoricalEnvironmentalAgent-like
 
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
@@ -70,4 +82,7 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         session_store=InMemorySessionStore(settings.session_max_turns),
         references=load_reference_registry(),
         environment_agent=EnvironmentalAgent(settings=settings),
+        productivity_engine=EnvironmentalProductivityEngine(),
+        comparison_engine=EnvironmentalComparisonEngine(),
+        historical_environment_agent=HistoricalEnvironmentalAgent(settings=settings),
     )

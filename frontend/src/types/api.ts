@@ -73,6 +73,78 @@ export interface SuitabilityInfo {
   disclaimer: string;
 }
 
+// ---- Phase 9 Step 3: researcher environmental context -----------------
+// Deterministic. NEVER affects risk / safety / decision / suitability /
+// geofencing / routing / alerts. Chlorophyll-a is a phytoplankton-biomass
+// proxy - it does not indicate fish presence, abundance or catch.
+export type ChlorophyllClass =
+  | "oligotrophic"
+  | "low"
+  | "moderate"
+  | "elevated"
+  | "high";
+
+export type ProductivityPotential = "unknown" | "low" | "moderate" | "elevated";
+
+export type ProductivityConfidence = "none" | "low" | "moderate";
+
+export interface EnvironmentalObservationInfo {
+  value: number | null;
+  unit: string;
+  validity: ValidityState | string | null;
+  data_tier: DataTier | string | null;
+  source: string | null;
+  source_tier: string | null;
+  observed_at: string | null;
+  conflicted: boolean;
+}
+
+// ---- Phase 9 Step 4: researcher temporal comparison ------------------
+// Deterministic current-vs-reference comparison. The reference is an
+// ORCA-computed value over a recent past window - NOT a climatological normal.
+// A single difference is NOT a trend. Chlorophyll-a change is NOT a fish /
+// catch / productivity change. Never affects risk / safety / decision / routing.
+export type ComparisonDirection = "higher" | "lower" | "unchanged" | "unknown";
+
+export interface EnvironmentalComparisonVariableInfo {
+  variable: string;
+  current: EnvironmentalObservationInfo | null;
+  reference: EnvironmentalObservationInfo | null;
+  reference_window: string;
+  absolute_change: number | null;
+  relative_change_pct: number | null; // chlorophyll-a only, guarded
+  direction: ComparisonDirection | string;
+  status: string;
+  data_sufficiency: "sufficient" | "insufficient" | string;
+  confidence: ProductivityConfidence | string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
+export interface EnvironmentalComparisonInfo {
+  sst: EnvironmentalComparisonVariableInfo | null;
+  chlorophyll_a: EnvironmentalComparisonVariableInfo | null;
+  reference_window: string;
+  data_sufficiency: "sufficient" | "insufficient" | string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
+export interface EnvironmentalInfo {
+  sst: EnvironmentalObservationInfo | null;
+  chlorophyll_a: EnvironmentalObservationInfo | null;
+  chlorophyll_class: ChlorophyllClass | null;
+  productivity_potential: ProductivityPotential;
+  data_sufficiency: "sufficient" | "insufficient" | string;
+  confidence: ProductivityConfidence | string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+  comparison?: EnvironmentalComparisonInfo | null; // Phase 9 Step 4 - optional
+}
+
 export interface RouteInfo {
   status: RouteStatus;
   waypoint_count: number | null;
@@ -219,6 +291,7 @@ export interface QueryResponse {
   decision: DecisionInfo | null;
   risk: RiskInfo | null;
   suitability: SuitabilityInfo | null;
+  environmental?: EnvironmentalInfo | null; // Phase 9 Step 3 - researcher context
   route: RouteInfo | null;
   gis: GisSummary | null;
   reference: ReferenceInfo[];

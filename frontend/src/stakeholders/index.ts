@@ -79,21 +79,27 @@ export const STAKEHOLDERS: Stakeholder[] = [
     suggestions: {
       en: [
         "What are the current marine conditions near Mangalore?",
+        "Show the chlorophyll-a and sea-surface temperature near Mangalore.",
+        "What is the environmental productivity potential off Mangalore?",
         "Show the supporting evidence and provenance for this assessment.",
         "Which sources disagree for this location?",
       ],
       hi: [
         "मंगलुरु के पास वर्तमान समुद्री परिस्थितियाँ क्या हैं?",
+        "मंगलुरु के पास क्लोरोफिल-a और समुद्री सतह तापमान दिखाएँ।",
+        "मंगलुरु के पास पर्यावरणीय उत्पादकता क्षमता क्या है?",
         "इस आकलन के लिए साक्ष्य और उत्पत्ति दिखाएँ।",
         "इस स्थान के लिए कौन से स्रोत असहमत हैं?",
       ],
       kn: [
         "ಮಂಗಳೂರಿನ ಬಳಿ ಪ್ರಸ್ತುತ ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳು ಏನು?",
+        "ಮಂಗಳೂರಿನ ಬಳಿ ಕ್ಲೋರೊಫಿಲ್-a ಮತ್ತು ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ ತೋರಿಸಿ.",
+        "ಮಂಗಳೂರಿನ ಬಳಿ ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ ಏನು?",
         "ಈ ಮೌಲ್ಯಮಾಪನಕ್ಕೆ ಸಾಕ್ಷ್ಯ ಮತ್ತು ಮೂಲ ತೋರಿಸಿ.",
         "ಈ ಸ್ಥಳಕ್ಕೆ ಯಾವ ಮೂಲಗಳು ಒಪ್ಪುವುದಿಲ್ಲ?",
       ],
     },
-    defaultLayers: ["coastline", "eez", "protected_areas"],
+    defaultLayers: ["coastline", "eez", "protected_areas", "environmental"],
     emphasisTab: "provenance",
   },
   {

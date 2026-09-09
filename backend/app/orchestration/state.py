@@ -16,6 +16,10 @@ from app.agents.route import RouteAgentResult
 from app.models.common import Coordinate
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
+from app.models.environmental import (
+    EnvironmentalComparisonResult,
+    EnvironmentalProductivityResult,
+)
 from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
 from app.models.geo import GeofenceResult
@@ -82,6 +86,12 @@ class OrcaGraphState(TypedDict, total=False):
     # ---- routing ----
     route_agent_result: RouteAgentResult | None
     route_result: RouteResult | None
+
+    # ---- environmental intelligence (Phase 9 Step 3/4, downstream of decision) ----
+    productivity_result: EnvironmentalProductivityResult | None
+    # Phase 9 Step 4: deterministic researcher temporal comparison. Fetched
+    # locally in the comparison node; never enters the fabric / risk / safety.
+    environmental_comparison: EnvironmentalComparisonResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

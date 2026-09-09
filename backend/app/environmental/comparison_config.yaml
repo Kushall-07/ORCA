@@ -1,0 +1,68 @@
+# ============================================================
+# ORCA Environmental Comparison Engine - configuration
+# ============================================================
+# version: 2026.09-mvp
+#
+# Phase 9 Step 4: deterministic temporal / comparative intelligence for
+# researchers. Compares a CURRENT environmental observation with an
+# ORCA-computed REFERENCE observation drawn from a recent past window of the
+# SAME product.
+#
+# Every value below is a RESOLUTION / DEFINEDNESS / DATA-QUALITY rule. NONE of
+# them is a scientific threshold:
+#   * they do NOT define a "significant" environmental change
+#   * they do NOT define a bloom, a front, an anomaly or a season
+#   * they are engineering floors for what the instruments/models can resolve
+#     and for when a ratio is mathematically stable
+#
+# The reference is NOT a climatological normal. It is a short prior-window
+# summary computed from the values the source actually returned.
+#
+# The engine is deterministic: same observations + this config -> same result.
+# It never averages unresolved conflicting observations and never fabricates a
+# value.
+
+version: "2026.09-mvp"
+
+disclaimer: >-
+  Chlorophyll-a is an environmental productivity proxy and does not indicate
+  fish presence, abundance, or catch.
+
+# ---- reference window ------------------------------------------------------
+# How far back the "earlier observation" reference is drawn from. The reference
+# summarises the values returned across this prior window. Configurable.
+reference_window_days: 30
+
+# ---- tie epsilon (reporting-resolution floor) ----------------------------
+# The smallest difference ORCA will call a change. |current - reference| at or
+# below this is reported as "unchanged". This is the product's reporting
+# resolution, NOT a "significant change" threshold. The difference is rounded to
+# 1e-6 before this test purely to defend against IEEE-754 subtraction noise.
+sst_tie_epsilon_c: 0.1            # deg C  - Open-Meteo Marine SST field resolution
+chl_tie_epsilon_mg_m3: 0.01       # mg m-3 - ocean-colour reporting resolution
+
+# ---- percentage-change definedness --------------------------------------
+# A percentage change is only reported for chlorophyll-a, and only when the
+# reference magnitude is at least this large. Below it a ratio is numerically
+# unstable; the absolute change is still reported, with an explicit limitation.
+chl_denominator_epsilon_mg_m3: 0.05
+
+# ---- minimum history --------------------------------------------------
+# The fewest accepted cloud-free daily chlorophyll-a composites required in the
+# reference window before a median reference is formed. Fewer than this ->
+# insufficient_history (no fabricated baseline).
+min_chl_composites: 3
+
+# ---- reference-date acceptance tolerance + anti-[last] guard ------------
+# A returned historical composite is only used if its timestamp lies inside the
+# reference window. The anti-[last] guard additionally rejects any composite
+# that is closer in time to "now" than to the reference window - that is an
+# accidental current/recent value returned by a fallback, not real history.
+# A composite inside the window but older than this tolerance from the window's
+# far edge is still usable but marked STALE.
+sst_reference_tolerance_hours: 12   # one 6-hourly SST model step, doubled
+chl_reference_tolerance_days: 2     # one daily composite, doubled
+
+# distance floor (metres) beyond which a satellite pixel lowers confidence;
+# kept equal to the Step 3 productivity engine's value for consistency.
+far_pixel_distance_m: 10000

@@ -45,7 +45,10 @@ Only these three languages are supported.
 
 Return ONLY a JSON object with these keys:
   language: "en"|"hi"|"kn"|"unknown"
-  intent: "fishing_safety"|"weather"|"ocean_conditions"|"route"|"pfz_reference"|"general"|"clarification_needed"
+  intent: "fishing_safety"|"weather"|"ocean_conditions"|"route"|"pfz_reference"|"environmental_conditions"|"general"|"clarification_needed"
+  ("environmental_conditions" = a researcher asking about sea-surface temperature,
+   chlorophyll-a, phytoplankton or environmental productivity potential - NOT a
+   fishing-safety or catch question)
   origin_name: string or null       (a place name the trip starts from / is about)
   destination_name: string or null  (only for route requests)
   activity: string or null          (e.g. "fishing")
@@ -54,6 +57,10 @@ Return ONLY a JSON object with these keys:
   requests_route: boolean
   requests_risk: boolean
   requests_pfz: boolean
+  wants_comparison: boolean   (true only when a RESEARCHER asks to compare the
+    current SST / chlorophyll-a with an earlier / historical / previous value -
+    e.g. "compare", "vs last month", "change since", "than usual". Never for a
+    fishing or safety question.)
   needs_clarification: boolean
   clarification_question: string or null
   confidence: number between 0 and 1
@@ -71,6 +78,30 @@ _KANNADA = re.compile("[ಀ-೿]")
 _ROUTE_WORDS = ("route", "navigate", "navigation", "path to", "way to", "sail to", "go to", "मार्ग", "रास्ता", "ಮಾರ್ಗ")
 _WEATHER_WORDS = ("weather", "wind", "rain", "storm", "मौसम", "हवा", "बारिश", "ಹವಾಮಾನ", "ಗಾಳಿ", "ಮಳೆ")
 _OCEAN_WORDS = ("wave", "swell", "sea state", "current", "tide", "ocean", "लहर", "समुद्र", "ಅಲೆ", "ಸಮುದ್ರ")
+# Phase 9 Step 3: researcher environmental queries (SST / chlorophyll / productivity)
+_ENV_WORDS = (
+    "chlorophyll", "chlorophyll-a", "chl-a", "chl a",
+    "sea surface temperature", "sea-surface temperature", "sst",
+    "phytoplankton", "primary production", "primary productivity",
+    "environmental productivity", "productivity potential", "ocean colour", "ocean color",
+    "समुद्री सतह तापमान", "क्लोरोफिल", "पादपप्लवक", "उत्पादकता",
+    "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ", "ಕ್ಲೋರೊಫಿಲ್", "ಉತ್ಪಾದಕತೆ",
+)
+# Phase 9 Step 4: comparative phrasing for a researcher temporal comparison.
+# Only acted on when the intent resolves to environmental_conditions.
+_COMPARE_WORDS = (
+    "compare", "comparison", "compared", "vs", "versus", "than last",
+    "than usual", "than normal", "than before", "than the average", "change since",
+    "changed since", "difference from", "historical", "history", "previous",
+    "prior", "last month", "past month", "a month ago", "last week", "earlier",
+    "over time", "trend",
+    # Hindi
+    "तुलना", "पिछले", "पिछला", "पहले की तुलना", "बदलाव", "ऐतिहासिक",
+    "पिछले महीने", "एक महीने पहले", "सामान्य से",
+    # Kannada
+    "ಹೋಲಿಸಿ", "ಹೋಲಿಕೆ", "ಹಿಂದಿನ", "ಬದಲಾವಣೆ", "ಐತಿಹಾಸಿಕ",
+    "ಕಳೆದ ತಿಂಗಳು", "ಒಂದು ತಿಂಗಳ ಹಿಂದೆ", "ಸಾಮಾನ್ಯಕ್ಕಿಂತ",
+)
 _FISH_WORDS = ("fish", "fishing", "मछली", "मछली पकड़", "ಮೀನು", "ಮೀನುಗಾರಿಕೆ")
 _SAFE_WORDS = ("safe", "safety", "risk", "सुरक्षित", "जोखिम", "ಸುರಕ್ಷಿತ", "ಅಪಾಯ")
 _PFZ_WORDS = ("pfz", "potential fishing zone", "incois advisory", "fishing zone advisory")
@@ -91,6 +122,7 @@ class _LlmQuery(BaseModel):
     requests_route: bool = False
     requests_risk: bool = False
     requests_pfz: bool = False
+    wants_comparison: bool = False
     needs_clarification: bool = False
     clarification_question: str | None = None
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -172,6 +204,9 @@ class QueryUnderstandingAgent:
             requests_route=q.requests_route or intent is QueryIntent.ROUTE,
             requests_risk=q.requests_risk or intent in (QueryIntent.FISHING_SAFETY,),
             requests_pfz=q.requests_pfz or intent is QueryIntent.PFZ_REFERENCE,
+            wants_comparison=(
+                q.wants_comparison and intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+            ),
             needs_clarification=q.needs_clarification,
             clarification_question=q.clarification_question,
             confidence=q.confidence,
@@ -198,11 +233,16 @@ class QueryUnderstandingAgent:
         is_weather = _any(low, _WEATHER_WORDS)
         is_ocean = _any(low, _OCEAN_WORDS)
         is_safe = _any(low, _SAFE_WORDS)
+        is_env = _any(low, _ENV_WORDS)
+        wants_comparison = is_env and not is_fish and not is_safe and _any(low, _COMPARE_WORDS)
 
         if requests_route:
             intent = QueryIntent.ROUTE
         elif requests_pfz:
             intent = QueryIntent.PFZ_REFERENCE
+        elif is_env and not is_fish and not is_safe:
+            # researcher environmental query (SST / chlorophyll / productivity)
+            intent = QueryIntent.ENVIRONMENTAL_CONDITIONS
         elif is_fish or (is_safe and not is_weather and not is_ocean):
             intent = QueryIntent.FISHING_SAFETY
         elif is_ocean:
@@ -235,6 +275,7 @@ class QueryUnderstandingAgent:
             requests_route=requests_route,
             requests_risk=intent is QueryIntent.FISHING_SAFETY or is_safe,
             requests_pfz=requests_pfz,
+            wants_comparison=wants_comparison and intent is QueryIntent.ENVIRONMENTAL_CONDITIONS,
             confidence=0.55,
             raw_entities={
                 k: v for k, v in {"origin": origin_name, "destination": destination_name}.items() if v

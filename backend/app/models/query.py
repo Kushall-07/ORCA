@@ -26,6 +26,7 @@ class QueryIntent(str, Enum):
     OCEAN_CONDITIONS = "ocean_conditions"
     ROUTE = "route"
     PFZ_REFERENCE = "pfz_reference"
+    ENVIRONMENTAL_CONDITIONS = "environmental_conditions"  # Phase 9 Step 3: researcher SST / chlorophyll / productivity
     GENERAL = "general"
     CLARIFICATION_NEEDED = "clarification_needed"
 
@@ -56,6 +57,10 @@ class QueryUnderstanding(BaseModel):
     requests_route: bool = False
     requests_risk: bool = False
     requests_pfz: bool = False
+    # Phase 9 Step 4: the researcher asked to compare current vs earlier
+    # environmental observations. Only acted on for environmental_conditions
+    # queries; never affects risk / safety / decision / routing.
+    wants_comparison: bool = False
     needs_clarification: bool = False
     clarification_question: str | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -72,6 +77,7 @@ class QueryUnderstanding(BaseModel):
             QueryIntent.OCEAN_CONDITIONS,
             QueryIntent.ROUTE,
             QueryIntent.PFZ_REFERENCE,
+            QueryIntent.ENVIRONMENTAL_CONDITIONS,
         )
 
     @property

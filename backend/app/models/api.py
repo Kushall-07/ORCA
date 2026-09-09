@@ -130,6 +130,78 @@ class SuitabilityInfo(BaseModel):
     disclaimer: str = ""
 
 
+class EnvironmentalObservationInfo(BaseModel):
+    """One environmental observation (SST or chlorophyll-a) as surfaced to a
+    researcher. Values, timestamps and tiers are the real ones - never fabricated."""
+
+    value: float | None = None
+    unit: str = ""
+    validity: str | None = None       # VALID | STALE | INVALID | MISSING
+    data_tier: str | None = None      # LIVE | CACHE | REFERENCE | DEMO | MISSING
+    source: str | None = None
+    source_tier: str | None = None
+    observed_at: str | None = None    # ISO - the real composite / model time
+    conflicted: bool = False
+
+
+class EnvironmentalComparisonVariableInfo(BaseModel):
+    """Phase 9 Step 4: a deterministic current-vs-reference comparison for ONE
+    variable (SST or chlorophyll-a). The reference is an ORCA-computed value over
+    a recent past window - NOT a climatological normal. A single difference is
+    NOT a trend."""
+
+    variable: str
+    current: EnvironmentalObservationInfo | None = None
+    reference: EnvironmentalObservationInfo | None = None
+    reference_window: str = ""
+    absolute_change: float | None = None
+    relative_change_pct: float | None = None      # chlorophyll-a only, guarded
+    direction: str = "unknown"                    # higher|lower|unchanged|unknown
+    status: str = "insufficient_history"
+    data_sufficiency: str = "insufficient"        # sufficient|insufficient
+    confidence: str = "none"                      # none|low|moderate
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
+class EnvironmentalComparisonInfo(BaseModel):
+    """Phase 9 Step 4: researcher-facing temporal comparison. Purely
+    informational - never affects risk, safety, decision, routing. Chlorophyll-a
+    change is NOT a fish / catch / productivity change."""
+
+    sst: EnvironmentalComparisonVariableInfo | None = None
+    chlorophyll_a: EnvironmentalComparisonVariableInfo | None = None
+    reference_window: str = ""
+    data_sufficiency: str = "insufficient"
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
+class EnvironmentalInfo(BaseModel):
+    """Phase 9 Step 3: deterministic researcher-facing environmental context.
+
+    Environmental productivity potential NEVER affects risk, safety, decision,
+    suitability, geofencing, routing or alerts. Chlorophyll-a is a
+    phytoplankton-biomass proxy - it does not indicate fish presence, abundance
+    or catch.
+    """
+
+    sst: EnvironmentalObservationInfo | None = None
+    chlorophyll_a: EnvironmentalObservationInfo | None = None
+    chlorophyll_class: str | None = None          # oligotrophic|low|moderate|elevated|high
+    productivity_potential: str = "unknown"       # unknown|low|moderate|elevated
+    data_sufficiency: str = "insufficient"        # sufficient|insufficient
+    confidence: str = "none"                      # none|low|moderate
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+    # Phase 9 Step 4: optional researcher temporal comparison. Null unless the
+    # query was comparative and a reference could be computed.
+    comparison: EnvironmentalComparisonInfo | None = None
+
+
 class DataQualityInfo(BaseModel):
     weather_tier: str | None = None
     ocean_tier: str | None = None
@@ -175,6 +247,7 @@ class QueryResponse(BaseModel):
     decision: DecisionInfo | None = None
     risk: RiskInfo | None = None
     suitability: SuitabilityInfo | None = None
+    environmental: EnvironmentalInfo | None = None   # Phase 9 Step 3 - researcher context, never affects safety
     route: RouteInfo | None = None
     gis: GisSummary | None = None
     reference: list[ReferenceInfo] = Field(default_factory=list)

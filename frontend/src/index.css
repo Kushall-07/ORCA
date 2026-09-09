@@ -488,6 +488,47 @@ button { font-family: inherit; }
 .suit__pfz { margin: 0; font-size: 0.8rem; }
 .suit__disclaimer { margin: 0; font-size: 0.74rem; color: var(--orca-muted); }
 
+/* ---------- environmental context (Phase 9 Step 3) ---------- */
+/* Deliberately NEUTRAL styling - environmental productivity is researcher
+   context, never a go/no-go signal, so it must not read like the risk or
+   suitability verdicts. */
+.env { display: flex; flex-direction: column; gap: 0.45rem; }
+.env__row { display: flex; align-items: baseline; gap: 0.6rem; }
+.env__level {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--orca-text);
+}
+.env__level--unknown { color: var(--orca-muted); }
+.env__caption { font-size: 0.76rem; color: var(--orca-faint); }
+.env__grid { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; }
+.env__derived { margin: 0; font-size: 0.76rem; color: var(--orca-faint); }
+.env__section-label {
+  margin: 0.2rem 0 0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--orca-muted);
+}
+.env__limitations {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--orca-muted);
+}
+.env__limitations li { margin: 0.15rem 0; }
+
+/* Phase 9 Step 4 - temporal comparison sub-block. Neutral only: a signed
+   number and a word. No colour-coded good/bad, no arrows, no charts. */
+.env-cmp { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; }
+.env-cmp__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.env-cmp__row { display: flex; flex-direction: column; gap: 0.1rem; }
+.env-cmp__var { font-weight: 600; font-size: 0.8rem; }
+.env-cmp__figures { font-size: 0.78rem; color: var(--orca-muted); }
+.env-cmp__figures--none { font-style: italic; }
+.env-cmp__window { margin: 0; font-size: 0.74rem; color: var(--orca-faint); }
+.env-cmp__note { margin: 0; font-size: 0.72rem; color: var(--orca-muted); }
+
 /* ---------- evidence ---------- */
 .evidence-table { display: flex; flex-direction: column; font-size: 0.8rem; }
 .evidence-row {

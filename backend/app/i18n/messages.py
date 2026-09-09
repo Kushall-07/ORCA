@@ -8,6 +8,11 @@ rendered in a single consistent form; source names are NOT translated.
 from __future__ import annotations
 
 from app.models.decision import DecisionStatus
+from app.models.environmental import (
+    ChlorophyllClass,
+    ComparisonDirection,
+    ProductivityPotential,
+)
 from app.models.query import Language
 from app.models.risk import RiskLevel
 from app.models.routing import RouteStatus
@@ -58,6 +63,63 @@ _SUIT_LABEL: dict[Language, dict[SuitabilityLevel, str]] = {
     },
 }
 
+_CHL_CLASS_LABEL: dict[Language, dict[ChlorophyllClass, str]] = {
+    Language.EN: {
+        ChlorophyllClass.OLIGOTROPHIC: "very low (oligotrophic)",
+        ChlorophyllClass.LOW: "low", ChlorophyllClass.MODERATE: "moderate",
+        ChlorophyllClass.ELEVATED: "elevated", ChlorophyllClass.HIGH: "very high",
+    },
+    Language.HI: {
+        ChlorophyllClass.OLIGOTROPHIC: "बहुत कम (अल्पपोषी)",
+        ChlorophyllClass.LOW: "कम", ChlorophyllClass.MODERATE: "मध्यम",
+        ChlorophyllClass.ELEVATED: "बढ़ा हुआ", ChlorophyllClass.HIGH: "बहुत अधिक",
+    },
+    Language.KN: {
+        ChlorophyllClass.OLIGOTROPHIC: "ಬಹಳ ಕಡಿಮೆ (ಒಲಿಗೊಟ್ರೋಫಿಕ್)",
+        ChlorophyllClass.LOW: "ಕಡಿಮೆ", ChlorophyllClass.MODERATE: "ಮಧ್ಯಮ",
+        ChlorophyllClass.ELEVATED: "ಹೆಚ್ಚಿನ", ChlorophyllClass.HIGH: "ಬಹಳ ಹೆಚ್ಚು",
+    },
+}
+
+_PRODUCTIVITY_LABEL: dict[Language, dict[ProductivityPotential, str]] = {
+    Language.EN: {
+        ProductivityPotential.UNKNOWN: "unknown", ProductivityPotential.LOW: "low",
+        ProductivityPotential.MODERATE: "moderate", ProductivityPotential.ELEVATED: "elevated",
+    },
+    Language.HI: {
+        ProductivityPotential.UNKNOWN: "अज्ञात", ProductivityPotential.LOW: "कम",
+        ProductivityPotential.MODERATE: "मध्यम", ProductivityPotential.ELEVATED: "बढ़ा हुआ",
+    },
+    Language.KN: {
+        ProductivityPotential.UNKNOWN: "ಅಜ್ಞಾತ", ProductivityPotential.LOW: "ಕಡಿಮೆ",
+        ProductivityPotential.MODERATE: "ಮಧ್ಯಮ", ProductivityPotential.ELEVATED: "ಹೆಚ್ಚಿನ",
+    },
+}
+
+# Phase 9 Step 4: relation words for a current-vs-reference difference. Only
+# "higher than" / "lower than" / "unchanged from" - never rising / declining /
+# trend / bloom.
+_CMP_DIRECTION_LABEL: dict[Language, dict[ComparisonDirection, str]] = {
+    Language.EN: {
+        ComparisonDirection.HIGHER: "higher than",
+        ComparisonDirection.LOWER: "lower than",
+        ComparisonDirection.UNCHANGED: "unchanged from",
+        ComparisonDirection.UNKNOWN: "not comparable with",
+    },
+    Language.HI: {
+        ComparisonDirection.HIGHER: "से अधिक",
+        ComparisonDirection.LOWER: "से कम",
+        ComparisonDirection.UNCHANGED: "से अपरिवर्तित",
+        ComparisonDirection.UNKNOWN: "से तुलनीय नहीं",
+    },
+    Language.KN: {
+        ComparisonDirection.HIGHER: "ಗಿಂತ ಹೆಚ್ಚು",
+        ComparisonDirection.LOWER: "ಗಿಂತ ಕಡಿಮೆ",
+        ComparisonDirection.UNCHANGED: "ಗಿಂತ ಬದಲಾಗಿಲ್ಲ",
+        ComparisonDirection.UNKNOWN: "ಜೊತೆ ಹೋಲಿಸಲಾಗದು",
+    },
+}
+
 _FRAGMENTS: dict[Language, dict[str, str]] = {
     Language.EN: {
         "risk": "Deterministic marine risk is {level} (score {score}/100).",
@@ -73,6 +135,22 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "stale": "Some evidence is stale and was not treated as current.",
         "conflict": "Sources disagree on {vars}; the disagreement is preserved, not averaged away.",
         "proxy": "Thunderstorm/lightning and cyclone indications here are model-derived proxies, not certified real-time detection.",
+        "env_sst": "Sea-surface temperature is {sst} degrees C ({validity}).",
+        "env_chl": "Chlorophyll-a is {chl} mg/m3, a {cls} phytoplankton-biomass level ({validity}).",
+        "env_productivity": "Environmental productivity potential is {level} (derived from chlorophyll-a only; sea-surface temperature is context, not a driver).",
+        "env_productivity_unknown": "Environmental productivity potential could not be determined for this location and time.",
+        "env_chl_missing": "Chlorophyll-a is unavailable here (satellite cloud cover or data gap).",
+        "env_sst_missing": "Sea-surface temperature is unavailable here.",
+        "env_disclaimer": "Chlorophyll-a is an environmental productivity proxy and does not indicate fish presence, abundance, or catch.",
+        "env_var_sst": "sea-surface temperature",
+        "env_var_chl": "chlorophyll-a",
+        "env_cmp_sst": "Sea-surface temperature is {delta} degrees C {rel} the ORCA-computed reference of {ref} degrees C ({window}).",
+        "env_cmp_sst_unchanged": "Sea-surface temperature is essentially unchanged from the ORCA-computed reference of {ref} degrees C ({window}).",
+        "env_cmp_chl": "Chlorophyll-a is {delta} mg/m3 ({pct}%) {rel} the ORCA-computed reference of {ref} mg/m3 ({window}).",
+        "env_cmp_chl_nopct": "Chlorophyll-a is {delta} mg/m3 {rel} the ORCA-computed reference of {ref} mg/m3 ({window}).",
+        "env_cmp_chl_unchanged": "Chlorophyll-a is essentially unchanged from the ORCA-computed reference of {ref} mg/m3 ({window}).",
+        "env_cmp_unavailable": "A temporal comparison for {var} could not be computed ({reason}).",
+        "env_cmp_note": "The reference is an ORCA-computed value over a recent past window, not a climatological normal; a single difference is not a trend.",
         "clarify": "Could you clarify: {q}",
         "understanding_failed": "ORCA could not reliably understand the request. Please rephrase with a location and what you want to know.",
     },
@@ -90,6 +168,22 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "stale": "कुछ साक्ष्य पुराने हैं और उन्हें वर्तमान नहीं माना गया।",
         "conflict": "{vars} पर स्रोत असहमत हैं; असहमति को औसत नहीं किया गया, संरक्षित रखा गया है।",
         "proxy": "यहाँ आंधी/बिजली और चक्रवात के संकेत मॉडल-आधारित प्रॉक्सी हैं, प्रमाणित वास्तविक-समय पहचान नहीं।",
+        "env_sst": "समुद्री सतह तापमान {sst} डिग्री C है ({validity})।",
+        "env_chl": "क्लोरोफिल-a {chl} mg/m3 है, यह {cls} पादपप्लवक-जैवभार स्तर है ({validity})।",
+        "env_productivity": "पर्यावरणीय उत्पादकता क्षमता {level} है (केवल क्लोरोफिल-a से निकाली गई; समुद्री सतह तापमान संदर्भ है, चालक नहीं)।",
+        "env_productivity_unknown": "इस स्थान और समय के लिए पर्यावरणीय उत्पादकता क्षमता निर्धारित नहीं की जा सकी।",
+        "env_chl_missing": "यहाँ क्लोरोफिल-a उपलब्ध नहीं है (उपग्रह बादल आवरण या डेटा अंतराल)।",
+        "env_sst_missing": "यहाँ समुद्री सतह तापमान उपलब्ध नहीं है।",
+        "env_disclaimer": "क्लोरोफिल-a एक पर्यावरणीय उत्पादकता प्रॉक्सी है और यह मछली की उपस्थिति, बहुतायत या पकड़ का संकेत नहीं देता।",
+        "env_var_sst": "समुद्री सतह तापमान",
+        "env_var_chl": "क्लोरोफिल-a",
+        "env_cmp_sst": "समुद्री सतह तापमान ORCA-गणित संदर्भ {ref} डिग्री C {rel} {delta} डिग्री C है ({window})।",
+        "env_cmp_sst_unchanged": "समुद्री सतह तापमान ORCA-गणित संदर्भ {ref} डिग्री C से लगभग अपरिवर्तित है ({window})।",
+        "env_cmp_chl": "क्लोरोफिल-a ORCA-गणित संदर्भ {ref} mg/m3 {rel} {delta} mg/m3 ({pct}%) है ({window})।",
+        "env_cmp_chl_nopct": "क्लोरोफिल-a ORCA-गणित संदर्भ {ref} mg/m3 {rel} {delta} mg/m3 है ({window})।",
+        "env_cmp_chl_unchanged": "क्लोरोफिल-a ORCA-गणित संदर्भ {ref} mg/m3 से लगभग अपरिवर्तित है ({window})।",
+        "env_cmp_unavailable": "{var} के लिए सामयिक तुलना नहीं की जा सकी ({reason})।",
+        "env_cmp_note": "संदर्भ हाल की एक पिछली अवधि पर ORCA-गणित मान है, कोई जलवायु सामान्य नहीं; एक अंतर कोई प्रवृत्ति नहीं।",
         "clarify": "कृपया स्पष्ट करें: {q}",
         "understanding_failed": "ORCA अनुरोध को विश्वसनीय रूप से नहीं समझ सका। कृपया स्थान और अपनी जानकारी की आवश्यकता के साथ दोबारा लिखें।",
     },
@@ -107,6 +201,22 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "stale": "ಕೆಲವು ಸಾಕ್ಷ್ಯಗಳು ಹಳೆಯವು ಮತ್ತು ಪ್ರಸ್ತುತ ಎಂದು ಪರಿಗಣಿಸಲಾಗಿಲ್ಲ.",
         "conflict": "{vars} ಬಗ್ಗೆ ಮೂಲಗಳು ಒಪ್ಪುವುದಿಲ್ಲ; ಭಿನ್ನಾಭಿಪ್ರಾಯವನ್ನು ಸರಾಸರಿ ಮಾಡದೆ ಉಳಿಸಿಕೊಳ್ಳಲಾಗಿದೆ.",
         "proxy": "ಇಲ್ಲಿನ ಗುಡುಗು/ಮಿಂಚು ಮತ್ತು ಚಂಡಮಾರುತ ಸೂಚನೆಗಳು ಮಾದರಿ-ಆಧಾರಿತ ಪ್ರಾಕ್ಸಿಗಳು, ಪ್ರಮಾಣೀಕೃತ ನೈಜ-ಸಮಯ ಪತ್ತೆ ಅಲ್ಲ.",
+        "env_sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ {sst} ಡಿಗ್ರಿ C ({validity}).",
+        "env_chl": "ಕ್ಲೋರೊಫಿಲ್-a {chl} mg/m3, ಇದು {cls} ಪ್ಲವಕ-ಜೀವರಾಶಿ ಮಟ್ಟ ({validity}).",
+        "env_productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ {level} (ಕೇವಲ ಕ್ಲೋರೊಫಿಲ್-a ನಿಂದ ಪಡೆದಿದೆ; ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ ಸಂದರ್ಭ, ಚಾಲಕವಲ್ಲ).",
+        "env_productivity_unknown": "ಈ ಸ್ಥಳ ಮತ್ತು ಸಮಯಕ್ಕೆ ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯವನ್ನು ನಿರ್ಧರಿಸಲಾಗಲಿಲ್ಲ.",
+        "env_chl_missing": "ಇಲ್ಲಿ ಕ್ಲೋರೊಫಿಲ್-a ಲಭ್ಯವಿಲ್ಲ (ಉಪಗ್ರಹ ಮೋಡ ಅಥವಾ ದತ್ತಾಂಶ ಅಂತರ).",
+        "env_sst_missing": "ಇಲ್ಲಿ ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ ಲಭ್ಯವಿಲ್ಲ.",
+        "env_disclaimer": "ಕ್ಲೋರೊಫಿಲ್-a ಒಂದು ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಪ್ರಾಕ್ಸಿ ಮತ್ತು ಇದು ಮೀನಿನ ಇರುವಿಕೆ, ಸಮೃದ್ಧಿ ಅಥವಾ ಹಿಡಿತವನ್ನು ಸೂಚಿಸುವುದಿಲ್ಲ.",
+        "env_var_sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
+        "env_var_chl": "ಕ್ಲೋರೊಫಿಲ್-a",
+        "env_cmp_sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} ಡಿಗ್ರಿ C {rel} {delta} ಡಿಗ್ರಿ C ({window}).",
+        "env_cmp_sst_unchanged": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} ಡಿಗ್ರಿ C ಗಿಂತ ಬಹುತೇಕ ಬದಲಾಗಿಲ್ಲ ({window}).",
+        "env_cmp_chl": "ಕ್ಲೋರೊಫಿಲ್-a ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} mg/m3 {rel} {delta} mg/m3 ({pct}%) ({window}).",
+        "env_cmp_chl_nopct": "ಕ್ಲೋರೊಫಿಲ್-a ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} mg/m3 {rel} {delta} mg/m3 ({window}).",
+        "env_cmp_chl_unchanged": "ಕ್ಲೋರೊಫಿಲ್-a ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} mg/m3 ಗಿಂತ ಬಹುತೇಕ ಬದಲಾಗಿಲ್ಲ ({window}).",
+        "env_cmp_unavailable": "{var} ಗಾಗಿ ತಾತ್ಕಾಲಿಕ ಹೋಲಿಕೆ ಮಾಡಲಾಗಲಿಲ್ಲ ({reason}).",
+        "env_cmp_note": "ಉಲ್ಲೇಖವು ಇತ್ತೀಚಿನ ಹಿಂದಿನ ಅವಧಿಯ ORCA-ಗಣಿತ ಮೌಲ್ಯ, ಹವಾಮಾನ ಸಾಮಾನ್ಯವಲ್ಲ; ಒಂದು ವ್ಯತ್ಯಾಸ ಪ್ರವೃತ್ತಿಯಲ್ಲ.",
         "clarify": "ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟಪಡಿಸಿ: {q}",
         "understanding_failed": "ORCA ವಿನಂತಿಯನ್ನು ವಿಶ್ವಾಸಾರ್ಹವಾಗಿ ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ಥಳ ಮತ್ತು ನಿಮಗೆ ಬೇಕಾದ ಮಾಹಿತಿಯೊಂದಿಗೆ ಮತ್ತೆ ಬರೆಯಿರಿ.",
     },
@@ -132,3 +242,15 @@ def risk_label(language: Language, level: RiskLevel) -> str:
 
 def suitability_label(language: Language, level: SuitabilityLevel) -> str:
     return _SUIT_LABEL[_lang(language)][level]
+
+
+def chlorophyll_class_label(language: Language, cls: ChlorophyllClass) -> str:
+    return _CHL_CLASS_LABEL[_lang(language)][cls]
+
+
+def productivity_label(language: Language, level: ProductivityPotential) -> str:
+    return _PRODUCTIVITY_LABEL[_lang(language)][level]
+
+
+def comparison_direction_label(language: Language, direction: ComparisonDirection) -> str:
+    return _CMP_DIRECTION_LABEL[_lang(language)][direction]

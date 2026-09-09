@@ -189,3 +189,35 @@ async def fetch_marine(
     return await get_json(
         url, params, timeout_s=timeout_s, retries=retries, client=client
     )
+
+
+async def fetch_marine_history(
+    lat: float,
+    lon: float,
+    *,
+    url: str,
+    past_days: int,
+    timeout_s: float,
+    retries: int,
+    client: httpx.AsyncClient | None = None,
+) -> dict[str, Any]:
+    """Phase 9 Step 4 - the SAME Open-Meteo Marine product as the live call, over
+    a recent past window (``past_days``), requesting ONLY
+    ``sea_surface_temperature``.
+
+    Used solely by the researcher temporal-comparison node to build an
+    ORCA-computed reference. It never enters the Marine Data Fabric and never
+    feeds risk / safety / decision / routing. ``past_days`` is clamped to
+    Open-Meteo's documented maximum of 92.
+    """
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": "sea_surface_temperature",
+        "past_days": max(1, min(int(past_days), 92)),
+        "forecast_days": 1,
+        "timezone": "UTC",
+    }
+    return await get_json(
+        url, params, timeout_s=timeout_s, retries=retries, client=client
+    )

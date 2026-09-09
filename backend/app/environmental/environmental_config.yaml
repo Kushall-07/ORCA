@@ -1,0 +1,43 @@
+# ============================================================
+# ORCA Environmental Productivity Engine - configuration
+# ============================================================
+# version: 2026.09-mvp
+#
+# DESCRIPTIVE trophic-magnitude bands for a chlorophyll-a concentration
+# (mg m-3). These are standard ocean-colour magnitude descriptors used in
+# trophic-status literature and operational visualisations. They are:
+#   * NOT fish-abundance thresholds
+#   * NOT catch-rate or fishing-success thresholds
+#   * NOT region- or season-tuned
+# A band is a coarse label for phytoplankton biomass magnitude only.
+#
+# SST is NOT used to threshold anything. ORCA has no defensible per-region or
+# per-species SST optimum and cannot compute a thermal front or an anomaly from
+# a single point / single time. SST is reported as context only and never
+# changes productivity_potential.
+#
+# The engine is deterministic: given the same observations and this config it
+# always returns the same result. It never averages conflicting observations and
+# never fabricates a value.
+
+version: "2026.09-mvp"
+
+disclaimer: >-
+  Chlorophyll-a is an environmental productivity proxy and does not indicate
+  fish presence, abundance, or catch.
+
+# chlorophyll-a class boundaries in mg m-3 (upper-exclusive)
+chlorophyll_classes:
+  oligotrophic_below: 0.1     # < 0.1        -> oligotrophic
+  low_below: 1.0              # 0.1 - < 1.0  -> low
+  moderate_below: 3.0         # 1.0 - < 3.0  -> moderate
+  elevated_below: 10.0        # 3.0 - < 10.0 -> elevated
+  #                            >= 10.0       -> high
+
+# class -> productivity_potential
+productivity_by_class:
+  oligotrophic: low
+  low: low
+  moderate: moderate
+  elevated: elevated
+  high: elevated

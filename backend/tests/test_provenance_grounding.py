@@ -112,3 +112,180 @@ def test_structural_numbers_are_allowed() -> None:
     report = ground_text("There are 3 key factors and the scale is 0 to 100.",
                          provenance=prov, decision=decision, risk=risk)
     assert report.grounded is True
+
+
+# ---- Phase 9 Step 3: environmental provenance + numeric grounding ---------
+from app.models.environmental import (  # noqa: E402
+    ChlorophyllClass,
+    DataSufficiency,
+    EnvironmentalObservation,
+    EnvironmentalProductivityResult,
+    ProductivityConfidence,
+    ProductivityPotential,
+)
+
+
+def _build_with_environment():
+    records = [
+        _rec("wave_height", 1.8, "m", "open-meteo-marine"),
+        _rec("wind_speed", 6.0, "m/s", "open-meteo-forecast"),
+        _rec("sea_surface_temperature", 29.3, "°C", "open-meteo-marine"),
+        _rec("chlorophyll_a", 2.4, "mg m-3", "noaa-coastwatch-erddap"),
+    ]
+    fabric = MarineDataFabric(query_coordinate=Q, query_time=T, built_at=T,
+                              records=tuple(records))
+    fusion = fuse(records, query_coordinate=Q, query_time=T)
+    arb = HierarchyArbitrator().arbitrate(ArbitrationInput(fabric=fabric, fusion=fusion))
+    conflicts = detect_conflicts(fusion=fusion, arbitration=arb)
+    risk = RiskEngine().evaluate(RiskEngineInput(wave_height_m=1.8, wind_speed_ms=6.0,
+                                                 weather_codes=(3,)))
+    safety = evaluate_safety(SafetyGuardInput(risk=risk))
+    decision = decide(safety, risk=risk)
+    u = QueryUnderstanding(language=Language.EN,
+                           intent=QueryIntent.ENVIRONMENTAL_CONDITIONS)
+    productivity = EnvironmentalProductivityResult(
+        sst=EnvironmentalObservation(
+            variable="sea_surface_temperature", value=29.3, unit="°C",
+            validity="VALID", data_tier="LIVE", source="open-meteo-marine", source_tier=3),
+        chlorophyll_a=EnvironmentalObservation(
+            variable="chlorophyll_a", value=2.4, unit="mg m-3", validity="VALID",
+            data_tier="LIVE", source="noaa-coastwatch-erddap", source_tier=3),
+        chlorophyll_class=ChlorophyllClass.MODERATE,
+        productivity_potential=ProductivityPotential.MODERATE,
+        data_sufficiency=DataSufficiency.SUFFICIENT,
+        confidence=ProductivityConfidence.MODERATE,
+    )
+    prov = build_provenance(
+        message="chlorophyll and SST near Mangalore?", understanding=u,
+        weather_tier="LIVE", ocean_tier="LIVE", environment_tier="LIVE",
+        fabric=fabric, fusion=fusion, arbitration=arb, conflicts=conflicts,
+        risk=risk, safety=safety, decision=decision, productivity=productivity,
+    )
+    return prov, decision, risk, productivity
+
+
+def test_environmental_provenance_node_present_and_traces_to_root() -> None:
+    prov, _, _, _ = _build_with_environment()
+    env_nodes = [n for n in prov.nodes if n.kind is ProvNodeKind.ENVIRONMENTAL]
+    assert env_nodes, "no ENVIRONMENTAL provenance node"
+    for n in prov.nodes:
+        assert prov.traces_to_root(n.id), f"{n.id} does not trace to the query"
+
+
+def test_environmental_chain_query_to_result() -> None:
+    prov, _, _, _ = _build_with_environment()
+    kinds = {n.kind for n in prov.nodes}
+    # query -> intent -> agent:environment -> observation -> validity -> productivity
+    assert ProvNodeKind.QUERY in kinds and ProvNodeKind.INTENT in kinds
+    assert ProvNodeKind.OBSERVATION in kinds and ProvNodeKind.VALIDITY in kinds
+    assert ProvNodeKind.ENVIRONMENTAL in kinds
+    labels = " ".join(n.label.lower() for n in prov.nodes)
+    assert "environment" in labels
+
+
+def test_sst_and_chlorophyll_numbers_are_grounded_via_environmental() -> None:
+    prov, decision, risk, productivity = _build_with_environment()
+    text = (
+        "Sea-surface temperature is 29.3 degrees C. Chlorophyll-a is 2.4 mg/m3, "
+        "a moderate phytoplankton-biomass level."
+    )
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity)
+    assert report.grounded is True
+    assert not report.unsupported
+
+
+def test_unsupported_environmental_number_is_still_rejected() -> None:
+    prov, decision, risk, productivity = _build_with_environment()
+    text = "Chlorophyll-a is 9.9 mg/m3."   # not the real 2.4
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity)
+    assert report.grounded is False
+    assert "9.9" in report.unsupported
+
+
+# ---- Phase 9 Step 4: comparison provenance + numeric grounding ------------
+from app.models.environmental import (  # noqa: E402
+    ComparisonDirection,
+    EnvironmentalComparison,
+    EnvironmentalComparisonResult,
+)
+
+
+def _build_with_comparison():
+    prov0, decision, risk, productivity = _build_with_environment()
+    current_sst = EnvironmentalObservation(
+        variable="sea_surface_temperature", value=29.3, unit="°C", validity="VALID",
+        data_tier="LIVE", source="open-meteo-marine", source_tier=3, role="current")
+    ref_sst = EnvironmentalObservation(
+        variable="sea_surface_temperature", value=27.9, unit="°C", validity="VALID",
+        data_tier="REFERENCE", source="open-meteo-marine (30-day history)", source_tier=3,
+        observed_at="2026-08-20T00:00:00+00:00", role="reference")
+    current_chl = EnvironmentalObservation(
+        variable="chlorophyll_a", value=2.4, unit="mg m-3", validity="VALID",
+        data_tier="LIVE", source="noaa-coastwatch-erddap", source_tier=3, role="current")
+    ref_chl = EnvironmentalObservation(
+        variable="chlorophyll_a", value=1.5, unit="mg m-3", validity="VALID",
+        data_tier="REFERENCE", source="noaa-coastwatch-erddap (30-day history)",
+        source_tier=3, observed_at="2026-08-21T00:00:00+00:00", role="reference")
+    comparison = EnvironmentalComparisonResult(
+        sst=EnvironmentalComparison(
+            variable="sea_surface_temperature", current=current_sst, reference=ref_sst,
+            reference_window="ORCA-computed reference over the last 30 days",
+            absolute_change=1.4, relative_change_pct=None,
+            direction=ComparisonDirection.HIGHER, status="ok",
+            data_sufficiency=DataSufficiency.SUFFICIENT,
+            confidence=ProductivityConfidence.MODERATE),
+        chlorophyll_a=EnvironmentalComparison(
+            variable="chlorophyll_a", current=current_chl, reference=ref_chl,
+            reference_window="ORCA-computed reference over the last 30 days",
+            absolute_change=0.9, relative_change_pct=60.0,
+            direction=ComparisonDirection.HIGHER, status="ok",
+            data_sufficiency=DataSufficiency.SUFFICIENT,
+            confidence=ProductivityConfidence.MODERATE),
+        reference_window="ORCA-computed reference over the last 30 days",
+        data_sufficiency=DataSufficiency.SUFFICIENT,
+    )
+    u = QueryUnderstanding(language=Language.EN,
+                           intent=QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                           wants_comparison=True)
+    prov = build_provenance(
+        message="compare chlorophyll and SST near Mangalore vs last month",
+        understanding=u, weather_tier="LIVE", ocean_tier="LIVE", environment_tier="LIVE",
+        risk=risk, safety=evaluate_safety(SafetyGuardInput(risk=risk)),
+        decision=decision, productivity=productivity, comparison=comparison,
+    )
+    return prov, decision, risk, productivity, comparison
+
+
+def test_comparison_provenance_nodes_present_and_trace_to_root() -> None:
+    prov, *_ = _build_with_comparison()
+    kinds = {n.kind for n in prov.nodes}
+    assert ProvNodeKind.ENVIRONMENTAL_COMPARISON in kinds
+    assert any(n.id == "agent:environment_history" for n in prov.nodes)
+    assert any(n.id == "cmp_obs:sea_surface_temperature:current" for n in prov.nodes)
+    assert any(n.id == "cmp_obs:sea_surface_temperature:reference" for n in prov.nodes)
+    for n in prov.nodes:
+        assert prov.traces_to_root(n.id), f"{n.id} does not trace to the query"
+
+
+def test_comparison_current_reference_and_delta_numbers_are_grounded() -> None:
+    prov, decision, risk, productivity, comparison = _build_with_comparison()
+    text = (
+        "Sea-surface temperature is 1.4 degrees C higher than the ORCA-computed "
+        "reference of 27.9 degrees C. Chlorophyll-a is 0.9 mg/m3 (60%) higher "
+        "than the reference of 1.5 mg/m3."
+    )
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity, comparison=comparison)
+    assert report.grounded is True
+    assert not report.unsupported
+
+
+def test_invented_comparison_delta_is_rejected() -> None:
+    prov, decision, risk, productivity, comparison = _build_with_comparison()
+    text = "Sea-surface temperature is 4.8 degrees C higher than the reference."
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity, comparison=comparison)
+    assert report.grounded is False
+    assert "4.8" in report.unsupported

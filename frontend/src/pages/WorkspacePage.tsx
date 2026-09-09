@@ -23,6 +23,7 @@ import {
   AlertsPanel,
   ExplanationPanel,
 } from "../components/intel/IntelPanels";
+import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPanel";
 import { ProvenanceViewer } from "../components/provenance/ProvenanceViewer";
 import { RoutePanel } from "../components/route/RoutePanel";
 import { ReportView } from "../components/report/ReportView";
@@ -162,6 +163,7 @@ export default function WorkspacePage() {
                 <DecisionCard resp={latest} />
                 <RiskPanel resp={latest} />
                 <SuitabilityPanel resp={latest} />
+                <EnvironmentalPanel resp={latest} />
                 <RoutePanel resp={latest} />
                 <ExplanationPanel resp={latest} />
               </>

@@ -14,6 +14,10 @@ from app.models.api import (
     ConflictItem,
     DataQualityInfo,
     DecisionInfo,
+    EnvironmentalComparisonInfo,
+    EnvironmentalComparisonVariableInfo,
+    EnvironmentalInfo,
+    EnvironmentalObservationInfo,
     EvidenceItem,
     GisSummary,
     LocationInfo,
@@ -106,6 +110,8 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     decision = state.get("decision")
     risk = state.get("risk_result")
     suit = state.get("suitability")
+    productivity = state.get("productivity_result")
+    comparison = state.get("environmental_comparison")
     route = state.get("route_result")
     fabric = state.get("fabric")
     expl = state.get("explanation")
@@ -155,6 +161,69 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             pfz_reference_present=suit.pfz_reference_present,
             pfz_note=suit.pfz_reference_note,
             disclaimer=suit.disclaimer,
+        )
+
+    def _obs_info(o):  # type: ignore[no-untyped-def]
+        if o is None:
+            return None
+        return EnvironmentalObservationInfo(
+            value=o.value, unit=o.unit, validity=o.validity,
+            data_tier=o.data_tier, source=o.source,
+            source_tier=str(o.source_tier), observed_at=o.observed_at,
+            conflicted=o.conflicted,
+        )
+
+    comparison_info = None
+    if comparison is not None:
+        def _cmp_var(c):  # type: ignore[no-untyped-def]
+            if c is None:
+                return None
+            return EnvironmentalComparisonVariableInfo(
+                variable=c.variable,
+                current=_obs_info(c.current),
+                reference=_obs_info(c.reference),
+                reference_window=c.reference_window,
+                absolute_change=c.absolute_change,
+                relative_change_pct=c.relative_change_pct,
+                direction=c.direction.value,
+                status=c.status,
+                data_sufficiency=c.data_sufficiency.value,
+                confidence=c.confidence.value,
+                limitations=list(c.limitations),
+                disclaimer=c.disclaimer,
+                engine_version=c.engine_version,
+            )
+
+        comparison_info = EnvironmentalComparisonInfo(
+            sst=_cmp_var(comparison.sst),
+            chlorophyll_a=_cmp_var(comparison.chlorophyll_a),
+            reference_window=comparison.reference_window,
+            data_sufficiency=comparison.data_sufficiency.value,
+            limitations=list(comparison.limitations),
+            disclaimer=comparison.disclaimer,
+            engine_version=comparison.engine_version,
+        )
+
+    environmental_info = None
+    if productivity is not None:
+        environmental_info = EnvironmentalInfo(
+            sst=_obs_info(productivity.sst),
+            chlorophyll_a=_obs_info(productivity.chlorophyll_a),
+            chlorophyll_class=(
+                productivity.chlorophyll_class.value
+                if productivity.chlorophyll_class is not None else None
+            ),
+            productivity_potential=productivity.productivity_potential.value,
+            data_sufficiency=productivity.data_sufficiency.value,
+            confidence=productivity.confidence.value,
+            limitations=list(productivity.limitations),
+            disclaimer=productivity.disclaimer,
+            engine_version=productivity.engine_version,
+            comparison=comparison_info,
+        )
+    elif comparison_info is not None:
+        environmental_info = EnvironmentalInfo(
+            disclaimer=comparison.disclaimer, comparison=comparison_info,
         )
 
     route_info = None
@@ -308,6 +377,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         decision=decision_info,
         risk=risk_info,
         suitability=suit_info,
+        environmental=environmental_info,
         route=route_info,
         gis=gis_summary,
         reference=references,

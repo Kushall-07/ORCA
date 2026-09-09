@@ -214,6 +214,135 @@ export function makeNoSafeResponse(): QueryResponse {
   });
 }
 
+// Phase 9 Step 3 - a researcher environmental-context response. The safety chain
+// is still fully present and unchanged; `environmental` is purely additive.
+export function makeEnvironmentalResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  return makeResponse({
+    intent: "environmental_conditions",
+    answer:
+      "Sea-surface temperature is 29.0 degrees C. Chlorophyll-a is 1.80 mg/m3, " +
+      "a moderate phytoplankton-biomass level, so environmental productivity " +
+      "potential is moderate. Chlorophyll-a is an environmental productivity " +
+      "proxy and does not indicate fish presence, abundance, or catch.",
+    environmental: {
+      sst: {
+        value: 29.0,
+        unit: "°C",
+        validity: "VALID",
+        data_tier: "LIVE",
+        source: "open-meteo-marine",
+        source_tier: "3",
+        observed_at: "2026-09-07T06:00:00+00:00",
+        conflicted: false,
+      },
+      chlorophyll_a: {
+        value: 1.8,
+        unit: "mg m-3",
+        validity: "VALID",
+        data_tier: "LIVE",
+        source: "noaa-coastwatch-erddap",
+        source_tier: "3",
+        observed_at: "2026-09-06T00:00:00+00:00",
+        conflicted: false,
+      },
+      chlorophyll_class: "moderate",
+      productivity_potential: "moderate",
+      data_sufficiency: "sufficient",
+      confidence: "moderate",
+      limitations: [],
+      disclaimer:
+        "Chlorophyll-a is an environmental productivity proxy and does not " +
+        "indicate fish presence, abundance, or catch.",
+      engine_version: "environmental-0.1.0",
+    },
+    ...overrides,
+  });
+}
+
+// Phase 9 Step 4 - a researcher temporal comparison response. The safety chain
+// is unchanged; `environmental.comparison` is purely additive.
+export function makeComparisonResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  const base = makeEnvironmentalResponse();
+  return makeResponse({
+    ...base,
+    answer:
+      base.answer +
+      " Sea-surface temperature is 1.2 degrees C higher than the ORCA-computed " +
+      "reference of 27.9 degrees C (ORCA-computed reference over the last 30 days). " +
+      "The reference is not a climatological normal; a single difference is not a trend.",
+    environmental: {
+      ...base.environmental!,
+      comparison: {
+        sst: {
+          variable: "sea_surface_temperature",
+          current: base.environmental!.sst,
+          reference: {
+            value: 27.9,
+            unit: "°C",
+            validity: "VALID",
+            data_tier: "REFERENCE",
+            source: "open-meteo-marine (median over 120 model values, 30-day history)",
+            source_tier: "3",
+            observed_at: "2026-08-23T00:00:00+00:00",
+            conflicted: false,
+          },
+          reference_window: "ORCA-computed reference over the last 30 days",
+          absolute_change: 1.2,
+          relative_change_pct: null,
+          direction: "higher",
+          status: "ok",
+          data_sufficiency: "sufficient",
+          confidence: "moderate",
+          limitations: [],
+          disclaimer:
+            "Chlorophyll-a is an environmental productivity proxy and does not " +
+            "indicate fish presence, abundance, or catch.",
+          engine_version: "environmental-comparison-0.1.0",
+        },
+        chlorophyll_a: {
+          variable: "chlorophyll_a",
+          current: base.environmental!.chlorophyll_a,
+          reference: {
+            value: 1.1,
+            unit: "mg m-3",
+            validity: "VALID",
+            data_tier: "REFERENCE",
+            source:
+              "noaa-coastwatch-erddap (median of 6 cloud-free composites, 30-day history)",
+            source_tier: "3",
+            observed_at: "2026-08-24T00:00:00+00:00",
+            conflicted: false,
+          },
+          reference_window: "ORCA-computed reference over the last 30 days",
+          absolute_change: 0.7,
+          relative_change_pct: 63.6,
+          direction: "higher",
+          status: "ok",
+          data_sufficiency: "sufficient",
+          confidence: "moderate",
+          limitations: [],
+          disclaimer:
+            "Chlorophyll-a is an environmental productivity proxy and does not " +
+            "indicate fish presence, abundance, or catch.",
+          engine_version: "environmental-comparison-0.1.0",
+        },
+        reference_window: "ORCA-computed reference over the last 30 days",
+        data_sufficiency: "sufficient",
+        limitations: [],
+        disclaimer:
+          "Chlorophyll-a is an environmental productivity proxy and does not " +
+          "indicate fish presence, abundance, or catch.",
+        engine_version: "environmental-comparison-0.1.0",
+      },
+    },
+    ...overrides,
+  });
+}
+
 export function makeNoRouteResponse(): QueryResponse {
   return makeResponse({
     intent: "ROUTE",
