@@ -95,12 +95,21 @@ _COMPARE_WORDS = (
     "changed since", "difference from", "historical", "history", "previous",
     "prior", "last month", "past month", "a month ago", "last week", "earlier",
     "over time", "trend",
+    # Phase 9 Step 6: bounded-window dispersion / coverage phrasing. This reuses
+    # the SAME comparison pathway (no new intent, no new flag) - it only widens
+    # the multilingual trigger set so a researcher asking about spread / coverage
+    # of the recent window is routed through the temporal-comparison node.
+    "dispersion", "dispersed", "spread", "variability", "how variable",
+    "how consistent", "distribution", "range of values", "coverage", "how stable",
+    "stability", "sampling",
     # Hindi
     "तुलना", "पिछले", "पिछला", "पहले की तुलना", "बदलाव", "ऐतिहासिक",
     "पिछले महीने", "एक महीने पहले", "सामान्य से",
+    "फैलाव", "विचरण", "परिवर्तनशीलता", "कितना स्थिर", "कवरेज", "वितरण",
     # Kannada
     "ಹೋಲಿಸಿ", "ಹೋಲಿಕೆ", "ಹಿಂದಿನ", "ಬದಲಾವಣೆ", "ಐತಿಹಾಸಿಕ",
     "ಕಳೆದ ತಿಂಗಳು", "ಒಂದು ತಿಂಗಳ ಹಿಂದೆ", "ಸಾಮಾನ್ಯಕ್ಕಿಂತ",
+    "ಪ್ರಸರಣ", "ವ್ಯತ್ಯಯ", "ಎಷ್ಟು ಸ್ಥಿರ", "ವ್ಯಾಪ್ತಿ", "ವಿತರಣೆ",
 )
 _FISH_WORDS = ("fish", "fishing", "मछली", "मछली पकड़", "ಮೀನು", "ಮೀನುಗಾರಿಕೆ")
 _SAFE_WORDS = ("safe", "safety", "risk", "सुरक्षित", "जोखिम", "ಸುರಕ್ಷಿತ", "ಅಪಾಯ")

@@ -218,6 +218,43 @@ class EnvironmentalEvidenceInfo(BaseModel):
     engine_version: str = ""
 
 
+class EnvironmentalStabilityVariableInfo(BaseModel):
+    """Phase 9 Step 6: bounded-window dispersion & coverage of the ALREADY-observed
+    SST or chlorophyll-a measurements. It is descriptive research context only -
+    NOT a trend, slope, forecast, fishing recommendation or biological inference.
+    Quartiles are nearest-rank; statistics are ``None`` when fewer than three
+    valid observations exist (honest missingness, never manufactured)."""
+
+    variable: str
+    status: str = "unavailable"            # adequate | limited | insufficient | unavailable
+    window: str = ""
+    unit: str = ""
+    observation_count: int = 0
+    minimum: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    iqr: float | None = None
+    coverage: str | None = None
+    gaps: list[str] = Field(default_factory=list)
+
+
+class EnvironmentalStabilityInfo(BaseModel):
+    """Phase 9 Step 6: deterministic bounded-window environmental stability &
+    coverage profile. Purely informational research context - it NEVER affects
+    risk, safety, decision, route or fishing suitability, and never predicts fish
+    presence, abundance or catch. The raw historical series is NOT exposed."""
+
+    sst: EnvironmentalStabilityVariableInfo | None = None
+    chlorophyll_a: EnvironmentalStabilityVariableInfo | None = None
+    window: str = ""
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
 class EnvironmentalInfo(BaseModel):
     """Phase 9 Step 3: deterministic researcher-facing environmental context.
 
@@ -242,6 +279,10 @@ class EnvironmentalInfo(BaseModel):
     # Phase 9 Step 5: optional deterministic evidence / reproducibility
     # assessment. Null unless environmental intelligence exists for this query.
     evidence: EnvironmentalEvidenceInfo | None = None
+    # Phase 9 Step 6: optional deterministic bounded-window stability / coverage
+    # profile. Null unless the query was comparative and an accepted historical
+    # series was available. Additive - existing clients are unaffected.
+    stability: EnvironmentalStabilityInfo | None = None
 
 
 class DataQualityInfo(BaseModel):

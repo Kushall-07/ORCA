@@ -5,6 +5,8 @@ import type {
   EnvironmentalComparisonVariableInfo,
   EnvironmentalEvidenceInfo,
   EnvironmentalObservationInfo,
+  EnvironmentalStabilityInfo,
+  EnvironmentalStabilityVariableInfo,
   QueryResponse,
 } from "../../types/api";
 import type { StringKey } from "../../i18n/strings";
@@ -227,6 +229,104 @@ function EvidenceBlock({
   );
 }
 
+const _STAB_STATUS_KEY: Record<string, StringKey> = {
+  adequate: "env.stab.status.adequate",
+  limited: "env.stab.status.limited",
+  insufficient: "env.stab.status.insufficient",
+  unavailable: "env.stab.status.unavailable",
+};
+
+function fmtStat(v: number | null, unit: string): string {
+  if (v == null) return "—";
+  const s = Number.isInteger(v) ? String(v) : String(v);
+  return `${s} ${unit}`.trim();
+}
+
+/**
+ * Phase 9 Step 6 - "Dispersion & coverage". A restrained, neutral description of
+ * how spread out and how well-covered the ALREADY-observed SST / chlorophyll-a
+ * measurements are inside the bounded 30-day window. It NEVER affects risk /
+ * safety / decision / route / suitability, is NOT a trend, forecast, catch
+ * prediction or "best fishing conditions" indicator, and carries no sparkline,
+ * chart, time-series graph, arrows or good/bad colours - only one neutral
+ * status chip and plain figures.
+ */
+function StabilityRow({
+  prof,
+  label,
+  t,
+}: {
+  prof: EnvironmentalStabilityVariableInfo;
+  label: string;
+  t: (k: StringKey) => string;
+}) {
+  const hasProfile = prof.median != null;
+  return (
+    <li className="env-stab__row">
+      <span className="env-stab__var">
+        {label}{" "}
+        <span className="env-stab__chip" data-neutral="true">
+          {t(_STAB_STATUS_KEY[String(prof.status)] ?? "env.stab.status.unavailable")}
+        </span>
+      </span>
+      {hasProfile ? (
+        <span className="env-stab__figures">
+          {prof.observation_count} {t("env.stab.observations")}
+          {" · "}
+          {t("env.stab.range")} {fmtStat(prof.minimum, "")}–{fmtStat(prof.maximum, prof.unit)}
+          {" · "}
+          {t("env.stab.median")} {fmtStat(prof.median, prof.unit)}
+          {" · "}
+          {t("env.stab.iqr")} {fmtStat(prof.iqr, prof.unit)}
+        </span>
+      ) : (
+        <span className="env-stab__figures env-stab__figures--none">
+          {prof.observation_count} {t("env.stab.observations")} ·{" "}
+          {t("env.stab.insufficientProfile")}
+        </span>
+      )}
+      {prof.coverage && (
+        <span className="env-stab__coverage">
+          {t("env.stab.coverage")}: {prof.coverage}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function StabilityBlock({
+  stability,
+  t,
+}: {
+  stability: EnvironmentalStabilityInfo;
+  t: (k: StringKey) => string;
+}) {
+  const rows: Array<{ prof: EnvironmentalStabilityVariableInfo; label: string }> = [];
+  if (stability.sst) rows.push({ prof: stability.sst, label: t("env.sst") });
+  if (stability.chlorophyll_a)
+    rows.push({ prof: stability.chlorophyll_a, label: t("env.chlorophyll") });
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="env-stab">
+      <p className="env__section-label">{t("env.stab.title")}</p>
+      <ul className="env-stab__list">
+        {rows.map((r) => (
+          <StabilityRow key={r.prof.variable} prof={r.prof} label={r.label} t={t} />
+        ))}
+      </ul>
+      {stability.limitations.length > 0 && (
+        <ul className="env__limitations">
+          {stability.limitations.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      )}
+      <p className="env-stab__note">{t("env.stab.note")}</p>
+    </div>
+  );
+}
+
 /**
  * Phase 9 Step 3 - the smallest possible researcher-facing environmental
  * summary. It is purely informational: environmental productivity potential
@@ -284,6 +384,8 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
         )}
 
         {env.comparison && <ComparisonBlock comparison={env.comparison} t={t} />}
+
+        {env.stability && <StabilityBlock stability={env.stability} t={t} />}
 
         {env.evidence && <EvidenceBlock evidence={env.evidence} t={t} />}
 

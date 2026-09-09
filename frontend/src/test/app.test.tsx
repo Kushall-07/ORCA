@@ -8,6 +8,7 @@ import {
   makeNoRouteResponse,
   makeNoSafeResponse,
   makeResponse,
+  makeStabilityResponse,
 } from "./fixtures";
 
 const postQuery = vi.fn();
@@ -521,5 +522,49 @@ describe("ORCA workspace", () => {
     const text = panel.textContent ?? "";
     expect(text).toContain("open-meteo-marine"); // source names not translated
     expect(text).toContain("noaacwNPPVIIRSchlaDaily");
+  });
+
+  // ---- Phase 9 Step 6: bounded-window stability & coverage -------------
+  it("renders the dispersion & coverage block with stats, coverage and honest sparse CHL", async () => {
+    postQuery.mockResolvedValue(makeStabilityResponse());
+    render(<App />);
+    await sendQuery(
+      "dispersion and coverage of the chlorophyll near Mangalore over the last 30 days",
+    );
+    expect(await screen.findByText("Dispersion & coverage")).toBeInTheDocument();
+    const panel = screen
+      .getByText("Dispersion & coverage")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    // SST dispersion figures (deterministic, from the backend result)
+    expect(text).toContain("27.7");
+    expect(text).toContain("28.1");
+    expect(text).toMatch(/median 27\.9/);
+    expect(text).toMatch(/IQR 0\.3/);
+    // observational coverage sentence
+    expect(text).toContain("26 of 30 window days");
+    // sparse chlorophyll-a is reported honestly, never fabricated
+    expect(text).toContain("ADEQUATE");
+    expect(text).toContain("INSUFFICIENT");
+    expect(text.toLowerCase()).toContain("fewer than three");
+    // neutral framing, never a fishing / trend / forecast claim, no chart
+    for (const bad of [
+      "more fish", "better fishing", "good fishing", "expected catch",
+      "higher catch", "yield", "bloom", "rising", "declining", "trending",
+      "increasing trend", "decreasing trend", "best fishing conditions",
+    ]) {
+      expect(text.toLowerCase()).not.toContain(bad);
+    }
+    const block = panel.querySelector(".env-stab") as HTMLElement;
+    expect(block.querySelector("svg")).toBeNull(); // no sparkline / chart
+    expect(block.querySelector("canvas")).toBeNull();
+  });
+
+  it("hides the dispersion & coverage block when stability is null", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no stability
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(screen.queryByText("Dispersion & coverage")).not.toBeInTheDocument();
   });
 });

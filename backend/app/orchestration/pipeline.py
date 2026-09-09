@@ -20,6 +20,8 @@ from app.models.api import (
     EnvironmentalEvidenceItemInfo,
     EnvironmentalInfo,
     EnvironmentalObservationInfo,
+    EnvironmentalStabilityInfo,
+    EnvironmentalStabilityVariableInfo,
     EvidenceItem,
     GisSummary,
     LocationInfo,
@@ -115,6 +117,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     productivity = state.get("productivity_result")
     comparison = state.get("environmental_comparison")
     evidence = state.get("environmental_evidence")
+    stability = state.get("environmental_stability")
     route = state.get("route_result")
     fabric = state.get("fabric")
     expl = state.get("explanation")
@@ -240,6 +243,37 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=evidence.engine_version,
         )
 
+    stability_info = None
+    if stability is not None:
+        def _stab_var(p):  # type: ignore[no-untyped-def]
+            if p is None:
+                return None
+            return EnvironmentalStabilityVariableInfo(
+                variable=p.variable,
+                status=p.status,
+                window=p.window,
+                unit=p.unit,
+                observation_count=p.observation_count,
+                minimum=p.minimum,
+                maximum=p.maximum,
+                range=p.range,
+                q1=p.q1,
+                median=p.median,
+                q3=p.q3,
+                iqr=p.iqr,
+                coverage=p.coverage,
+                gaps=list(p.gaps),
+            )
+
+        stability_info = EnvironmentalStabilityInfo(
+            sst=_stab_var(stability.sst),
+            chlorophyll_a=_stab_var(stability.chlorophyll_a),
+            window=stability.window,
+            limitations=list(stability.limitations),
+            disclaimer=stability.disclaimer,
+            engine_version=stability.engine_version,
+        )
+
     environmental_info = None
     if productivity is not None:
         environmental_info = EnvironmentalInfo(
@@ -257,15 +291,18 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=productivity.engine_version,
             comparison=comparison_info,
             evidence=evidence_info,
+            stability=stability_info,
         )
-    elif comparison_info is not None or evidence_info is not None:
+    elif comparison_info is not None or evidence_info is not None or stability_info is not None:
         environmental_info = EnvironmentalInfo(
             disclaimer=(
                 comparison.disclaimer if comparison is not None
-                else evidence.disclaimer
+                else evidence.disclaimer if evidence is not None
+                else stability.disclaimer
             ),
             comparison=comparison_info,
             evidence=evidence_info,
+            stability=stability_info,
         )
 
     route_info = None

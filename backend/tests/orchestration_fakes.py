@@ -14,10 +14,11 @@ from app.models.fabric import DataTier, SourceStatus
 from app.models.gis_agent import EezResult, GisQueryResult, LayerKind, ProtectedAreaHit
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType, LayerAuthority
 from app.models.observations import MarineObservation
-from app.models.environmental import EnvironmentalObservation
+from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPoint
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.stability import EnvironmentalStabilityEngine
 from app.agents.historical_environment import HistoricalReference
 from app.orchestration.deps import OrcaDeps
 from app.orchestration.pipeline import OrcaPipeline
@@ -166,12 +167,36 @@ class FakeEnvironmentalAgent:
         )
 
 
+def _synth_series(median: float, count: int, span_days: int, window_days: int):
+    """Deterministic (value, observed_at) points evenly spread across a window.
+    Values fan symmetrically around ``median`` so quartiles are predictable."""
+    if count <= 0:
+        return ()
+    pts: list[ReferenceSeriesPoint] = []
+    step = span_days / max(1, count - 1) if count > 1 else 0
+    for i in range(count):
+        days_ago = window_days - 2 - i * step
+        offset = ((i % 5) - 2) * 0.1 * (1.0 if median < 5 else 1.0)
+        value = round(median + offset, 3)
+        pts.append(
+            ReferenceSeriesPoint(
+                value=value,
+                observed_at=(NOW - timedelta(days=days_ago)).isoformat(),
+            )
+        )
+    return tuple(pts)
+
+
 class FakeHistoricalEnvironmentalAgent:
     """Deterministic reference-fetch stand-in for the graph tests.
 
     ``sst`` / ``chl`` None -> that variable's reference is absent (honest
     insufficient history). ``fail=True`` raises inside fetch_reference to prove
     the comparison node still does not break the graph.
+
+    ``sst_series`` / ``chl_series`` (tuples of ``ReferenceSeriesPoint``) let a
+    test hand the Step 6 stability node an exact accepted series; when omitted a
+    deterministic spread of ``sst_points`` / ``chl_points`` points is synthesised.
     """
 
     def __init__(
@@ -183,6 +208,11 @@ class FakeHistoricalEnvironmentalAgent:
         chl_validity: str = "VALID",
         window_label: str = "ORCA-computed reference over the last 30 days",
         fail: bool = False,
+        sst_points: int = 14,
+        chl_points: int = 8,
+        series_span_days: int = 26,
+        sst_series: tuple | None = None,
+        chl_series: tuple | None = None,
     ) -> None:
         self._sst = sst
         self._chl = chl
@@ -190,6 +220,11 @@ class FakeHistoricalEnvironmentalAgent:
         self._chl_validity = chl_validity
         self._window = window_label
         self._fail = fail
+        self._sst_points = sst_points
+        self._chl_points = chl_points
+        self._span = series_span_days
+        self._sst_series = sst_series
+        self._chl_series = chl_series
 
     async def fetch_reference(self, coordinate, *, current_time, window_days):
         if self._fail:
@@ -214,8 +249,28 @@ class FakeHistoricalEnvironmentalAgent:
                 observed_at=(current_time - timedelta(days=14)).isoformat(),
                 distance_m=1800.0, role="reference",
             )
+        if self._sst_series is not None:
+            sst_series = tuple(self._sst_series)
+        elif self._sst is not None:
+            sst_series = _synth_series(
+                self._sst, self._sst_points, self._span, window_days
+            )
+        else:
+            sst_series = ()
+
+        if self._chl_series is not None:
+            chl_series = tuple(self._chl_series)
+        elif self._chl is not None:
+            chl_series = _synth_series(
+                self._chl, self._chl_points, self._span, window_days
+            )
+        else:
+            chl_series = ()
+
         return HistoricalReference(
             sst=sst_obs, chlorophyll_a=chl_obs, reference_window=self._window,
+            sst_series=sst_series, chlorophyll_series=chl_series,
+            window_days=window_days,
         )
 
 
@@ -228,6 +283,7 @@ def make_pipeline(
     productivity_engine=_UNSET,
     comparison_engine=_UNSET,
     evidence_engine=_UNSET,
+    stability_engine=_UNSET,
     historical_environment_agent=None,
     qu_llm=None,
     explain_llm=None,
@@ -264,6 +320,11 @@ def make_pipeline(
             EnvironmentalEvidenceEngine()
             if evidence_engine is _UNSET
             else evidence_engine
+        ),
+        stability_engine=(
+            EnvironmentalStabilityEngine()
+            if stability_engine is _UNSET
+            else stability_engine
         ),
         historical_environment_agent=historical_environment_agent,
     )

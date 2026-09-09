@@ -22,6 +22,7 @@ from app.core.config import Settings, get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.stability import EnvironmentalStabilityEngine
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
@@ -68,6 +69,11 @@ class OrcaDeps:
     # absent the environmental_evidence node simply skips (non-blocking). It is
     # pure re-serialisation of existing metadata and never feeds the safety chain.
     evidence_engine: EnvironmentalEvidenceEngine | None = None
+    # Phase 9 Step 6: deterministic Environmental Stability Engine (bounded-window
+    # dispersion & coverage of the Step 4 series). Optional; when absent the
+    # environmental_stability node simply skips (non-blocking). It issues ZERO
+    # HTTP calls and never feeds risk / safety / decision / route / suitability.
+    stability_engine: EnvironmentalStabilityEngine | None = None
 
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
@@ -91,4 +97,5 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         comparison_engine=EnvironmentalComparisonEngine(),
         historical_environment_agent=HistoricalEnvironmentalAgent(settings=settings),
         evidence_engine=EnvironmentalEvidenceEngine(),
+        stability_engine=EnvironmentalStabilityEngine(),
     )

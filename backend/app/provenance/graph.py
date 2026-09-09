@@ -12,6 +12,7 @@ from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
+    EnvironmentalStabilityResult,
 )
 from app.models.fabric import MarineDataFabric
 from app.models.gis_agent import GisQueryResult
@@ -52,6 +53,7 @@ def build_provenance(
     productivity: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
     evidence: EnvironmentalEvidenceResult | None = None,
+    stability: EnvironmentalStabilityResult | None = None,
 ) -> ProvenanceGraph:
     nodes: list[ProvNode] = []
     edges: list[ProvEdge] = []
@@ -344,6 +346,98 @@ def build_provenance(
                 ),
                 *dict.fromkeys(cmp_parents),
             )
+
+    # ---- environmental stability / coverage (Phase 9 Step 6; never feeds safety) ----
+    if stability is not None and (
+        stability.sst is not None or stability.chlorophyll_a is not None
+    ):
+        _STAB = ProvNodeKind.ENVIRONMENTAL_STABILITY
+        hist_parent = (
+            "agent:environment_history"
+            if any(n.id == "agent:environment_history" for n in nodes)
+            else parent_for_data
+        )
+        stab_agent = add(
+            ProvNode(
+                id="agent:environment_stability", kind=_AGENT_RESULT,
+                label=(
+                    "environmental stability profile (ORCA-derived, bounded-window "
+                    "dispersion & coverage)"
+                ),
+                value=stability.window or "bounded window",
+                source="orca-environmental-stability-engine",
+            ),
+            hist_parent,
+        )
+
+        stab_prof_ids: list[str] = []
+        overall_bits: list[str] = []
+        for var, prof in (
+            ("sea_surface_temperature", stability.sst),
+            ("chlorophyll_a", stability.chlorophyll_a),
+        ):
+            if prof is None:
+                continue
+            overall_bits.append(f"{var}={prof.status}")
+            series_id = add(
+                ProvNode(
+                    id=f"stability_series:{var}", kind=ProvNodeKind.OBSERVATION,
+                    label=f"{var} accepted historical series (bounded window)",
+                    value=prof.observation_count, unit="observations",
+                    detail={
+                        "window": prof.window,
+                        "coverage": prof.coverage or "",
+                        "status": prof.status,
+                    },
+                ),
+                stab_agent,
+            )
+            sdetail: dict[str, str] = {
+                "variable": var,
+                "status": prof.status,
+                "window": prof.window,
+                "observation_count": f"{prof.observation_count}",
+                "engine_version": stability.engine_version,
+                "disclaimer": stability.disclaimer,
+            }
+            for k, v in (
+                ("minimum", prof.minimum), ("maximum", prof.maximum),
+                ("range", prof.range), ("q1", prof.q1), ("median", prof.median),
+                ("q3", prof.q3), ("iqr", prof.iqr),
+            ):
+                if v is not None:
+                    sdetail[k] = f"{v}"
+            if prof.coverage:
+                sdetail["coverage"] = prof.coverage
+            if prof.gaps:
+                sdetail["gaps"] = " | ".join(prof.gaps)
+            stab_prof_ids.append(
+                add(
+                    ProvNode(
+                        id=f"stability:{var}", kind=_STAB,
+                        label=f"{var} bounded-window dispersion & coverage",
+                        value=(prof.median if prof.median is not None else prof.status),
+                        unit=(prof.unit or None) if prof.median is not None else None,
+                        detail=sdetail,
+                    ),
+                    series_id,
+                )
+            )
+
+        add(
+            ProvNode(
+                id="assessment:environment_stability", kind=_STAB,
+                label="environmental stability / coverage assessment (ORCA-derived)",
+                value="; ".join(overall_bits) if overall_bits else "unavailable",
+                detail={
+                    "window": stability.window,
+                    "engine_version": stability.engine_version,
+                    "disclaimer": stability.disclaimer,
+                    "limitations": " | ".join(stability.limitations),
+                },
+            ),
+            stab_agent, *dict.fromkeys(stab_prof_ids),
+        )
 
     # ---- environmental evidence / reproducibility (Phase 9 Step 5; never feeds safety) ----
     if evidence is not None and evidence.items:

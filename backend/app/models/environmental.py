@@ -28,6 +28,9 @@ ENVIRONMENTAL_COMPARISON_ENGINE_VERSION = "environmental-comparison-0.1.0"
 # Phase 9 Step 5: deterministic evidence-assessment / reproducibility engine.
 ENVIRONMENTAL_EVIDENCE_ENGINE_VERSION = "environmental-evidence-0.1.0"
 
+# Phase 9 Step 6: deterministic bounded-window stability / coverage profile.
+ENVIRONMENTAL_STABILITY_ENGINE_VERSION = "environmental-stability-0.1.0"
+
 PRODUCTIVITY_DISCLAIMER = (
     "Chlorophyll-a is an environmental productivity proxy and does not indicate "
     "fish presence, abundance, or catch."
@@ -315,3 +318,108 @@ class EnvironmentalEvidenceResult(BaseModel):
     @property
     def has_items(self) -> bool:
         return len(self.items) > 0
+
+
+# ==========================================================================
+# Phase 9 Step 6: Bounded-Window Environmental Stability & Coverage Profile
+# ==========================================================================
+# A deterministic, LLM-free, I/O-free engine that DESCRIBES the dispersion and
+# observational coverage of the EXISTING bounded 30-day SST / chlorophyll-a
+# historical window already fetched by Step 4. It is an evidence / research
+# context feature only.
+#
+# It is NOT fishing suitability, NOT a fishing recommendation, NOT a risk input,
+# NOT trend analysis, NOT prediction and NOT biological inference. It computes
+# NO slope, regression, trajectory, rate of change, forecast, seasonality, bloom
+# or productivity change. A narrow distribution does not mean "safer fishing"; a
+# wide distribution does not mean "worse fishing"; sparse coverage does not mean
+# poor environmental conditions.
+
+
+class ReferenceSeriesPoint(BaseModel):
+    """One accepted raw historical observation (value + real timestamp) from the
+    Step 4 reference window. Never fabricated or interpolated. This series is an
+    INTERNAL pipeline detail - it is never exposed through the public API."""
+
+    model_config = ConfigDict(frozen=True)
+
+    value: float
+    observed_at: str  # ISO - the real composite / model time
+
+
+class EnvironmentalReferenceSeries(BaseModel):
+    """The accepted raw SST / chlorophyll-a observation series for the Step 4
+    bounded window, carried internally from the comparison node to the stability
+    node. NOT projected to the public API (raw series are never returned)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst: tuple[ReferenceSeriesPoint, ...] = ()
+    chlorophyll_a: tuple[ReferenceSeriesPoint, ...] = ()
+    window_label: str = ""
+    window_days: int = 0
+
+
+class EnvironmentalStability(BaseModel):
+    """Deterministic bounded-window dispersion & coverage profile for ONE
+    variable. Every statistic is a plain description of the values ALREADY
+    observed inside the fixed window - never a trend, a forecast or a biological
+    statement. Quartiles are NEAREST-RANK. When fewer than three valid
+    observations exist the dispersion statistics are ``None`` (honest
+    missingness, never manufactured)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    window: str = ""
+    variable: str = ""
+    unit: str = ""
+    status: str = ReproducibilityStatus.UNAVAILABLE.value  # adequate|limited|insufficient|unavailable
+    observation_count: int = 0
+    minimum: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    iqr: float | None = None
+    coverage: str | None = None          # descriptive coverage sentence, when timestamps support it
+    gaps: tuple[str, ...] = ()           # descriptive gap sentences, when timestamps support it
+
+    @property
+    def has_profile(self) -> bool:
+        return self.median is not None
+
+
+class EnvironmentalStabilityInputs(BaseModel):
+    """Everything the stability engine needs. The node builds this from the
+    accepted Step 4 series already in pipeline state; the engine performs NO
+    I/O and issues ZERO HTTP requests."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst_series: tuple[ReferenceSeriesPoint, ...] = ()
+    chl_series: tuple[ReferenceSeriesPoint, ...] = ()
+    window_label: str = ""
+    window_days: int = 0
+
+
+class EnvironmentalStabilityResult(BaseModel):
+    """Deterministic output of the Environmental Stability Engine. Purely
+    descriptive research context - it NEVER feeds risk, suitability, safety,
+    decision, routing or geofencing, and never makes a fish / catch / trend
+    claim."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst: EnvironmentalStability | None = None
+    chlorophyll_a: EnvironmentalStability | None = None
+    window: str = ""
+    limitations: tuple[str, ...] = ()
+    disclaimer: str = ENVIRONMENTAL_EVIDENCE_DISCLAIMER
+    engine_version: str = ENVIRONMENTAL_STABILITY_ENGINE_VERSION
+
+    @property
+    def any_profile(self) -> bool:
+        return any(
+            p is not None and p.has_profile for p in (self.sst, self.chlorophyll_a)
+        )

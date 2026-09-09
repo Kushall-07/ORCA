@@ -20,6 +20,8 @@ from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
+    EnvironmentalReferenceSeries,
+    EnvironmentalStabilityResult,
 )
 from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
@@ -97,6 +99,13 @@ class OrcaGraphState(TypedDict, total=False):
     # Pure re-serialisation of existing metadata; never feeds risk / safety /
     # decision / route / suitability.
     environmental_evidence: EnvironmentalEvidenceResult | None
+    # Phase 9 Step 6: the accepted raw Step 4 SST/CHL series, carried from the
+    # comparison node to the stability node. INTERNAL only - never projected to
+    # the public API.
+    environmental_reference_series: EnvironmentalReferenceSeries | None
+    # Phase 9 Step 6: deterministic bounded-window dispersion & coverage profile.
+    # Downstream-only research context; never feeds the safety chain.
+    environmental_stability: EnvironmentalStabilityResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

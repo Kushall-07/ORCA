@@ -750,3 +750,300 @@ def test_no_additional_http_calls_added_by_step5() -> None:
     node_body = nodes_src.split("async def environmental_evidence_node", 1)[1].split("async def ", 1)[0]
     assert "fetch(" not in node_body and ".query(" not in node_body
     assert "fetch_reference" not in node_body
+
+
+# ==========================================================================
+# Phase 9 Step 6 - the Environmental Stability Engine + environmental_stability node
+# ==========================================================================
+# Bounded-window dispersion & coverage of the ACCEPTED Step 4 series. It consumes
+# existing data only (0 additional HTTP calls), is strictly downstream of
+# decision, and must NEVER enter the safety chain.
+STABILITY_Q = (
+    "describe the dispersion and coverage of the chlorophyll and sea surface "
+    "temperature near Mangalore over the last 30 days"
+)
+
+
+def _stab_pipeline(**kw):
+    kw.setdefault("weather", FakeWeatherAgent())
+    kw.setdefault("ocean", _ocean_with_sst(29.1))
+    kw.setdefault("environment", FakeEnvironmentalAgent(1.8))
+    kw.setdefault(
+        "historical_environment_agent",
+        FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1),
+    )
+    return make_pipeline(**kw)
+
+
+async def test_safety_chain_byte_identical_with_stability_enabled_disabled_failing() -> None:
+    """MANDATORY Step 6 regression: enabling / disabling / failing the stability
+    engine must produce byte-identical risk / safety / decision / route output,
+    for both a plain fishing query and a comparative environmental query."""
+
+    class BoomStability:
+        version = "environmental-stability-0.1.0"
+
+        def assess(self, _inputs):
+            raise RuntimeError("stability engine exploded")
+
+    for q, tag in ((FISHING_Q, "fish"), (STABILITY_Q, "stab")):
+        runs = {
+            "off": _stab_pipeline(stability_engine=None),
+            "on": _stab_pipeline(),
+            "raises": _stab_pipeline(stability_engine=BoomStability()),
+        }
+        results = {
+            n: await p.run(message=q, session_id=f"s6-{tag}-{n}", now=NOW)
+            for n, p in runs.items()
+        }
+        baseline = _safety_chain_snapshot(results["off"])
+        for n, r in results.items():
+            assert _safety_chain_snapshot(r) == baseline, f"safety chain moved for {tag}/{n}"
+
+
+async def test_stability_present_for_comparative_query_absent_otherwise() -> None:
+    r_cmp = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-cmp", now=NOW)
+    assert r_cmp.environmental is not None
+    assert r_cmp.environmental.stability is not None
+    assert "environmental_stability" in r_cmp.agent_trace
+
+    # a non-comparative environmental query -> no stability block (existing
+    # clients unaffected), but the environmental block itself still appears.
+    r_plain = await _stab_pipeline().run(message=ENV_Q, session_id="s6-plain", now=NOW)
+    assert r_plain.environmental is not None
+    assert r_plain.environmental.stability is None
+    assert "environmental_stability:skip" in r_plain.agent_trace
+
+
+async def test_stability_runs_strictly_downstream_of_decision() -> None:
+    r = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-order", now=NOW)
+    trace = [t for t in r.agent_trace if ":" not in t or t.endswith(":skip") is False]
+    trace = r.agent_trace
+    assert "decision" in trace and "environmental_stability" in trace
+    assert trace.index("decision") < trace.index("environmental_stability")
+    # and after the Step 4 comparison node it depends on
+    assert trace.index("environmental_comparison") < trace.index("environmental_stability")
+    # and before evidence / provenance / explain
+    assert trace.index("environmental_stability") < trace.index("provenance")
+
+
+async def test_stability_engine_failure_is_nonblocking() -> None:
+    class BoomStability:
+        version = "x"
+
+        def assess(self, _inputs):
+            raise RuntimeError("boom")
+
+    r = await _stab_pipeline(stability_engine=BoomStability()).run(
+        message=STABILITY_Q, session_id="s6-boom", now=NOW
+    )
+    assert r.status == "OK"
+    assert r.decision is not None
+    # the environmental block is still there (productivity + comparison); just no
+    # stability sub-block.
+    assert r.environmental is not None
+    assert r.environmental.stability is None
+
+
+async def test_stability_never_mutates_suitability_risk_decision_route() -> None:
+    without = await _stab_pipeline(stability_engine=None).run(
+        message=FISHING_Q, session_id="s6-mut-off", now=NOW
+    )
+    with_stab = await _stab_pipeline().run(
+        message=FISHING_Q, session_id="s6-mut-on", now=NOW
+    )
+    assert (with_stab.suitability and (with_stab.suitability.level, with_stab.suitability.score)) == \
+           (without.suitability and (without.suitability.level, without.suitability.score))
+    assert _decision_snapshot(with_stab) == _decision_snapshot(without)
+
+
+def test_risk_engine_input_has_no_stability_fields() -> None:
+    fields = set(RiskEngineInput.model_fields)
+    for bad in (
+        "stability", "dispersion", "coverage", "iqr", "quartile", "q1", "q3",
+        "median", "environmental_stability", "stability_status", "stability_profile",
+    ):
+        assert bad not in fields
+
+
+async def test_risk_safety_decision_route_do_not_consume_stability() -> None:
+    """The safety-chain nodes must receive identical inputs whether or not the
+    stability engine ran, and never read the stability result from state."""
+    seen: list = []
+
+    def _capture(pipe):
+        orig = pipe.deps.risk_engine.evaluate
+
+        def wrapper(data):
+            seen.append((data.wave_height_m, data.wind_speed_ms,
+                         data.min_pressure_hpa, data.weather_codes))
+            return orig(data)
+
+        pipe.deps.risk_engine.evaluate = wrapper  # type: ignore[assignment]
+        return pipe
+
+    await _capture(_stab_pipeline(stability_engine=None)).run(
+        message=STABILITY_Q, session_id="s6-cap1", now=NOW
+    )
+    await _capture(_stab_pipeline()).run(
+        message=STABILITY_Q, session_id="s6-cap2", now=NOW
+    )
+    assert len(seen) == 2 and seen[0] == seen[1]
+
+    # the safety-chain nodes' source must not reference the stability state key
+    import pathlib
+
+    nodes_src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "orchestration" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    for fn in ("risk_node", "policy_node", "decision_node", "route_node"):
+        body = nodes_src.split(f"async def {fn}", 1)[1].split("async def ", 1)[0]
+        assert "environmental_stability" not in body, f"{fn} references environmental_stability"
+
+
+def test_stability_modules_do_not_import_the_safety_chain() -> None:
+    import ast as _ast
+    import pathlib as _pl
+
+    targets = [
+        _pl.Path(__file__).resolve().parents[1] / "app" / "environmental" / "stability.py",
+    ]
+    banned = ("app.policy", "app.risk.engine", "app.decision", "app.routing", "app.safety")
+    for py in targets:
+        tree = _ast.parse(py.read_text(encoding="utf-8"))
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.ImportFrom) and node.module:
+                assert not any(node.module.startswith(b) for b in banned), \
+                    f"{py.name} imports {node.module}"
+
+
+def test_no_additional_http_calls_added_by_step6() -> None:
+    """The stability node performs NO network I/O: stability.py imports no HTTP
+    client and the node awaits no fetch / query / fetch_reference."""
+    import ast
+    import pathlib
+
+    st = pathlib.Path(__file__).resolve().parents[1] / "app" / "environmental" / "stability.py"
+    tree = ast.parse(st.read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name.split(".")[0] for a in node.names)
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    for banned in ("httpx", "requests", "aiohttp", "urllib3"):
+        assert banned not in imported, f"stability.py imports {banned}"
+
+    nodes_src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "orchestration" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    body = nodes_src.split("async def environmental_stability_node", 1)[1].split("async def ", 1)[0]
+    assert "fetch(" not in body and ".query(" not in body
+    assert "fetch_reference" not in body
+
+
+def test_stability_module_has_no_llm_dependency() -> None:
+    code = (
+        "import sys, app.environmental.stability;"
+        "bad=[m for m in sys.modules if m.split('.')[0] in "
+        "('groq','langgraph','langchain','langchain_core','openai','anthropic','ollama')];"
+        "print('BAD' if bad else 'CLEAN', bad)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert out.startswith("CLEAN"), out
+
+
+async def test_stability_provenance_traces_to_root_and_is_the_right_kind() -> None:
+    r = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-prov", now=NOW)
+    nodes = r.provenance.get("nodes", [])
+    stab_nodes = [n for n in nodes if n.get("kind") == "environmental_stability"]
+    assert stab_nodes, "no environmental_stability provenance node"
+    ids = {n["id"] for n in nodes}
+    assert "assessment:environment_stability" in ids
+    assert "agent:environment_stability" in ids
+    assert any(i.startswith("stability_series:") for i in ids)
+
+    root = r.provenance.get("root_id", "query")
+    incoming: dict[str, list[str]] = {}
+    for e in r.provenance.get("edges", []):
+        incoming.setdefault(e["dst"], []).append(e["src"])
+
+    def traces(nid: str) -> bool:
+        seen, stack = set(), [nid]
+        while stack:
+            cur = stack.pop()
+            if cur == root:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(incoming.get(cur, []))
+        return False
+
+    for n in nodes:
+        assert traces(n["id"]), f"provenance node {n['id']} is orphaned"
+
+
+async def test_stability_numbers_in_answer_are_grounded() -> None:
+    r = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-ground", now=NOW)
+    assert r.environmental.stability is not None
+    assert r.grounded is True
+
+
+async def test_stability_answer_makes_no_biological_trend_or_forecast_claim() -> None:
+    r = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-nobio", now=NOW)
+    low = r.answer.lower()
+    for bad in (
+        "more fish", "fewer fish", "better fishing", "worse fishing",
+        "higher catch", "lower catch", "yield", "bloom", "rising trend",
+        "declining trend", "increasing trend", "decreasing trend", "trending up",
+        "trending down", "is rising", "is declining", "rate of change", "slope",
+        "seasonality", "safer fishing",
+    ):
+        assert bad not in low
+
+
+async def test_stability_multilingual_explanation_renders_in_hi_and_kn() -> None:
+    cases = (
+        # Hindi: chlorophyll + SST, "dispersion / last month" comparison trigger
+        ("hi", "मंगलुरु के पास क्लोरोफिल और समुद्री सतह तापमान का पिछले महीने से फैलाव और कवरेज बताइए",
+         "अंतरचतुर्थक"),
+        # Kannada: same, with the Kannada dispersion / previous trigger words
+        ("kn", "ಮಂಗಳೂರು ಬಳಿ ಕ್ಲೋರೊಫಿಲ್ ಮತ್ತು ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನದ ಹಿಂದಿನ ತಿಂಗಳಿಗೆ ಹೋಲಿಸಿ ಪ್ರಸರಣ ಮತ್ತು ವ್ಯಾಪ್ತಿ ತಿಳಿಸಿ",
+         "ಅಂತರಚತುರ್ಥಕ"),
+    )
+    for lang, msg, marker in cases:
+        r = await _stab_pipeline().run(
+            message=msg, session_id=f"s6-{lang}", now=NOW
+        )
+        assert r.language == lang, (lang, r.language)
+        assert r.environmental is not None and r.environmental.stability is not None
+        assert marker in r.answer, (lang, r.answer)
+
+
+async def test_api_is_backward_compatible_and_hides_raw_series() -> None:
+    r = await _stab_pipeline().run(message=STABILITY_Q, session_id="s6-api", now=NOW)
+    dumped = r.model_dump()
+    env = dumped["environmental"]
+    assert "stability" in env  # additive field present
+    stab = env["stability"]
+    # the raw accepted historical series is NEVER exposed
+    blob = repr(stab)
+    for leaked in ("observed_at", "series", "ReferenceSeriesPoint", "sst_series", "chl_series"):
+        assert leaked not in blob
+    for var in ("sst", "chlorophyll_a"):
+        prof = stab[var]
+        if prof is None:
+            continue
+        assert set(prof) == {
+            "variable", "status", "window", "unit", "observation_count",
+            "minimum", "maximum", "range", "q1", "median", "q3", "iqr",
+            "coverage", "gaps",
+        }
+    # a response without any environmental intelligence still validates and omits it
+    plain = await make_pipeline(weather=FakeWeatherAgent(), ocean=FakeOceanAgent()).run(
+        message=FISHING_Q, session_id="s6-api-plain", now=NOW
+    )
+    assert plain.environmental is None

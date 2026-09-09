@@ -173,6 +173,39 @@ export interface EnvironmentalEvidenceInfo {
   engine_version: string;
 }
 
+// ---- Phase 9 Step 6: bounded-window stability & coverage -----------
+// Deterministic description of the DISPERSION and observational COVERAGE of the
+// SST / chlorophyll-a measurements ALREADY made inside the bounded 30-day
+// window. It is NOT a trend, slope, forecast, fishing recommendation or
+// biological inference, and never affects risk / safety / decision / route.
+// Quartiles are nearest-rank; statistics are null when fewer than three valid
+// observations exist. The raw historical series is never returned.
+export interface EnvironmentalStabilityVariableInfo {
+  variable: string;
+  status: ReproducibilityStatus | string;
+  window: string;
+  unit: string;
+  observation_count: number;
+  minimum: number | null;
+  maximum: number | null;
+  range: number | null;
+  q1: number | null;
+  median: number | null;
+  q3: number | null;
+  iqr: number | null;
+  coverage: string | null;
+  gaps: string[];
+}
+
+export interface EnvironmentalStabilityInfo {
+  sst: EnvironmentalStabilityVariableInfo | null;
+  chlorophyll_a: EnvironmentalStabilityVariableInfo | null;
+  window: string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
 export interface EnvironmentalInfo {
   sst: EnvironmentalObservationInfo | null;
   chlorophyll_a: EnvironmentalObservationInfo | null;
@@ -185,6 +218,7 @@ export interface EnvironmentalInfo {
   engine_version: string;
   comparison?: EnvironmentalComparisonInfo | null; // Phase 9 Step 4 - optional
   evidence?: EnvironmentalEvidenceInfo | null; // Phase 9 Step 5 - optional
+  stability?: EnvironmentalStabilityInfo | null; // Phase 9 Step 6 - optional
 }
 
 export interface RouteInfo {

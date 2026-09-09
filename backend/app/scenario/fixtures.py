@@ -19,9 +19,10 @@ from app.core.config import get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
+from app.environmental.stability import EnvironmentalStabilityEngine
 from app.agents.historical_environment import HistoricalReference
 from app.models.common import Coordinate, SignalKind, SourceTier
-from app.models.environmental import EnvironmentalObservation
+from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPoint
 from app.models.fabric import DataTier, SourceStatus
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType, LayerAuthority
 from app.models.gis_agent import EezResult, GisQueryResult, LayerKind, ProtectedAreaHit
@@ -164,14 +165,47 @@ class ScenarioEnvironmentalAgent:
         )
 
 
-class ScenarioHistoricalEnvironmentalAgent:
-    """Deterministic reference-fetch stand-in - Phase 9 Step 4. Never enters the
-    Marine Data Fabric; feeds only the comparison engine -> provenance /
-    explanation. ``sst`` / ``chl`` None -> honest insufficient history."""
+def _scn_series(median: float, count: int, span_days: int, window_days: int):
+    """Deterministic accepted series for the Step 6 stability node - evenly
+    spread points fanning symmetrically around ``median``."""
+    if count <= 0:
+        return ()
+    step = span_days / max(1, count - 1) if count > 1 else 0
+    out: list[ReferenceSeriesPoint] = []
+    for i in range(count):
+        days_ago = window_days - 2 - i * step
+        offset = ((i % 5) - 2) * 0.1
+        out.append(
+            ReferenceSeriesPoint(
+                value=round(median + offset, 3),
+                observed_at=(SCENARIO_NOW - timedelta(days=days_ago)).isoformat(),
+            )
+        )
+    return tuple(out)
 
-    def __init__(self, *, sst: float | None = 27.9, chl: float | None = 1.1) -> None:
+
+class ScenarioHistoricalEnvironmentalAgent:
+    """Deterministic reference-fetch stand-in - Phase 9 Step 4 / Step 6. Never
+    enters the Marine Data Fabric; feeds only the comparison + stability engines
+    -> provenance / explanation. ``sst`` / ``chl`` None -> honest insufficient
+    history. ``sst_points`` / ``chl_points`` set the size of the accepted series
+    handed to the bounded-window stability node (0 -> that variable has no
+    series)."""
+
+    def __init__(
+        self,
+        *,
+        sst: float | None = 27.9,
+        chl: float | None = 1.1,
+        sst_points: int = 14,
+        chl_points: int = 8,
+        span_days: int = 26,
+    ) -> None:
         self._sst = sst
         self._chl = chl
+        self._sst_points = sst_points
+        self._chl_points = chl_points
+        self._span = span_days
 
     async def fetch_reference(self, coordinate, *, current_time, window_days):
         window = f"ORCA-computed reference over the {window_days} days before {current_time.date().isoformat()}"
@@ -195,7 +229,19 @@ class ScenarioHistoricalEnvironmentalAgent:
                 observed_at=(current_time - timedelta(days=14)).isoformat(),
                 distance_m=1800.0, role="reference",
             )
-        return HistoricalReference(sst=sst_obs, chlorophyll_a=chl_obs, reference_window=window)
+        sst_series = (
+            _scn_series(self._sst, self._sst_points, self._span, window_days)
+            if self._sst is not None else ()
+        )
+        chl_series = (
+            _scn_series(self._chl, self._chl_points, self._span, window_days)
+            if self._chl is not None else ()
+        )
+        return HistoricalReference(
+            sst=sst_obs, chlorophyll_a=chl_obs, reference_window=window,
+            sst_series=sst_series, chlorophyll_series=chl_series,
+            window_days=window_days,
+        )
 
 
 class ScenarioGisAgent:
@@ -386,6 +432,32 @@ _FIXTURES = {
         # evidence engine reports it honestly as 'limited' with an age limitation.
         environment=ScenarioEnvironmentalAgent(1.8, days_old=6),
     ),
+    # Phase 9 Step 6 - bounded-window stability & coverage fixtures. The
+    # stability node consumes ONLY the accepted raw Step 4 series (zero extra
+    # HTTP calls) and never feeds risk / safety / decision / route.
+    "researcher_env_stability": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),
+        # dense, well-spread SST and CHL history -> a valid dispersion profile.
+        historical_environment_agent=ScenarioHistoricalEnvironmentalAgent(
+            sst=27.9, chl=1.1, sst_points=16, chl_points=9, span_days=26,
+        ),
+    ),
+    "researcher_env_stability_sparse_chl": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),
+        # adequate SST history but only two accepted CHL composites in the
+        # window -> honest 'insufficient' coverage, no manufactured statistics.
+        historical_environment_agent=ScenarioHistoricalEnvironmentalAgent(
+            sst=27.9, chl=1.1, sst_points=15, chl_points=2, span_days=24,
+        ),
+    ),
 }
 
 
@@ -429,6 +501,7 @@ def make_scenario_pipeline(
         comparison_engine=EnvironmentalComparisonEngine(),
         historical_environment_agent=historical_environment_agent,
         evidence_engine=EnvironmentalEvidenceEngine(),
+        stability_engine=EnvironmentalStabilityEngine(),
     )
     return OrcaPipeline(deps)
 

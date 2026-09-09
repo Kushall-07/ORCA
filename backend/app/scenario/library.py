@@ -494,6 +494,73 @@ SCENARIOS: tuple[Scenario, ...] = (
               "it honestly as 'limited' with an age limitation and fabricates "
               "nothing. The main query still completes.",
     ),
+    # ---- Phase 9 Step 6: bounded-window environmental stability & coverage ----
+    # Additive. Scenarios 01-22 above are frozen and unchanged. These two
+    # exercise the environmental_stability node, which consumes only the
+    # accepted raw Step 4 series (zero extra HTTP calls) and never touches the
+    # safety chain.
+    Scenario(
+        scenario_id="23_researcher_environmental_stability",
+        title="Researcher: bounded-window SST/CHL dispersion & coverage profile",
+        stakeholder="researcher",
+        fixture="researcher_env_stability",
+        turns=("Describe the dispersion and coverage of the chlorophyll-a and "
+               "sea-surface temperature observations near Mangalore over the last "
+               "30 days.",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("sea_surface_temperature", "chlorophyll_a"),
+                provenance_has_kinds=("environmental_stability",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=("interquartile range", "median", "coverage"),
+                answer_excludes_all=(
+                    "more fish", "fewer fish", "better fishing", "worse fishing",
+                    "higher catch", "lower catch", "yield", "bloom",
+                    "rising trend", "declining trend", "trending up", "trending down",
+                    "increasing trend", "decreasing trend", "rate of change",
+                    "seasonality",
+                ),
+                node_trace_present=True,
+                request_id_present=True,
+            ),
+        ),
+        tags=("phase9", "researcher", "stability"),
+        notes="The stability engine describes dispersion (nearest-rank quartiles, "
+              "IQR) and observational coverage of the ALREADY-observed bounded "
+              "window. It is not a trend, forecast or fishing indicator, and it "
+              "never enters risk / safety / decision / route.",
+    ),
+    Scenario(
+        scenario_id="24_researcher_environmental_stability_sparse_chl",
+        title="Researcher: sparse chlorophyll-a history -> honest limited coverage",
+        stakeholder="researcher",
+        fixture="researcher_env_stability_sparse_chl",
+        turns=("How variable and how well-covered is the chlorophyll-a and "
+               "sea-surface temperature sampling near Mangalore compared with the "
+               "past month?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                provenance_has_kinds=("environmental_stability",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=("coverage", "fewer than three", "observation"),
+                answer_excludes_all=(
+                    "more fish", "better fishing", "higher catch", "yield", "bloom",
+                    "rising trend", "declining trend",
+                ),
+            ),
+        ),
+        tags=("phase9", "researcher", "stability", "limitation"),
+        notes="Only two accepted chlorophyll-a composites in the window -> the "
+              "stability engine reports 'insufficient' coverage with no "
+              "manufactured statistics; the SST profile is still computed and "
+              "the main query still completes.",
+    ),
 )
 
 

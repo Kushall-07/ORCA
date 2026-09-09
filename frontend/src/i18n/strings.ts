@@ -103,6 +103,20 @@ export type StringKey =
   | "env.ev.status.limited"
   | "env.ev.status.insufficient"
   | "env.ev.status.unavailable"
+  | "env.stab.title"
+  | "env.stab.observations"
+  | "env.stab.range"
+  | "env.stab.median"
+  | "env.stab.iqr"
+  | "env.stab.quartiles"
+  | "env.stab.coverage"
+  | "env.stab.gaps"
+  | "env.stab.insufficientProfile"
+  | "env.stab.note"
+  | "env.stab.status.adequate"
+  | "env.stab.status.limited"
+  | "env.stab.status.insufficient"
+  | "env.stab.status.unavailable"
   | "panel.route"
   | "route.status"
   | "route.distance"
@@ -276,6 +290,22 @@ const en: Table = {
   "env.ev.status.limited": "LIMITED",
   "env.ev.status.insufficient": "INSUFFICIENT",
   "env.ev.status.unavailable": "UNAVAILABLE",
+  "env.stab.title": "Dispersion & coverage",
+  "env.stab.observations": "observations",
+  "env.stab.range": "range",
+  "env.stab.median": "median",
+  "env.stab.iqr": "IQR",
+  "env.stab.quartiles": "Q1 / Q3",
+  "env.stab.coverage": "coverage",
+  "env.stab.gaps": "gaps",
+  "env.stab.insufficientProfile":
+    "Fewer than three observations in the window - no dispersion statistics were computed.",
+  "env.stab.note":
+    "This describes observed environmental data coverage and dispersion within a bounded window. It is not a trend, a forecast or a fishing indicator.",
+  "env.stab.status.adequate": "ADEQUATE",
+  "env.stab.status.limited": "LIMITED",
+  "env.stab.status.insufficient": "INSUFFICIENT",
+  "env.stab.status.unavailable": "UNAVAILABLE",
   "panel.route": "Route",
   "route.status": "Status",
   "route.distance": "Distance",
@@ -453,6 +483,22 @@ const hi: Table = {
   "env.ev.status.limited": "सीमित",
   "env.ev.status.insufficient": "अपर्याप्त",
   "env.ev.status.unavailable": "अनुपलब्ध",
+  "env.stab.title": "फैलाव और कवरेज",
+  "env.stab.observations": "प्रेक्षण",
+  "env.stab.range": "परिसर",
+  "env.stab.median": "माध्यिका",
+  "env.stab.iqr": "IQR",
+  "env.stab.quartiles": "Q1 / Q3",
+  "env.stab.coverage": "कवरेज",
+  "env.stab.gaps": "अंतराल",
+  "env.stab.insufficientProfile":
+    "अवधि में तीन से कम प्रेक्षण - कोई परिक्षेपण आँकड़े नहीं निकाले गए।",
+  "env.stab.note":
+    "यह एक सीमित अवधि के भीतर प्रेक्षित पर्यावरणीय डेटा की कवरेज और फैलाव का वर्णन करता है। यह कोई प्रवृत्ति, पूर्वानुमान या मछली पकड़ने का संकेतक नहीं है।",
+  "env.stab.status.adequate": "पर्याप्त",
+  "env.stab.status.limited": "सीमित",
+  "env.stab.status.insufficient": "अपर्याप्त",
+  "env.stab.status.unavailable": "अनुपलब्ध",
   "panel.route": "मार्ग",
   "route.status": "स्थिति",
   "route.distance": "दूरी",
@@ -629,6 +675,22 @@ const kn: Table = {
   "env.ev.status.limited": "ಸೀಮಿತ",
   "env.ev.status.insufficient": "ಅಸಮರ್ಪಕ",
   "env.ev.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "env.stab.title": "ಪ್ರಸರಣ ಮತ್ತು ವ್ಯಾಪ್ತಿ",
+  "env.stab.observations": "ವೀಕ್ಷಣೆಗಳು",
+  "env.stab.range": "ವ್ಯಾಪ್ತಿ",
+  "env.stab.median": "ಮಧ್ಯಂಕ",
+  "env.stab.iqr": "IQR",
+  "env.stab.quartiles": "Q1 / Q3",
+  "env.stab.coverage": "ವ್ಯಾಪ್ತಿ",
+  "env.stab.gaps": "ಅಂತರಗಳು",
+  "env.stab.insufficientProfile":
+    "ಅವಧಿಯಲ್ಲಿ ಮೂರಕ್ಕಿಂತ ಕಡಿಮೆ ವೀಕ್ಷಣೆಗಳು - ಯಾವುದೇ ಪ್ರಸರಣ ಅಂಕಿಅಂಶಗಳನ್ನು ಲೆಕ್ಕಿಸಲಾಗಿಲ್ಲ.",
+  "env.stab.note":
+    "ಇದು ಸೀಮಿತ ಅವಧಿಯೊಳಗೆ ವೀಕ್ಷಿಸಿದ ಪರಿಸರ ದತ್ತಾಂಶದ ವ್ಯಾಪ್ತಿ ಮತ್ತು ಪ್ರಸರಣವನ್ನು ವಿವರಿಸುತ್ತದೆ. ಇದು ಪ್ರವೃತ್ತಿ, ಮುನ್ಸೂಚನೆ ಅಥವಾ ಮೀನುಗಾರಿಕೆ ಸೂಚಕವಲ್ಲ.",
+  "env.stab.status.adequate": "ಸಮರ್ಪಕ",
+  "env.stab.status.limited": "ಸೀಮಿತ",
+  "env.stab.status.insufficient": "ಅಸಮರ್ಪಕ",
+  "env.stab.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
   "panel.route": "ಮಾರ್ಗ",
   "route.status": "ಸ್ಥಿತಿ",
   "route.distance": "ದೂರ",

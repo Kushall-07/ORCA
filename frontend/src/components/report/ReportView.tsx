@@ -151,6 +151,30 @@ export function ReportView({
               {resp.environmental.comparison && (
                 <p className="report__fine">{t("env.cmp.note")}</p>
               )}
+              {resp.environmental.stability &&
+                ([resp.environmental.stability.sst, resp.environmental.stability.chlorophyll_a]
+                  .filter((p): p is NonNullable<typeof p> => p != null)
+                  .map((p) => (
+                    <p key={`stab-${p.variable}`}>
+                      {p.variable === "sea_surface_temperature"
+                        ? t("env.sst")
+                        : t("env.chlorophyll")}{" "}
+                      — {t("env.stab.title")}:{" "}
+                      {p.median != null
+                        ? `${p.observation_count} ${t("env.stab.observations")}, ${t(
+                            "env.stab.range",
+                          )} ${p.minimum ?? "—"}–${p.maximum ?? "—"} ${p.unit}, ${t(
+                            "env.stab.median",
+                          )} ${p.median} ${p.unit}, ${t("env.stab.iqr")} ${p.iqr ?? "—"} ${p.unit}`
+                        : `${p.observation_count} ${t("env.stab.observations")} — ${t(
+                            "env.stab.insufficientProfile",
+                          )}`}
+                      {p.coverage ? ` (${p.coverage})` : ""}
+                    </p>
+                  )))}
+              {resp.environmental.stability && (
+                <p className="report__fine">{t("env.stab.note")}</p>
+              )}
               {resp.environmental.evidence &&
                 resp.environmental.evidence.items.length > 0 && (
                   <>

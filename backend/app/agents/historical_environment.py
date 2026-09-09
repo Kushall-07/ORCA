@@ -34,7 +34,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.environmental.comparison import ComparisonConfig, load_comparison_config
 from app.models.common import Coordinate, SourceTier
-from app.models.environmental import EnvironmentalObservation
+from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPoint
 from app.services import oceancolor, openmeteo
 
 logger = get_logger(__name__)
@@ -46,7 +46,13 @@ _SST_UNIT = "°C"
 
 class HistoricalReference(BaseModel):
     """Result of one reference fetch. Either observation may be ``None`` (honest
-    insufficient history); the query still completes."""
+    insufficient history); the query still completes.
+
+    Phase 9 Step 6: the ``*_series`` fields carry the ACCEPTED raw observations
+    (value + real timestamp) the source actually returned inside the window, so
+    the downstream stability node can describe their dispersion / coverage
+    without any additional fetch. These are an internal pipeline detail and are
+    never exposed through the public API."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -54,6 +60,9 @@ class HistoricalReference(BaseModel):
     chlorophyll_a: EnvironmentalObservation | None = None
     reference_window: str = ""
     notes: tuple[str, ...] = ()
+    sst_series: tuple[ReferenceSeriesPoint, ...] = ()
+    chlorophyll_series: tuple[ReferenceSeriesPoint, ...] = ()
+    window_days: int = 0
 
 
 def _aware(dt: datetime) -> datetime:
@@ -91,9 +100,15 @@ class HistoricalEnvironmentalAgent:
     ) -> HistoricalReference:
         current_time = _aware(current_time)
         notes: list[str] = []
+        sst_series: list[ReferenceSeriesPoint] = []
+        chl_series: list[ReferenceSeriesPoint] = []
 
-        sst = await self._sst_reference(coordinate, current_time, window_days, notes)
-        chl = await self._chl_reference(coordinate, current_time, window_days, notes)
+        sst = await self._sst_reference(
+            coordinate, current_time, window_days, notes, sst_series
+        )
+        chl = await self._chl_reference(
+            coordinate, current_time, window_days, notes, chl_series
+        )
 
         window_label = (
             f"ORCA-computed reference over the {window_days} days before "
@@ -104,6 +119,9 @@ class HistoricalEnvironmentalAgent:
             chlorophyll_a=chl,
             reference_window=window_label,
             notes=tuple(notes),
+            sst_series=tuple(sst_series),
+            chlorophyll_series=tuple(chl_series),
+            window_days=window_days,
         )
 
     # ------------------------------------------------------------------
@@ -113,6 +131,7 @@ class HistoricalEnvironmentalAgent:
         current_time: datetime,
         window_days: int,
         notes: list[str],
+        series_out: list[ReferenceSeriesPoint],
     ) -> EnvironmentalObservation | None:
         end = current_time - timedelta(hours=self.config.sst_reference_tolerance_hours)
         start = current_time - timedelta(days=window_days)
@@ -152,6 +171,10 @@ class HistoricalEnvironmentalAgent:
             )
             return None
 
+        series_out.extend(
+            ReferenceSeriesPoint(value=round(float(v), 2), observed_at=dt.isoformat())
+            for v, dt in sorted(pairs, key=lambda p: p[1])
+        )
         value, observed_at = _lower_median(pairs)
         newest = max(dt for _, dt in pairs)
         stale = (end - newest) > timedelta(days=window_days / 2.0)
@@ -177,6 +200,7 @@ class HistoricalEnvironmentalAgent:
         current_time: datetime,
         window_days: int,
         notes: list[str],
+        series_out: list[ReferenceSeriesPoint],
     ) -> EnvironmentalObservation | None:
         if not self.settings.oceancolor_enabled:
             notes.append("historical chlorophyll-a: ocean-colour integration disabled")
@@ -207,6 +231,13 @@ class HistoricalEnvironmentalAgent:
             for c in composites
             if start <= _aware(c.observed_at) <= end and c.value > 0.0
         ]
+        # The accepted raw series flows to the Step 6 stability node even when
+        # too few composites exist to form a median reference here - so the
+        # bounded-window coverage can still be described honestly.
+        series_out.extend(
+            ReferenceSeriesPoint(value=float(v), observed_at=dt.isoformat())
+            for v, dt, _ in sorted(accepted, key=lambda p: p[1])
+        )
         if len(accepted) < self.config.min_chl_composites:
             notes.append(
                 f"historical chlorophyll-a: only {len(accepted)} cloud-free "

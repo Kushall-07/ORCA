@@ -418,6 +418,78 @@ export function makeEvidenceResponse(
   });
 }
 
+// Phase 9 Step 6 - bounded-window stability & coverage. Additive, neutral,
+// never affects the safety chain, never a fish / catch / trend claim. The raw
+// historical series is never present.
+export function makeStabilityResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  const base = makeEnvironmentalResponse();
+  return makeResponse({
+    ...base,
+    answer:
+      base.answer +
+      " Within the bounded window, the 16 observed sea-surface temperature " +
+      "measurements range 27.7 to 28.1 °C (median 27.9 °C, interquartile range " +
+      "0.3 °C). This describes the dispersion and observational coverage of " +
+      "measurements already made inside a bounded past window. It is not a " +
+      "trend, a forecast or a fishing indicator.",
+    environmental: {
+      ...base.environmental!,
+      stability: {
+        window: "ORCA-computed reference over the last 30 days",
+        limitations: [
+          "The chlorophyll-a history has only 2 accepted observation(s) in the " +
+            "bounded window - fewer than three, so no dispersion statistics were " +
+            "computed (coverage is described only).",
+        ],
+        disclaimer:
+          "Environmental observations and chlorophyll-a are descriptive " +
+          "environmental indicators and do not directly predict fish presence, " +
+          "abundance, or catch.",
+        engine_version: "environmental-stability-0.1.0",
+        sst: {
+          variable: "sea_surface_temperature",
+          status: "adequate",
+          window: "ORCA-computed reference over the last 30 days",
+          unit: "°C",
+          observation_count: 16,
+          minimum: 27.7,
+          maximum: 28.1,
+          range: 0.4,
+          q1: 27.7,
+          median: 27.9,
+          q3: 28.0,
+          iqr: 0.3,
+          coverage:
+            "16 accepted sea-surface temperature observation(s) spanning " +
+            "2026-08-10 to 2026-09-05 (26 of 30 window days).",
+          gaps: [],
+        },
+        chlorophyll_a: {
+          variable: "chlorophyll_a",
+          status: "insufficient",
+          window: "ORCA-computed reference over the last 30 days",
+          unit: "mg m-3",
+          observation_count: 2,
+          minimum: null,
+          maximum: null,
+          range: null,
+          q1: null,
+          median: null,
+          q3: null,
+          iqr: null,
+          coverage:
+            "2 accepted chlorophyll-a observation(s) spanning 2026-08-10 to " +
+            "2026-08-24 (14 of 30 window days).",
+          gaps: [],
+        },
+      },
+    },
+    ...overrides,
+  });
+}
+
 export function makeNoRouteResponse(): QueryResponse {
   return makeResponse({
     intent: "ROUTE",

@@ -424,23 +424,31 @@ START → understand → (failed/clarify ⇒ explain)
       → fabric → temporal → fusion → arbitration → conflicts
       → suitability (only for fishing intents) → risk → policy → decision
       → (route requested & routing_allowed & O/D resolved ⇒ route)
-      → alerts → productivity → environmental_comparison → environmental_evidence
+      → alerts → productivity → environmental_comparison → environmental_stability
+      → environmental_evidence
       → provenance → explain → assemble → END
 ```
 
 The **`productivity`** node (Phase 9 Step 3), the **`environmental_comparison`**
-node (Phase 9 Step 4) and the **`environmental_evidence`** node (Phase 9 Step 5)
-are deterministic, non-blocking, and strictly downstream of the decision.
+node (Phase 9 Step 4), the **`environmental_stability`** node (Phase 9 Step 6) and
+the **`environmental_evidence`** node (Phase 9 Step 5) are deterministic,
+non-blocking, and strictly downstream of the decision.
 `productivity` runs the **Environmental Productivity Engine** on the
 already-collected SST + chlorophyll-a observations. `environmental_comparison`
 runs the **Environmental Comparison Engine** on the current observation plus an
 ORCA-computed reference it fetches **locally** (at most two extra HTTP calls) —
 that historical data never enters the Marine Data Fabric, fusion, arbitration,
 conflict detection, the Temporal Validity Gate's gated set, or `RiskEngineInput`.
+`environmental_stability` runs the **Environmental Stability Engine**, which
+describes the bounded-window **dispersion** (nearest-rank quartiles, IQR, min /
+max / range, median) and observational **coverage** of the *accepted raw Step 4
+series* — it consumes existing data only (**zero extra HTTP calls, no LLM**),
+computes no slope / trend / forecast / seasonality / bloom, makes no fish / catch
+claim, and never exposes the raw series through the API.
 `environmental_evidence` runs the **Environmental Evidence Engine**, which fetches
 **nothing** (zero extra HTTP calls, no LLM) and only re-serialises + categorises
 metadata that already exists into a reproducibility bundle and a categorical
-data-quality status. None of these three nodes feed Risk / Safety / Decision /
+data-quality status. None of these four nodes feed Risk / Safety / Decision /
 Suitability / geofencing / Routing / Alerts — risk/safety/decision/routing output
 is byte-identical with and without them. `collect_environment` (Step 2) is the
 parallel ocean-colour branch.

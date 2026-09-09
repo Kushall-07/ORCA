@@ -567,7 +567,10 @@ async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  #
     Gated: only runs for an ``environmental_conditions`` query whose
     ``wants_comparison`` flag is set.
     """
-    from app.models.environmental import EnvironmentalComparisonInputs
+    from app.models.environmental import (
+        EnvironmentalComparisonInputs,
+        EnvironmentalReferenceSeries,
+    )
 
     engine = getattr(deps, "comparison_engine", None)
     hist_agent = getattr(deps, "historical_environment_agent", None)
@@ -621,9 +624,67 @@ async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  #
             "agent_trace": ["environmental_comparison:skip"],
         }
 
+    # Phase 9 Step 6: carry the ACCEPTED raw series (already fetched above, no
+    # extra HTTP) to the stability node. Internal only - never projected to the
+    # public API.
+    reference_series = EnvironmentalReferenceSeries(
+        sst=tuple(getattr(reference, "sst_series", ()) or ()),
+        chlorophyll_a=tuple(getattr(reference, "chlorophyll_series", ()) or ()),
+        window_label=reference.reference_window,
+        window_days=int(getattr(reference, "window_days", 0) or window_days),
+    )
+
     return {
         "environmental_comparison": result,
+        "environmental_reference_series": reference_series,
         "agent_trace": ["environmental_comparison"],
+    }
+
+
+async def environmental_stability_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 6: deterministic bounded-window environmental stability &
+    coverage profile.
+
+    Runs strictly downstream of decision / alerts / productivity / comparison
+    and BEFORE environmental_evidence. It consumes ONLY the accepted raw Step 4
+    SST / chlorophyll-a series already carried in state - it fetches NOTHING
+    (zero HTTP calls), rebuilds NOTHING, invokes no LLM, and NEVER feeds risk,
+    safety, decision, route, suitability, geofencing or alerts. It describes the
+    dispersion and observational coverage of the already-observed measurements;
+    it is NOT a trend, a forecast, a fishing recommendation or a biological
+    inference. Skips (result ``None``) when there is no reference series to
+    describe or the engine is unavailable; any failure is non-blocking.
+    """
+    from app.models.environmental import EnvironmentalStabilityInputs
+
+    engine = getattr(deps, "stability_engine", None)
+    series = state.get("environmental_reference_series")
+
+    if engine is None or series is None:
+        return {
+            "environmental_stability": None,
+            "agent_trace": ["environmental_stability:skip"],
+        }
+
+    try:
+        result = engine.assess(
+            EnvironmentalStabilityInputs(
+                sst_series=series.sst,
+                chl_series=series.chlorophyll_a,
+                window_label=series.window_label,
+                window_days=series.window_days,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise; be defensive
+        logger.warning("environmental stability engine error: %s", type(exc).__name__)
+        return {
+            "environmental_stability": None,
+            "agent_trace": ["environmental_stability:skip"],
+        }
+
+    return {
+        "environmental_stability": result,
+        "agent_trace": ["environmental_stability"],
     }
 
 
@@ -700,6 +761,7 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         productivity=state.get("productivity_result"),
         comparison=state.get("environmental_comparison"),
         evidence=state.get("environmental_evidence"),
+        stability=state.get("environmental_stability"),
         environment_tier=_tier(state.get("environment_result")),
     )
     return {"provenance": prov, "agent_trace": ["provenance"]}
@@ -722,6 +784,7 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         productivity=state.get("productivity_result"),
         comparison=state.get("environmental_comparison"),
         environmental_evidence=state.get("environmental_evidence"),
+        stability=state.get("environmental_stability"),
     )
     return {"explanation": expl, "agent_trace": ["explain"]}
 

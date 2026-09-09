@@ -16,6 +16,7 @@ from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
+    EnvironmentalStabilityResult,
 )
 from app.models.provenance import ProvenanceGraph
 from app.models.risk import RiskResult
@@ -71,6 +72,7 @@ def _engine_values(
     environmental: EnvironmentalProductivityResult | None,
     comparison: EnvironmentalComparisonResult | None,
     environmental_evidence: EnvironmentalEvidenceResult | None,
+    stability: EnvironmentalStabilityResult | None,
     extra: tuple[float, ...],
 ) -> list[float]:
     values: list[float] = list(extra)
@@ -103,6 +105,20 @@ def _engine_values(
             for n in (it.value, it.spatial_distance_km, it.latitude, it.longitude):
                 if n is not None:
                     values += [n, round(n, 1), round(n, 2), round(n)]
+    if stability is not None:
+        # Step 6 explanation text uses categorical words + counts + already-observed
+        # dispersion values; all of these are copies of accepted observations, added
+        # here so any figure the explanation restates is grounded.
+        for prof in (stability.sst, stability.chlorophyll_a):
+            if prof is None:
+                continue
+            values.append(float(prof.observation_count))
+            for n in (
+                prof.minimum, prof.maximum, prof.range,
+                prof.q1, prof.median, prof.q3, prof.iqr,
+            ):
+                if n is not None:
+                    values += [n, round(n, 1), round(n, 2), round(n, 3), round(n)]
     if risk is not None:
         values += [risk.overall_score, round(risk.overall_score)]
         for f in risk.factors:
@@ -133,11 +149,12 @@ def ground_text(
     environmental: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
+    stability: EnvironmentalStabilityResult | None = None,
     extra_allowed: tuple[float, ...] = (),
 ) -> GroundingReport:
     engine = _engine_values(
         provenance, decision, risk, suitability, route, environmental, comparison,
-        environmental_evidence, extra_allowed,
+        environmental_evidence, stability, extra_allowed,
     )
     claims: list[GroundingClaim] = []
     unsupported: list[str] = []

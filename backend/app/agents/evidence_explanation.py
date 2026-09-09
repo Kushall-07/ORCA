@@ -29,6 +29,7 @@ from app.models.environmental import (
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
+    EnvironmentalStabilityResult,
     ProductivityPotential,
 )
 from app.models.explanation import Explanation
@@ -74,6 +75,15 @@ Hard rules:
   unavailable), its sources, timestamps and validity. It is NOT a biological,
   productivity or fishing statement. Never turn a data-quality remark into a
   claim about fish, catch, productivity or fishing conditions.
+- If a bounded-window stability / coverage profile is present: it describes ONLY
+  the dispersion (min / max / range / quartiles / IQR) and observational
+  coverage of measurements ALREADY made inside a fixed past window. Restate the
+  given numbers and the categorical coverage status; do NOT compute any of them.
+  It is NOT a trend, slope, rate of change, forecast, seasonality, bloom or
+  prediction, and NOT a fishing or biological statement. A narrow spread does
+  NOT mean safer/better fishing; a wide spread does NOT mean worse fishing;
+  sparse coverage does NOT mean poor conditions. Never read observation ordering
+  as a direction over time.
 - Respond in the requested language only. Be concise (3-6 sentences).
 Return plain text, no markdown headings."""
 
@@ -119,6 +129,7 @@ class ExplanationAgent:
         productivity: EnvironmentalProductivityResult | None = None,
         comparison: EnvironmentalComparisonResult | None = None,
         environmental_evidence: EnvironmentalEvidenceResult | None = None,
+        stability: EnvironmentalStabilityResult | None = None,
     ) -> Explanation:
         template = render_template(
             language=language,
@@ -132,6 +143,7 @@ class ExplanationAgent:
             productivity=productivity,
             comparison=comparison,
             environmental_evidence=environmental_evidence,
+            stability=stability,
         )
 
         notes = _structured_notes(
@@ -145,7 +157,7 @@ class ExplanationAgent:
         context = json.dumps(
             _llm_context(language, understanding, decision, risk, suitability,
                          conflicts, route, fabric, productivity, comparison,
-                         environmental_evidence),
+                         environmental_evidence, stability),
             ensure_ascii=False,
         )
         user = f"CONTEXT (authoritative, do not change):\n{context}\n\nExplain this decision."
@@ -163,12 +175,14 @@ class ExplanationAgent:
                 text, provenance=provenance, decision=decision, risk=risk,
                 suitability=suitability, route=route, environmental=productivity,
                 comparison=comparison, environmental_evidence=environmental_evidence,
+                stability=stability,
             )
             contradiction = _contradicts_decision(text, decision)
             biological = (
                 productivity is not None
                 or comparison is not None
                 or environmental_evidence is not None
+                or stability is not None
             ) and _contains_biological_claim(text)
             if report.grounded and not contradiction and not biological:
                 return Explanation(
@@ -213,6 +227,7 @@ def render_template(
     productivity: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
+    stability: EnvironmentalStabilityResult | None = None,
 ) -> Explanation:
     parts: list[str] = []
     notes = _structured_notes(decision, risk, suitability, conflicts, route, (), fabric)
@@ -306,6 +321,18 @@ def render_template(
     if environmental_evidence is not None and environmental_evidence.items:
         _render_evidence(parts, language, environmental_evidence)
         if productivity is None and comparison is None:
+            parts.append(frag(language, "env_disclaimer"))
+
+    # ---- bounded-window environmental stability / coverage (Phase 9 Step 6) ----
+    if stability is not None and (
+        stability.sst is not None or stability.chlorophyll_a is not None
+    ):
+        _render_stability(parts, language, stability)
+        if (
+            productivity is None
+            and comparison is None
+            and environmental_evidence is None
+        ):
             parts.append(frag(language, "env_disclaimer"))
 
     proxy_mentioned = risk is not None and any(
@@ -438,6 +465,64 @@ def _render_evidence(parts, language, evidence) -> None:  # type: ignore[no-unty
     parts.append(frag(language, "env_ev_disclaimer"))
 
 
+def _fmt_stat(value: float | None) -> str:
+    if value is None:
+        return "—"
+    if value == int(value):
+        return str(int(value))
+    return f"{value:g}"
+
+
+def _render_stability(parts, language, stability) -> None:  # type: ignore[no-untyped-def]
+    """Append deterministic bounded-window dispersion & coverage sentences
+    (EN / HI / KN).
+
+    States only: observation count, min / max / range, median, IQR, and the
+    categorical coverage status. NEVER a trend, slope, forecast or a biological
+    / fishing claim. Observation ordering is never described as a direction.
+    """
+    for prof in (stability.sst, stability.chlorophyll_a):
+        if prof is None:
+            continue
+        is_sst = prof.variable == "sea_surface_temperature"
+        var_label = frag(language, "env_var_sst" if is_sst else "env_var_chl")
+
+        if prof.status == "unavailable" or prof.observation_count == 0:
+            parts.append(frag(language, "env_stab_unavailable", var=var_label))
+            continue
+        if prof.status == "insufficient" or prof.median is None:
+            parts.append(
+                frag(
+                    language, "env_stab_insufficient",
+                    var=var_label, count=prof.observation_count,
+                )
+            )
+            if prof.coverage:
+                parts.append(
+                    frag(language, "env_stab_coverage",
+                         var=var_label, coverage=prof.coverage)
+                )
+            continue
+
+        unit = prof.unit
+        parts.append(
+            frag(
+                language, "env_stab_var",
+                var=var_label, count=prof.observation_count,
+                min=_fmt_stat(prof.minimum), max=_fmt_stat(prof.maximum),
+                median=_fmt_stat(prof.median), iqr=_fmt_stat(prof.iqr), unit=unit,
+            )
+        )
+        if prof.status == "limited":
+            parts.append(frag(language, "env_stab_limited", var=var_label))
+        if prof.coverage:
+            parts.append(
+                frag(language, "env_stab_coverage",
+                     var=var_label, coverage=prof.coverage)
+            )
+    parts.append(frag(language, "env_stab_note"))
+
+
 def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fabric) -> dict:  # type: ignore[no-untyped-def]
     reasoning = " | ".join(decision.reasons[:4]) if decision else "no decision"
     evidence_refs = tuple(
@@ -472,7 +557,7 @@ def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fab
     }
 
 
-def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None) -> dict:  # type: ignore[no-untyped-def]
+def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None, stability=None) -> dict:  # type: ignore[no-untyped-def]
     ctx: dict = {"language": language.value if hasattr(language, "value") else str(language)}
     if understanding is not None:
         ctx["intent"] = understanding.intent.value
@@ -623,6 +708,45 @@ def _llm_context(language, understanding, decision, risk, suitability, conflicts
                 "catch, yield, productive fishing, or favourable fishing "
                 "conditions. Do not compute quality - restate the given status "
                 "and per-variable source/timestamp/validity."
+            ),
+        }
+
+    if stability is not None and (
+        stability.sst is not None or stability.chlorophyll_a is not None
+    ):
+        def _stab_ctx(p):  # type: ignore[no-untyped-def]
+            if p is None:
+                return None
+            return {
+                "variable": p.variable,
+                "status": p.status,
+                "observation_count": p.observation_count,
+                "minimum": p.minimum,
+                "maximum": p.maximum,
+                "range": p.range,
+                "q1": p.q1,
+                "median": p.median,
+                "q3": p.q3,
+                "iqr": p.iqr,
+                "unit": p.unit,
+                "coverage": p.coverage,
+                "gaps": list(p.gaps),
+            }
+
+        ctx["environmental_stability"] = {
+            "sst": _stab_ctx(stability.sst),
+            "chlorophyll_a": _stab_ctx(stability.chlorophyll_a),
+            "window": stability.window,
+            "limitations": list(stability.limitations),
+            "disclaimer": stability.disclaimer,
+            "note": (
+                "Bounded-window DISPERSION and COVERAGE of measurements already "
+                "made. Restate the given min/max/range/quartiles/IQR, the "
+                "observation count and the categorical coverage status only - do "
+                "NOT compute them. NEVER say trend, slope, rate of change, "
+                "rising/declining, forecast, seasonality, bloom, more/fewer fish, "
+                "better/worse fishing, catch or yield. A narrow spread is not "
+                "'safer fishing'; sparse coverage is not 'poor conditions'."
             ),
         }
     return ctx
