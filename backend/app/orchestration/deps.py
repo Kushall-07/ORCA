@@ -21,6 +21,7 @@ from app.agents.weather import WeatherAgent
 from app.core.config import Settings, get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
+from app.environmental.evidence import EnvironmentalEvidenceEngine
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
@@ -63,6 +64,10 @@ class OrcaDeps:
     # feeds risk / safety / decision / routing.
     comparison_engine: EnvironmentalComparisonEngine | None = None
     historical_environment_agent: object = None  # HistoricalEnvironmentalAgent-like
+    # Phase 9 Step 5: deterministic Environmental Evidence Engine. Optional; when
+    # absent the environmental_evidence node simply skips (non-blocking). It is
+    # pure re-serialisation of existing metadata and never feeds the safety chain.
+    evidence_engine: EnvironmentalEvidenceEngine | None = None
 
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
@@ -85,4 +90,5 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         productivity_engine=EnvironmentalProductivityEngine(),
         comparison_engine=EnvironmentalComparisonEngine(),
         historical_environment_agent=HistoricalEnvironmentalAgent(settings=settings),
+        evidence_engine=EnvironmentalEvidenceEngine(),
     )

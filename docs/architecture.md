@@ -424,21 +424,26 @@ START → understand → (failed/clarify ⇒ explain)
       → fabric → temporal → fusion → arbitration → conflicts
       → suitability (only for fishing intents) → risk → policy → decision
       → (route requested & routing_allowed & O/D resolved ⇒ route)
-      → alerts → productivity → environmental_comparison
+      → alerts → productivity → environmental_comparison → environmental_evidence
       → provenance → explain → assemble → END
 ```
 
-The **`productivity`** node (Phase 9 Step 3) and the **`environmental_comparison`**
-node (Phase 9 Step 4) are deterministic, non-blocking, and strictly downstream of
-the decision. `productivity` runs the **Environmental Productivity Engine** on the
+The **`productivity`** node (Phase 9 Step 3), the **`environmental_comparison`**
+node (Phase 9 Step 4) and the **`environmental_evidence`** node (Phase 9 Step 5)
+are deterministic, non-blocking, and strictly downstream of the decision.
+`productivity` runs the **Environmental Productivity Engine** on the
 already-collected SST + chlorophyll-a observations. `environmental_comparison`
 runs the **Environmental Comparison Engine** on the current observation plus an
 ORCA-computed reference it fetches **locally** (at most two extra HTTP calls) —
 that historical data never enters the Marine Data Fabric, fusion, arbitration,
 conflict detection, the Temporal Validity Gate's gated set, or `RiskEngineInput`.
-Neither node feeds Risk / Safety / Decision / Suitability / geofencing / Routing /
-Alerts — risk/safety/decision/routing output is byte-identical with and without
-them. `collect_environment` (Step 2) is the parallel ocean-colour branch.
+`environmental_evidence` runs the **Environmental Evidence Engine**, which fetches
+**nothing** (zero extra HTTP calls, no LLM) and only re-serialises + categorises
+metadata that already exists into a reproducibility bundle and a categorical
+data-quality status. None of these three nodes feed Risk / Safety / Decision /
+Suitability / geofencing / Routing / Alerts — risk/safety/decision/routing output
+is byte-identical with and without them. `collect_environment` (Step 2) is the
+parallel ocean-colour branch.
 
 Conditional edges skip unnecessary work (a weather-only query never routes or
 scores suitability). Data collection runs in parallel LangGraph branches and
@@ -725,6 +730,61 @@ historical observations never appear in `resp.evidence` or the fabric;
 17–18 are the Step 3 cases; 19–20 are additive Step 4 cases. See
 [`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
 
+### Step 5 — environmental evidence assessment & reproducibility bundle (implemented)
+
+A third deterministic engine, the **Environmental Evidence Engine**
+(`app/environmental/evidence.py`, bands in `app/environmental/evidence_config.yaml`),
+answers *"how reproducible and auditable are the environmental observations ORCA
+already collected?"*. It **fetches nothing** (0 extra HTTP calls), runs **no LLM**,
+and only re-serialises + categorises metadata that already exists.
+
+* Per observation (current SST/CHL + the Step 4 historical/reference composites,
+  clearly labelled `observation_kind`) it surfaces `variable`, `value`, `unit`,
+  `source`, `dataset` (parsed from the source string), `observation_time`,
+  `query_time`, `latitude`/`longitude` (the queried point — never a fabricated
+  pixel centre), `spatial_distance_km`, `validity`, `age`, `evidence_tier`,
+  `source_status`, and a categorical `reproducibility_status`
+  (`adequate | limited | insufficient | unavailable` — never a numeric score,
+  never a weighted formula).
+* Overall `status` is derived **only from the current observations**: all
+  adequate → `adequate`; some usable but stale / spatially distant → `limited`;
+  missing metadata / conflicting → `insufficient`; no current observation →
+  `unavailable`.
+* An optional **`optical_water_hint`** derived from the existing GIS
+  `coastline_distance_m` / `depth_m` is a coarse descriptive string only
+  ("likely optically-complex coastal water — retrievals may be less reliable.
+  Descriptive context only"). It is **not** a Case-1/Case-2 classification, it
+  never corrects a measurement, and it never changes CHL / productivity /
+  confidence / risk / suitability / decision. Omitted when GIS context is absent.
+* Missing / stale / conflicting follow existing ORCA semantics exactly: missing →
+  `unavailable`; stale → preserved, flagged, `limited`; conflicting → raw values
+  preserved, **never averaged**, `insufficient`. Nothing is fabricated.
+
+**Provenance** gains `ProvNodeKind.ENVIRONMENTAL_EVIDENCE`, an
+`agent:environment_evidence` node, one `evidence_item:<var>:<kind>` node per
+observation, and an `assessment:environment_evidence` node; every numeric value
+in the bundle is grounded against the corresponding observation node.
+**Explanation** adds EN/HI/KN sentences stating only the categorical status, the
+per-variable source / timestamp / validity, the current-vs-historical
+distinction, and honest missing / conflict notes; the deterministic
+biological-claim guard is extended to reject "good/favourable/productive fishing"
+phrasing. **Query Understanding is unchanged** — no `wants_evidence_detail`, no
+new intent; the evidence block appears automatically whenever environmental
+intelligence exists. **API**: additive optional `EnvironmentalInfo.evidence`
+(`EnvironmentalEvidenceInfo`), `null` unless an environmental block exists.
+**Frontend**: an "Evidence & reproducibility" sub-block inside the existing
+`EnvironmentalPanel` (categorical status chip, per-variable source/timestamp/
+validity, coastal-water context line, a collapsible reproducibility-bundle
+`<details>` with a client-side **Copy as JSON** button — no new endpoint, no
+persistence) + a report-section block. Neutral only: no colour-coded good/bad,
+no arrows, no trend charts, no map markers.
+
+**Invariant.** Risk / Safety / Decision / Route output is **byte-identical**
+whether the evidence engine is enabled, disabled, or raising; `RiskEngineInput`
+gains no field; the evidence node performs zero network I/O. Scenarios 01–20 are
+unchanged; 21–22 are additive Step 5 cases. See
+[`phase9-step5-environmental-evidence.md`](phase9-step5-environmental-evidence.md).
+
 ---
 
 ## 7. Implementation phases
@@ -739,15 +799,15 @@ historical observations never appear in `resp.evidence` or the fabric;
 | 6 | ✅ Operator frontend (chat, decision / risk / suitability / evidence / conflict / provenance / alerts / activity / explanation panels, `NO_SAFE_RECOMMENDATION` layout, map layers via read-only `/gis/*` + `/reference/*`, data-provenance legend, en/hi/kn UI, stakeholder context, print/export). Additive backward-compatible response fields. Provenance graph + grounding + explanation + alerts were delivered in Phase 5. |
 | 7 | ✅ Demo hardening & observability: real-timed `node_trace` (additive to the frozen `agent_trace`), end-to-end `request_id` correlation, deterministic Scenario Engine (`python -m app.scenario.run`) with 16 scenarios through the real pipeline, `--perf` measurement (min/median/p95/max), data-failure / conflict / determinism / provenance matrices, structured logging fields, frontend timing view. Reasoning semantics unchanged. |
 | 8 | ✅ Live integration & full-stack validation |
-| 9 | ✅ Environmental intelligence — Step 1 feasibility, Step 2 SST + chlorophyll-a ingestion, Step 3 deterministic Environmental Productivity Engine + `environmental_conditions` intent + `EnvironmentalPanel`, Step 4 deterministic Environmental Comparison Engine + `HistoricalEnvironmentalAgent` + `wants_comparison` flag (researcher current-vs-reference context; never affects risk / safety / decision / routing) |
-| 8+ | Deeper provenance exports, regional spatial risk aggregation, multi-year climatology tables, environmental trend/time-series analysis (not started) |
+| 9 | ✅ Environmental intelligence — Step 1 feasibility, Step 2 SST + chlorophyll-a ingestion, Step 3 deterministic Environmental Productivity Engine + `environmental_conditions` intent + `EnvironmentalPanel`, Step 4 deterministic Environmental Comparison Engine + `HistoricalEnvironmentalAgent` + `wants_comparison` flag, Step 5 deterministic Environmental Evidence Engine + reproducibility bundle (0 extra HTTP calls, no LLM; never affects risk / safety / decision / routing) |
+| 8+ | Regional spatial risk aggregation, multi-year climatology tables, environmental trend/time-series analysis (not started) |
 
-Current status: **Phase 9 Step 4 complete** (deterministic Environmental
-Comparison Engine + local historical reference fetch + researcher comparison UI;
-temporal comparison never affects risk / safety / decision / routing — proven
-byte-identical with the engine/agent enabled, absent, or raising; historical
-observations proven never to enter the fabric or `RiskEngineInput`). Backend
-(650 tests) + frontend (27 tests) suites green; 20/20 scenarios (16 frozen
-Phase 7 + 2 Step 3 + 2 Step 4) pass through the real pipeline. Docker runtime E2E
-not executed — CLI unavailable in the dev environment; compose validated by
-inspection.
+Current status: **Phase 9 Step 5 complete** (deterministic Environmental
+Evidence Engine + reproducibility bundle + researcher "Evidence & reproducibility"
+UI; the evidence assessment fetches nothing, invokes no LLM, and never affects
+risk / safety / decision / routing — proven byte-identical with the engine
+enabled, disabled, or raising; `RiskEngineInput` gains no field). Backend
+(697 tests) + frontend (32 tests) suites green; 22/22 scenarios (16 frozen
+Phase 7 + 2 Step 3 + 2 Step 4 + 2 Step 5) pass through the real pipeline. Docker
+runtime E2E not executed — CLI unavailable in the dev environment; compose
+validated by inspection.

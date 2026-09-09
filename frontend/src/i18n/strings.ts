@@ -83,6 +83,26 @@ export type StringKey =
   | "env.cmp.unknown"
   | "env.cmp.unavailable"
   | "env.cmp.note"
+  | "env.ev.title"
+  | "env.ev.status"
+  | "env.ev.summary"
+  | "env.ev.current"
+  | "env.ev.historical"
+  | "env.ev.source"
+  | "env.ev.dataset"
+  | "env.ev.observed"
+  | "env.ev.validity"
+  | "env.ev.distance"
+  | "env.ev.tier"
+  | "env.ev.reproducibility"
+  | "env.ev.opticalHint"
+  | "env.ev.bundle"
+  | "env.ev.copyJson"
+  | "env.ev.copied"
+  | "env.ev.status.adequate"
+  | "env.ev.status.limited"
+  | "env.ev.status.insufficient"
+  | "env.ev.status.unavailable"
   | "panel.route"
   | "route.status"
   | "route.distance"
@@ -236,6 +256,26 @@ const en: Table = {
   "env.cmp.unknown": "not comparable",
   "env.cmp.unavailable": "A temporal comparison could not be computed.",
   "env.cmp.note": "The reference is an ORCA-computed value over a recent past window, not a climatological normal. A single difference is not a trend.",
+  "env.ev.title": "Evidence & reproducibility",
+  "env.ev.status": "Data reproducibility",
+  "env.ev.summary": "Summary",
+  "env.ev.current": "current",
+  "env.ev.historical": "historical / reference",
+  "env.ev.source": "source",
+  "env.ev.dataset": "dataset",
+  "env.ev.observed": "observed",
+  "env.ev.validity": "validity",
+  "env.ev.distance": "pixel distance",
+  "env.ev.tier": "tier",
+  "env.ev.reproducibility": "reproducibility",
+  "env.ev.opticalHint": "Coastal-water context",
+  "env.ev.bundle": "Reproducibility bundle",
+  "env.ev.copyJson": "Copy as JSON",
+  "env.ev.copied": "Copied",
+  "env.ev.status.adequate": "ADEQUATE",
+  "env.ev.status.limited": "LIMITED",
+  "env.ev.status.insufficient": "INSUFFICIENT",
+  "env.ev.status.unavailable": "UNAVAILABLE",
   "panel.route": "Route",
   "route.status": "Status",
   "route.distance": "Distance",
@@ -393,6 +433,26 @@ const hi: Table = {
   "env.cmp.unknown": "तुलनीय नहीं",
   "env.cmp.unavailable": "सामयिक तुलना नहीं की जा सकी।",
   "env.cmp.note": "संदर्भ हाल की एक पिछली अवधि पर ORCA-गणित मान है, कोई जलवायु सामान्य नहीं। एक अंतर कोई प्रवृत्ति नहीं।",
+  "env.ev.title": "साक्ष्य और पुनरुत्पादकता",
+  "env.ev.status": "डेटा पुनरुत्पादकता",
+  "env.ev.summary": "सारांश",
+  "env.ev.current": "वर्तमान",
+  "env.ev.historical": "ऐतिहासिक / संदर्भ",
+  "env.ev.source": "स्रोत",
+  "env.ev.dataset": "डेटासेट",
+  "env.ev.observed": "प्रेक्षण समय",
+  "env.ev.validity": "वैधता",
+  "env.ev.distance": "पिक्सेल दूरी",
+  "env.ev.tier": "श्रेणी",
+  "env.ev.reproducibility": "पुनरुत्पादकता",
+  "env.ev.opticalHint": "तटीय-जल संदर्भ",
+  "env.ev.bundle": "पुनरुत्पादकता बंडल",
+  "env.ev.copyJson": "JSON के रूप में कॉपी करें",
+  "env.ev.copied": "कॉपी किया गया",
+  "env.ev.status.adequate": "पर्याप्त",
+  "env.ev.status.limited": "सीमित",
+  "env.ev.status.insufficient": "अपर्याप्त",
+  "env.ev.status.unavailable": "अनुपलब्ध",
   "panel.route": "मार्ग",
   "route.status": "स्थिति",
   "route.distance": "दूरी",
@@ -549,6 +609,26 @@ const kn: Table = {
   "env.cmp.unknown": "ಹೋಲಿಸಲಾಗದು",
   "env.cmp.unavailable": "ತಾತ್ಕಾಲಿಕ ಹೋಲಿಕೆ ಮಾಡಲಾಗಲಿಲ್ಲ.",
   "env.cmp.note": "ಉಲ್ಲೇಖವು ಇತ್ತೀಚಿನ ಹಿಂದಿನ ಅವಧಿಯ ORCA-ಗಣಿತ ಮೌಲ್ಯ, ಹವಾಮಾನ ಸಾಮಾನ್ಯವಲ್ಲ. ಒಂದು ವ್ಯತ್ಯಾಸ ಪ್ರವೃತ್ತಿಯಲ್ಲ.",
+  "env.ev.title": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ಪುನರುತ್ಪಾದನೀಯತೆ",
+  "env.ev.status": "ದತ್ತಾಂಶ ಪುನರುತ್ಪಾದನೀಯತೆ",
+  "env.ev.summary": "ಸಾರಾಂಶ",
+  "env.ev.current": "ಪ್ರಸ್ತುತ",
+  "env.ev.historical": "ಐತಿಹಾಸಿಕ / ಉಲ್ಲೇಖ",
+  "env.ev.source": "ಮೂಲ",
+  "env.ev.dataset": "ದತ್ತಾಂಶ ಸೆಟ್",
+  "env.ev.observed": "ವೀಕ್ಷಣೆ ಸಮಯ",
+  "env.ev.validity": "ಮಾನ್ಯತೆ",
+  "env.ev.distance": "ಪಿಕ್ಸೆಲ್ ಅಂತರ",
+  "env.ev.tier": "ಶ್ರೇಣಿ",
+  "env.ev.reproducibility": "ಪುನರುತ್ಪಾದನೀಯತೆ",
+  "env.ev.opticalHint": "ಕರಾವಳಿ-ನೀರಿನ ಸಂದರ್ಭ",
+  "env.ev.bundle": "ಪುನರುತ್ಪಾದನೀಯತೆ ಬಂಡಲ್",
+  "env.ev.copyJson": "JSON ಆಗಿ ನಕಲಿಸಿ",
+  "env.ev.copied": "ನಕಲಿಸಲಾಗಿದೆ",
+  "env.ev.status.adequate": "ಸಮರ್ಪಕ",
+  "env.ev.status.limited": "ಸೀಮಿತ",
+  "env.ev.status.insufficient": "ಅಸಮರ್ಪಕ",
+  "env.ev.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
   "panel.route": "ಮಾರ್ಗ",
   "route.status": "ಸ್ಥಿತಿ",
   "route.distance": "ದೂರ",

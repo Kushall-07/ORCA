@@ -358,3 +358,104 @@ async def test_clean_llm_comparison_text_is_used_and_grounded() -> None:
     e = await _explain_cmp(ExplanationAgent(StubLlmClient(text_response=clean)), _comparison())
     assert e.generated_via == "groq"
     assert e.grounded is True
+
+
+# ---- Phase 9 Step 5: environmental evidence in the explanation -----------
+from app.environmental.evidence import EnvironmentalEvidenceEngine  # noqa: E402
+from app.models.environmental import EnvironmentalEvidenceInputs  # noqa: E402
+
+_EV_ENGINE = EnvironmentalEvidenceEngine()
+
+
+def _evidence(*, sst_valid="VALID", chl_valid="VALID", chl_conflicted=False,
+              coast=88000.0, depth=-560.0):
+    sst = EnvironmentalObservation(
+        variable="sea_surface_temperature", value=29.1, unit="°C", validity=sst_valid,
+        data_tier="LIVE", source="open-meteo-marine", source_tier=3,
+        observed_at="2026-09-07T06:00:00+00:00", role="current",
+    )
+    chl = EnvironmentalObservation(
+        variable="chlorophyll_a", value=1.8, unit="mg m-3", validity=chl_valid,
+        data_tier="LIVE", source="noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+        source_tier=3, observed_at="2026-09-06T00:00:00+00:00",
+        distance_m=4200.0, conflicted=chl_conflicted, role="current",
+    )
+    return _EV_ENGINE.assess(EnvironmentalEvidenceInputs(
+        sst_current=sst, chl_current=chl, comparison=None,
+        coastline_distance_m=coast, depth_m=depth,
+        query_time="2026-09-09T06:00:00+00:00", latitude=12.87, longitude=74.84,
+    ))
+
+
+async def _explain_ev(agent, evidence, *, language=Language.EN, productivity=None):
+    decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
+    return await agent.explain(
+        language=language,
+        understanding=QueryUnderstanding(
+            language=language, intent=QueryIntent.ENVIRONMENTAL_CONDITIONS,
+        ),
+        decision=decision, risk=risk, suitability=None, conflicts=(), route=None,
+        alerts=(), fabric=None, provenance=None, productivity=productivity,
+        comparison=None, environmental_evidence=evidence,
+    )
+
+
+async def test_template_explains_evidence_status_and_sources() -> None:
+    e = await _explain_ev(ExplanationAgent(None), _evidence())
+    low = e.text.lower()
+    assert "reproducibility is adequate" in low
+    assert "open-meteo-marine" in low or "noaa-coastwatch-erddap" in low
+    assert "do not directly predict fish presence" in low
+    for bad in ("more fish", "good fishing", "better fishing", "expected catch",
+                "yield", "productive fishing"):
+        assert bad not in low
+    assert e.grounded is True
+
+
+async def test_template_evidence_reports_missing_and_conflict_honestly() -> None:
+    e = await _explain_ev(
+        ExplanationAgent(None),
+        _evidence(sst_valid="MISSING", chl_conflicted=True),
+    )
+    low = e.text.lower()
+    assert "reproducibility is" in low
+    assert "no current observation is available" in low or "sea-surface temperature" in low
+
+
+async def test_evidence_multilingual_hi_kn() -> None:
+    hi = await _explain_ev(ExplanationAgent(None), _evidence(), language=Language.HI)
+    kn = await _explain_ev(ExplanationAgent(None), _evidence(), language=Language.KN)
+    assert any("ऀ" <= ch <= "ॿ" for ch in hi.text)
+    assert any("ಀ" <= ch <= "೿" for ch in kn.text)
+    # source names + numbers stay untranslated
+    assert "open-meteo-marine" in hi.text or "noaa-coastwatch-erddap" in hi.text
+    # disclaimer present in each language
+    assert "मछली" in hi.text
+    assert "ಮೀನಿನ" in kn.text
+
+
+async def test_llm_evidence_fishing_claim_is_rejected_and_template_used() -> None:
+    hype = (
+        "Environmental data reproducibility is adequate. The chlorophyll-a source "
+        "is noaa-coastwatch-erddap. This means good fishing conditions and a high "
+        "expected catch for the survey vessel."
+    )
+    agent = ExplanationAgent(StubLlmClient(text_response=[hype, hype]), max_retries=1)
+    e = await _explain_ev(agent, _evidence())
+    assert e.generated_via == "template"
+    low = e.text.lower()
+    assert "good fishing" not in low and "expected catch" not in low
+
+
+async def test_clean_llm_evidence_text_is_used_and_grounded() -> None:
+    clean = (
+        "ORCA assessment: conditions are within acceptable limits. Deterministic "
+        "marine risk is low. Environmental data reproducibility is adequate: the "
+        "sea-surface temperature comes from open-meteo-marine and chlorophyll-a "
+        "from noaa-coastwatch-erddap, both valid and timestamped. Environmental "
+        "observations and chlorophyll-a are descriptive environmental indicators "
+        "and do not directly predict fish presence, abundance, or catch."
+    )
+    e = await _explain_ev(ExplanationAgent(StubLlmClient(text_response=clean)), _evidence())
+    assert e.generated_via == "groq"
+    assert e.grounded is True

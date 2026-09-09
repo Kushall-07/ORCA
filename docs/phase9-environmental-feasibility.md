@@ -150,6 +150,17 @@ never labelled LIVE (`DataTier.CACHE`, `source_tier=CACHED`).
   one difference, exposed in the additive
   `QueryResponse.environmental.comparison` block. See
   [`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
+* **Done in Step 5:** a deterministic **environmental evidence / reproducibility
+  assessment**. It fetches **nothing** (0 extra HTTP calls), runs **no LLM**, and
+  only re-serialises + categorises metadata that already exists (source, dataset
+  id, observation timestamp, validity, tier, pixel distance) into a
+  per-observation record and a categorical overall status
+  (`adequate | limited | insufficient | unavailable`, never a numeric score). An
+  optional `optical_water_hint` from the existing GIS coastline/depth context is
+  a coarse descriptive string only. Exposed in the additive
+  `QueryResponse.environmental.evidence` block; never feeds risk / safety /
+  decision / route. See
+  [`phase9-step5-environmental-evidence.md`](phase9-step5-environmental-evidence.md).
 * **Still deferred.** A true multi-year **climatological normal**, seasonal
   climatology tables, environmental **trend / time-series** analysis, slopes,
   regression and forecasting are *not* implemented. The Step 4 reference is a

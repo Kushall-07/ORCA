@@ -1,0 +1,46 @@
+# ============================================================
+# ORCA Environmental Evidence Engine - configuration
+# ============================================================
+# version: 2026.09-mvp
+#
+# Phase 9 Step 5. This engine describes HOW REPRODUCIBLE AND AUDITABLE ORCA's
+# already-collected environmental observations are. It fetches nothing, adds
+# nothing to the Marine Data Fabric, and never touches risk / safety / decision
+# / route / suitability. It makes NO biological or fishing claim.
+#
+# Every value below is an ENGINEERING / DATA-QUALITY / DESCRIPTIVE band. NONE of
+# them is a scientific threshold:
+#   * they do NOT define a Case-1 / Case-2 water type
+#   * they do NOT correct or adjust any measurement
+#   * they do NOT change chlorophyll-a, productivity, confidence, risk,
+#     suitability, decision or routing
+#   * they only decide coarse descriptive wording
+
+version: "2026.09-mvp"
+
+disclaimer: >-
+  Environmental observations and chlorophyll-a are descriptive environmental
+  indicators and do not directly predict fish presence, abundance, or catch.
+
+# ---- coastal-proximity bands (km from the modelled Natural Earth coastline) ----
+# Descriptive geography only. Natural Earth 1:10m coastline is simplified and is
+# NOT an authoritative or legal coastline; it is used here for approximate
+# distance context only.
+coastal_proximity:
+  very_near_coast_km: 10
+  near_coast_km: 40
+  #  > near_coast_km -> "open ocean"
+
+# ---- shelf-depth context (metres; negative is below sea level) ----
+# GEBCO 0.05 deg sampled grid. NOT authoritative hydrographic data. Shallower
+# than this AND near the coast -> a cautious "retrievals may be less reliable"
+# hint. Used for wording only.
+shelf_hint_depth_m: -200
+
+# ---- far-pixel band ----
+# Fraction of the EXISTING ocean-colour spatial acceptance ceiling
+# (services/oceancolor.MAX_PIXEL_DISTANCE_M, currently 25 km) beyond which the
+# nearest accepted satellite pixel is described as "far" and the observation's
+# reproducibility is downgraded from adequate to limited. Engineering band, not
+# a threshold.
+far_pixel_fraction: 0.6

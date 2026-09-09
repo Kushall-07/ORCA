@@ -529,6 +529,50 @@ button { font-family: inherit; }
 .env-cmp__window { margin: 0; font-size: 0.74rem; color: var(--orca-faint); }
 .env-cmp__note { margin: 0; font-size: 0.72rem; color: var(--orca-muted); }
 
+/* ---------- Phase 9 Step 5: environmental evidence / reproducibility ---------- */
+/* Neutral only: a categorical status word, no colour-coded good/bad, no arrows,
+   no charts. */
+.env-ev { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem; }
+.env-ev__status { display: flex; align-items: baseline; gap: 0.5rem; }
+.env-ev__badge {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--orca-border-soft);
+  border-radius: 3px;
+  color: var(--orca-text);
+}
+.env-ev__caption { font-size: 0.74rem; color: var(--orca-faint); }
+.env-ev__summary { margin: 0; font-size: 0.78rem; color: var(--orca-muted); }
+.env-ev__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.env-ev__row { display: flex; flex-direction: column; gap: 0.1rem; }
+.env-ev__var { font-weight: 600; font-size: 0.8rem; }
+.env-ev__kind { font-weight: 400; color: var(--orca-faint); }
+.env-ev__meta { font-size: 0.74rem; color: var(--orca-muted); word-break: break-word; }
+.env-ev__hint { margin: 0; font-size: 0.74rem; color: var(--orca-muted); }
+.env-ev__bundle { font-size: 0.74rem; }
+.env-ev__bundle > summary { cursor: pointer; color: var(--orca-faint); }
+.env-ev__json {
+  margin: 0.3rem 0;
+  padding: 0.4rem;
+  background: var(--orca-surface-2, rgba(127,127,127,0.08));
+  border-radius: 4px;
+  font-size: 0.7rem;
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre;
+}
+.env-ev__copy {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--orca-border-soft);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--orca-text);
+  cursor: pointer;
+}
+
 /* ---------- evidence ---------- */
 .evidence-table { display: flex; flex-direction: column; font-size: 0.8rem; }
 .evidence-row {

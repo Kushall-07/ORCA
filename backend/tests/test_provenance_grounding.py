@@ -289,3 +289,80 @@ def test_invented_comparison_delta_is_rejected() -> None:
                          environmental=productivity, comparison=comparison)
     assert report.grounded is False
     assert "4.8" in report.unsupported
+
+
+# ---- Phase 9 Step 5: environmental evidence provenance + grounding --------
+from app.environmental.evidence import EnvironmentalEvidenceEngine  # noqa: E402
+from app.models.environmental import (  # noqa: E402
+    EnvironmentalEvidenceInputs,
+)
+
+
+def _build_with_evidence():
+    prov0, decision, risk, productivity = _build_with_environment()
+    ev = EnvironmentalEvidenceEngine().assess(
+        EnvironmentalEvidenceInputs(
+            sst_current=productivity.sst.model_copy(update={"role": "current"}),
+            chl_current=productivity.chlorophyll_a.model_copy(
+                update={"role": "current", "observed_at": "2026-09-06T00:00:00+00:00",
+                        "distance_m": 4200.0}
+            ),
+            comparison=None,
+            coastline_distance_m=88000.0, depth_m=-560.0,
+            query_time="2026-09-07T12:00:00+00:00", latitude=12.87, longitude=74.84,
+        )
+    )
+    u = QueryUnderstanding(language=Language.EN,
+                           intent=QueryIntent.ENVIRONMENTAL_CONDITIONS)
+    prov = build_provenance(
+        message="how reproducible is the chlorophyll data near Mangalore",
+        understanding=u, weather_tier="LIVE", ocean_tier="LIVE", environment_tier="LIVE",
+        risk=risk, safety=evaluate_safety(SafetyGuardInput(risk=risk)),
+        decision=decision, productivity=productivity, evidence=ev,
+    )
+    return prov, decision, risk, productivity, ev
+
+
+def test_evidence_provenance_nodes_present_and_trace_to_root() -> None:
+    prov, *_ = _build_with_evidence()
+    kinds = {n.kind for n in prov.nodes}
+    assert ProvNodeKind.ENVIRONMENTAL_EVIDENCE in kinds
+    assert any(n.id == "agent:environment_evidence" for n in prov.nodes)
+    assert any(n.id == "assessment:environment_evidence" for n in prov.nodes)
+    assert any(n.id.startswith("evidence_item:chlorophyll_a:") for n in prov.nodes)
+    for n in prov.nodes:
+        assert prov.traces_to_root(n.id), f"{n.id} does not trace to the query"
+
+
+def test_evidence_chain_query_to_assessment() -> None:
+    prov, *_ = _build_with_evidence()
+    labels = " ".join(n.label.lower() for n in prov.nodes)
+    assert "evidence" in labels and "reproducibility" in labels
+    kinds = {n.kind for n in prov.nodes}
+    assert ProvNodeKind.ENVIRONMENTAL_EVIDENCE in kinds
+    # the assessment node hangs off the per-item evidence nodes + the agent node
+    assessment = next(n for n in prov.nodes if n.id == "assessment:environment_evidence")
+    incoming = {e.src for e in prov.edges if e.dst == assessment.id}
+    assert "agent:environment_evidence" in incoming
+    assert any(s.startswith("evidence_item:") for s in incoming)
+
+
+def test_evidence_observation_values_are_grounded() -> None:
+    prov, decision, risk, productivity, ev = _build_with_evidence()
+    text = (
+        "Sea-surface temperature is 29.3 degrees C and chlorophyll-a is 2.4 mg/m3. "
+        "Environmental data reproducibility is adequate."
+    )
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity, environmental_evidence=ev)
+    assert report.grounded is True
+    assert not report.unsupported
+
+
+def test_invented_evidence_number_is_rejected() -> None:
+    prov, decision, risk, productivity, ev = _build_with_evidence()
+    text = "The nearest chlorophyll-a pixel is 88.5 km from the queried point."
+    report = ground_text(text, provenance=prov, decision=decision, risk=risk,
+                         environmental=productivity, environmental_evidence=ev)
+    assert report.grounded is False
+    assert "88.5" in report.unsupported

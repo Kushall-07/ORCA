@@ -132,6 +132,47 @@ export interface EnvironmentalComparisonInfo {
   engine_version: string;
 }
 
+// ---- Phase 9 Step 5: environmental evidence / reproducibility -------
+// Deterministic re-serialisation + categorisation of metadata ORCA already
+// holds. Purely informational: NEVER affects risk / safety / decision / route /
+// suitability, and never predicts fish presence, abundance or catch. `status`
+// is a categorical descriptor, not a numeric score.
+export type ReproducibilityStatus =
+  | "adequate"
+  | "limited"
+  | "insufficient"
+  | "unavailable";
+
+export interface EnvironmentalEvidenceItemInfo {
+  variable: string;
+  value: number | null;
+  unit: string;
+  source: string | null;
+  dataset: string | null;
+  observation_time: string | null;
+  query_time: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  spatial_distance_km: number | null;
+  validity: ValidityState | string | null;
+  age: string; // fresh | stale | outside_window | unavailable
+  evidence_tier: DataTier | string | null;
+  source_status: string; // valid | stale | invalid | missing | conflicted
+  observation_kind: string; // current | historical_reference
+  reproducibility_status: ReproducibilityStatus | string;
+  limitations: string[];
+}
+
+export interface EnvironmentalEvidenceInfo {
+  status: ReproducibilityStatus | string;
+  items: EnvironmentalEvidenceItemInfo[];
+  summary: string;
+  optical_water_hint: string | null;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
 export interface EnvironmentalInfo {
   sst: EnvironmentalObservationInfo | null;
   chlorophyll_a: EnvironmentalObservationInfo | null;
@@ -143,6 +184,7 @@ export interface EnvironmentalInfo {
   disclaimer: string;
   engine_version: string;
   comparison?: EnvironmentalComparisonInfo | null; // Phase 9 Step 4 - optional
+  evidence?: EnvironmentalEvidenceInfo | null; // Phase 9 Step 5 - optional
 }
 
 export interface RouteInfo {

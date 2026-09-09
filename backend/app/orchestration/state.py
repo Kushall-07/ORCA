@@ -18,6 +18,7 @@ from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
+    EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
 )
 from app.models.explanation import Explanation
@@ -92,6 +93,10 @@ class OrcaGraphState(TypedDict, total=False):
     # Phase 9 Step 4: deterministic researcher temporal comparison. Fetched
     # locally in the comparison node; never enters the fabric / risk / safety.
     environmental_comparison: EnvironmentalComparisonResult | None
+    # Phase 9 Step 5: deterministic evidence / reproducibility assessment.
+    # Pure re-serialisation of existing metadata; never feeds risk / safety /
+    # decision / route / suitability.
+    environmental_evidence: EnvironmentalEvidenceResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

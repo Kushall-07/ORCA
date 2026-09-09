@@ -16,6 +16,7 @@ from app.i18n.messages import (
     chlorophyll_class_label,
     comparison_direction_label,
     decision_sentence,
+    evidence_status_label,
     frag,
     productivity_label,
     risk_label,
@@ -26,6 +27,7 @@ from app.models.decision import DecisionResult, DecisionStatus
 from app.models.environmental import (
     ComparisonDirection,
     EnvironmentalComparisonResult,
+    EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
     ProductivityPotential,
 )
@@ -67,6 +69,11 @@ Hard rules:
   better/worse fishing, more/fewer fish, higher/lower catch, yield or fishing
   success. The reference is an ORCA-computed value over a recent past window, NOT
   a climatological normal; one difference is NOT a trend.
+- If an environmental evidence assessment is present: it describes only how
+  reproducible / auditable the DATA is (adequate / limited / insufficient /
+  unavailable), its sources, timestamps and validity. It is NOT a biological,
+  productivity or fishing statement. Never turn a data-quality remark into a
+  claim about fish, catch, productivity or fishing conditions.
 - Respond in the requested language only. Be concise (3-6 sentences).
 Return plain text, no markdown headings."""
 
@@ -84,6 +91,10 @@ _BIOLOGICAL_CLAIMS = (
     "rising trend", "declining trend", "increasing trend", "decreasing trend",
     "upward trend", "downward trend", "is rising", "is declining", "is increasing",
     "is decreasing", "trending up", "trending down", "bloom",
+    # Step 5 - a data-quality remark must never imply a fishing outcome
+    "good conditions for fishing", "favourable for catch", "favorable for catch",
+    "productive fishing ground", "reliable fishing", "chlorophyll proves",
+    "sst proves", "guarantees catch", "guarantees fish",
 )
 
 
@@ -107,6 +118,7 @@ class ExplanationAgent:
         provenance: ProvenanceGraph | None,
         productivity: EnvironmentalProductivityResult | None = None,
         comparison: EnvironmentalComparisonResult | None = None,
+        environmental_evidence: EnvironmentalEvidenceResult | None = None,
     ) -> Explanation:
         template = render_template(
             language=language,
@@ -119,6 +131,7 @@ class ExplanationAgent:
             fabric=fabric,
             productivity=productivity,
             comparison=comparison,
+            environmental_evidence=environmental_evidence,
         )
 
         notes = _structured_notes(
@@ -131,7 +144,8 @@ class ExplanationAgent:
         # ---- LLM path with grounding ----
         context = json.dumps(
             _llm_context(language, understanding, decision, risk, suitability,
-                         conflicts, route, fabric, productivity, comparison),
+                         conflicts, route, fabric, productivity, comparison,
+                         environmental_evidence),
             ensure_ascii=False,
         )
         user = f"CONTEXT (authoritative, do not change):\n{context}\n\nExplain this decision."
@@ -148,11 +162,13 @@ class ExplanationAgent:
             report = ground_text(
                 text, provenance=provenance, decision=decision, risk=risk,
                 suitability=suitability, route=route, environmental=productivity,
-                comparison=comparison,
+                comparison=comparison, environmental_evidence=environmental_evidence,
             )
             contradiction = _contradicts_decision(text, decision)
             biological = (
-                productivity is not None or comparison is not None
+                productivity is not None
+                or comparison is not None
+                or environmental_evidence is not None
             ) and _contains_biological_claim(text)
             if report.grounded and not contradiction and not biological:
                 return Explanation(
@@ -196,6 +212,7 @@ def render_template(
     fabric: MarineDataFabric | None,
     productivity: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
+    environmental_evidence: EnvironmentalEvidenceResult | None = None,
 ) -> Explanation:
     parts: list[str] = []
     notes = _structured_notes(decision, risk, suitability, conflicts, route, (), fabric)
@@ -283,6 +300,12 @@ def render_template(
     ):
         _render_comparison(parts, language, comparison)
         if productivity is None:
+            parts.append(frag(language, "env_disclaimer"))
+
+    # ---- environmental evidence / reproducibility (Phase 9 Step 5) ----
+    if environmental_evidence is not None and environmental_evidence.items:
+        _render_evidence(parts, language, environmental_evidence)
+        if productivity is None and comparison is None:
             parts.append(frag(language, "env_disclaimer"))
 
     proxy_mentioned = risk is not None and any(
@@ -381,6 +404,40 @@ def _render_comparison(parts, language, comparison) -> None:  # type: ignore[no-
     parts.append(frag(language, "env_cmp_note"))
 
 
+def _render_evidence(parts, language, evidence) -> None:  # type: ignore[no-untyped-def]
+    """Append deterministic environmental-evidence sentences (EN / HI / KN).
+
+    States only the categorical reproducibility status, the per-variable
+    sources / timestamps / validity, current-vs-historical distinction, and
+    honest missing / conflicted notes. NEVER a biological or fishing claim.
+    """
+    parts.append(frag(
+        language, "env_ev_status",
+        status=evidence_status_label(language, evidence.status),
+    ))
+    for it in evidence.items:
+        if it.observation_kind != "current":
+            continue
+        var_label = frag(
+            language,
+            "env_var_sst" if it.variable == "sea_surface_temperature" else "env_var_chl",
+        )
+        if it.value is None or it.validity in ("MISSING", None):
+            parts.append(frag(language, "env_ev_var_missing", var=var_label))
+            continue
+        src = it.source or frag(language, "env_ev_unknown_source")
+        when = it.observation_time or frag(language, "env_ev_unknown_time")
+        parts.append(frag(
+            language, "env_ev_var",
+            var=var_label, src=src, when=when, validity=str(it.validity),
+        ))
+    if any(it.observation_kind == "historical_reference" for it in evidence.items):
+        parts.append(frag(language, "env_ev_reference_note"))
+    if evidence.optical_water_hint and "coastal" in evidence.optical_water_hint.lower():
+        parts.append(frag(language, "env_ev_coastal"))
+    parts.append(frag(language, "env_ev_disclaimer"))
+
+
 def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fabric) -> dict:  # type: ignore[no-untyped-def]
     reasoning = " | ".join(decision.reasons[:4]) if decision else "no decision"
     evidence_refs = tuple(
@@ -415,7 +472,7 @@ def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fab
     }
 
 
-def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None) -> dict:  # type: ignore[no-untyped-def]
+def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None) -> dict:  # type: ignore[no-untyped-def]
     ctx: dict = {"language": language.value if hasattr(language, "value") else str(language)}
     if understanding is not None:
         ctx["intent"] = understanding.intent.value
@@ -532,6 +589,40 @@ def _llm_context(language, understanding, decision, risk, suitability, conflicts
                 "better fishing/more fish/catch/yield. The reference is an "
                 "ORCA-computed value over a recent past window, NOT a "
                 "climatological normal; one difference is NOT a trend."
+            ),
+        }
+
+    if environmental_evidence is not None and environmental_evidence.items:
+        ev = environmental_evidence
+        ctx["environmental_evidence"] = {
+            "status": ev.status,
+            "summary": ev.summary,
+            "optical_water_hint": ev.optical_water_hint,
+            "limitations": list(ev.limitations),
+            "disclaimer": ev.disclaimer,
+            "items": [
+                {
+                    "variable": it.variable,
+                    "observation_kind": it.observation_kind,
+                    "value": it.value,
+                    "unit": it.unit,
+                    "source": it.source,
+                    "dataset": it.dataset,
+                    "observation_time": it.observation_time,
+                    "validity": it.validity,
+                    "age": it.age,
+                    "evidence_tier": it.evidence_tier,
+                    "reproducibility_status": it.reproducibility_status,
+                }
+                for it in ev.items
+            ],
+            "note": (
+                "This describes DATA QUALITY and reproducibility only "
+                "(adequate/limited/insufficient/unavailable). It is NOT a "
+                "biological, productivity or fishing statement. Never say fish, "
+                "catch, yield, productive fishing, or favourable fishing "
+                "conditions. Do not compute quality - restate the given status "
+                "and per-variable source/timestamp/validity."
             ),
         }
     return ctx

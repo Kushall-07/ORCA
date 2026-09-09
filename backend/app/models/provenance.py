@@ -32,6 +32,7 @@ class ProvNodeKind(str, Enum):
     ALERT = "alert"
     ENVIRONMENTAL = "environmental"   # Phase 9 Step 3: productivity calculation
     ENVIRONMENTAL_COMPARISON = "environmental_comparison"  # Phase 9 Step 4: temporal comparison
+    ENVIRONMENTAL_EVIDENCE = "environmental_evidence"  # Phase 9 Step 5: evidence / reproducibility assessment
     EXPLANATION = "explanation"
 
 

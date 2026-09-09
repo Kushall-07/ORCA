@@ -261,6 +261,102 @@ def test_comparison_field_is_additive_extra_forbid_still_holds() -> None:
         )
 
 
+# ---- Phase 9 Step 5: environmental.evidence additive contract ------------
+def test_evidence_absent_for_non_environmental_query(client) -> None:
+    query_api.set_pipeline(make_pipeline())
+    body = client.post("/query", json={
+        "session_id": "api-ev-none",
+        "message": "Is it safe to go fishing from Mangalore now?",
+    }).json()
+    assert body["environmental"] is None  # no env block at all -> no evidence
+
+
+def test_environmental_query_exposes_the_evidence_contract(client) -> None:
+    from tests.orchestration_fakes import (
+        FakeEnvironmentalAgent, FakeOceanAgent, make_pipeline, obs,
+    )
+
+    ocean = FakeOceanAgent(observations=(
+        obs("wave_height", 1.1, "m", "open-meteo-marine"),
+        obs("sea_surface_temperature", 29.0, "°C", "open-meteo-marine"),
+    ))
+    query_api.set_pipeline(make_pipeline(
+        ocean=ocean, environment=FakeEnvironmentalAgent(2.1, days_old=1),
+    ))
+    body = client.post("/query", json={
+        "session_id": "api-ev",
+        "message": "how reproducible is the chlorophyll-a and sea surface temperature data near Mangalore",
+    }).json()
+
+    assert body["intent"] == "environmental_conditions"
+    ev = body["environmental"]["evidence"]
+    assert ev is not None
+    for key in ("status", "items", "summary", "optical_water_hint",
+                "limitations", "disclaimer", "engine_version"):
+        assert key in ev
+    assert ev["status"] in ("adequate", "limited", "insufficient", "unavailable")
+    assert isinstance(ev["items"], list) and len(ev["items"]) >= 1
+    it = ev["items"][0]
+    for key in ("variable", "value", "unit", "source", "dataset",
+                "observation_time", "query_time", "latitude", "longitude",
+                "spatial_distance_km", "validity", "age", "evidence_tier",
+                "source_status", "observation_kind", "reproducibility_status",
+                "limitations"):
+        assert key in it
+    assert it["observation_kind"] in ("current", "historical_reference")
+    assert it["reproducibility_status"] in (
+        "adequate", "limited", "insufficient", "unavailable"
+    )
+    # never a numeric quality score
+    assert not any(ch.isdigit() for ch in ev["status"])
+    assert ev["disclaimer"] == (
+        "Environmental observations and chlorophyll-a are descriptive "
+        "environmental indicators and do not directly predict fish presence, "
+        "abundance, or catch."
+    )
+    # safety chain intact
+    assert body["decision"]["status"] in (
+        "PROCEED", "PROCEED_WITH_CAUTION", "DO_NOT_PROCEED", "NO_SAFE_RECOMMENDATION"
+    )
+    low = (body["answer"] + " " + ev["summary"]).lower()
+    for bad in ("more fish", "good fishing", "better fishing", "expected catch",
+                "productive fishing", "yield"):
+        assert bad not in low
+
+
+def test_evidence_field_is_additive_extra_forbid_still_holds() -> None:
+    from app.models.api import EnvironmentalInfo, QueryResponse
+
+    assert EnvironmentalInfo().evidence is None  # optional, default None
+    with pytest.raises(Exception):
+        QueryResponse(
+            session_id="x", turn=1, status="OK", language="en", intent="general",
+            answer="hi", yet_another_surprise=1,
+        )
+
+
+def test_evidence_field_no_existing_env_field_removed(client) -> None:
+    from tests.orchestration_fakes import (
+        FakeEnvironmentalAgent, FakeOceanAgent, make_pipeline, obs,
+    )
+
+    ocean = FakeOceanAgent(observations=(
+        obs("wave_height", 1.1, "m", "open-meteo-marine"),
+        obs("sea_surface_temperature", 29.0, "°C", "open-meteo-marine"),
+    ))
+    query_api.set_pipeline(make_pipeline(
+        ocean=ocean, environment=FakeEnvironmentalAgent(2.1, days_old=1),
+    ))
+    env = client.post("/query", json={
+        "session_id": "api-ev-shape",
+        "message": "chlorophyll-a and sea surface temperature near Mangalore",
+    }).json()["environmental"]
+    for key in ("sst", "chlorophyll_a", "chlorophyll_class", "productivity_potential",
+                "data_sufficiency", "confidence", "limitations", "disclaimer",
+                "engine_version", "comparison", "evidence"):
+        assert key in env, f"missing environmental field {key!r}"
+
+
 def test_route_query_returns_waypoint_geometry(client) -> None:
     from tests.orchestration_fakes import make_pipeline
 

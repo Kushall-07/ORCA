@@ -16,6 +16,8 @@ from app.models.api import (
     DecisionInfo,
     EnvironmentalComparisonInfo,
     EnvironmentalComparisonVariableInfo,
+    EnvironmentalEvidenceInfo,
+    EnvironmentalEvidenceItemInfo,
     EnvironmentalInfo,
     EnvironmentalObservationInfo,
     EvidenceItem,
@@ -112,6 +114,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     suit = state.get("suitability")
     productivity = state.get("productivity_result")
     comparison = state.get("environmental_comparison")
+    evidence = state.get("environmental_evidence")
     route = state.get("route_result")
     fabric = state.get("fabric")
     expl = state.get("explanation")
@@ -204,6 +207,39 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=comparison.engine_version,
         )
 
+    evidence_info = None
+    if evidence is not None:
+        evidence_info = EnvironmentalEvidenceInfo(
+            status=evidence.status,
+            items=[
+                EnvironmentalEvidenceItemInfo(
+                    variable=it.variable,
+                    value=it.value,
+                    unit=it.unit,
+                    source=it.source,
+                    dataset=it.dataset,
+                    observation_time=it.observation_time,
+                    query_time=it.query_time,
+                    latitude=it.latitude,
+                    longitude=it.longitude,
+                    spatial_distance_km=it.spatial_distance_km,
+                    validity=it.validity,
+                    age=it.age,
+                    evidence_tier=it.evidence_tier,
+                    source_status=it.source_status,
+                    observation_kind=it.observation_kind,
+                    reproducibility_status=it.reproducibility_status,
+                    limitations=list(it.limitations),
+                )
+                for it in evidence.items
+            ],
+            summary=evidence.summary,
+            optical_water_hint=evidence.optical_water_hint,
+            limitations=list(evidence.limitations),
+            disclaimer=evidence.disclaimer,
+            engine_version=evidence.engine_version,
+        )
+
     environmental_info = None
     if productivity is not None:
         environmental_info = EnvironmentalInfo(
@@ -220,10 +256,16 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             disclaimer=productivity.disclaimer,
             engine_version=productivity.engine_version,
             comparison=comparison_info,
+            evidence=evidence_info,
         )
-    elif comparison_info is not None:
+    elif comparison_info is not None or evidence_info is not None:
         environmental_info = EnvironmentalInfo(
-            disclaimer=comparison.disclaimer, comparison=comparison_info,
+            disclaimer=(
+                comparison.disclaimer if comparison is not None
+                else evidence.disclaimer
+            ),
+            comparison=comparison_info,
+            evidence=evidence_info,
         )
 
     route_info = None

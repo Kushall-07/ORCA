@@ -151,6 +151,42 @@ export function ReportView({
               {resp.environmental.comparison && (
                 <p className="report__fine">{t("env.cmp.note")}</p>
               )}
+              {resp.environmental.evidence &&
+                resp.environmental.evidence.items.length > 0 && (
+                  <>
+                    <p>
+                      {t("env.ev.title")} — {t("env.ev.status")}:{" "}
+                      {String(resp.environmental.evidence.status).toUpperCase()}
+                    </p>
+                    {resp.environmental.evidence.summary && (
+                      <p className="report__fine">
+                        {resp.environmental.evidence.summary}
+                      </p>
+                    )}
+                    <ul>
+                      {resp.environmental.evidence.items.map((it, i) => (
+                        <li key={i}>
+                          {it.variable} ({it.observation_kind}):{" "}
+                          {t("env.ev.source")} {it.source ?? "—"}
+                          {it.dataset ? `, ${t("env.ev.dataset")} ${it.dataset}` : ""}
+                          {`, ${t("env.ev.observed")} ${it.observation_time ?? "—"}`}
+                          {`, ${t("env.ev.validity")} ${String(it.validity ?? "—")}`}
+                          {`, ${t("env.ev.reproducibility")} ${String(
+                            it.reproducibility_status,
+                          )}`}
+                        </li>
+                      ))}
+                    </ul>
+                    {resp.environmental.evidence.optical_water_hint && (
+                      <p className="report__fine">
+                        {resp.environmental.evidence.optical_water_hint}
+                      </p>
+                    )}
+                    <p className="report__fine">
+                      {resp.environmental.evidence.disclaimer}
+                    </p>
+                  </>
+                )}
               <p className="report__fine">{resp.environmental.disclaimer}</p>
             </section>
           )}

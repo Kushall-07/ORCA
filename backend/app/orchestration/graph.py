@@ -10,13 +10,16 @@
       -> suitability (conditional) -> risk -> policy -> decision
       -> (route requested & allowed) -> route
       -> alerts -> productivity -> environmental_comparison
+      -> environmental_evidence
       -> provenance -> explain -> assemble -> END
 
-The productivity node (Phase 9 Step 3) and the environmental_comparison node
-(Phase 9 Step 4) are deterministic and strictly downstream of decision: they
-never feed risk, safety, decision, suitability, geofencing, routing or alerts.
-The comparison node fetches its historical reference LOCALLY - historical
-observations never enter the Marine Data Fabric.
+The productivity node (Phase 9 Step 3), the environmental_comparison node
+(Phase 9 Step 4) and the environmental_evidence node (Phase 9 Step 5) are
+deterministic and strictly downstream of decision: they never feed risk, safety,
+decision, suitability, geofencing, routing or alerts. The comparison node fetches
+its historical reference LOCALLY - historical observations never enter the Marine
+Data Fabric. The evidence node fetches NOTHING - it re-serialises and categorises
+metadata that already exists.
 
 Conditional edges skip unnecessary work: a weather-only query never computes a
 route; a failed / clarification query jumps straight to the explanation.
@@ -92,6 +95,7 @@ def build_orca_graph(deps: OrcaDeps):
     add("alerts", nodes.alerts_node)
     add("productivity", nodes.productivity_node)
     add("environmental_comparison", nodes.environmental_comparison_node)
+    add("environmental_evidence", nodes.environmental_evidence_node)
     add("provenance", nodes.provenance_node)
     add("explain", nodes.explain_node)
     add("assemble", nodes.assemble_node)
@@ -117,7 +121,8 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_edge("route", "alerts")
     g.add_edge("alerts", "productivity")
     g.add_edge("productivity", "environmental_comparison")
-    g.add_edge("environmental_comparison", "provenance")
+    g.add_edge("environmental_comparison", "environmental_evidence")
+    g.add_edge("environmental_evidence", "provenance")
     g.add_edge("provenance", "explain")
     g.add_edge("explain", "assemble")
     g.add_edge("assemble", END)

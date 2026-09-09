@@ -120,6 +120,23 @@ _CMP_DIRECTION_LABEL: dict[Language, dict[ComparisonDirection, str]] = {
     },
 }
 
+# Phase 9 Step 5: categorical environmental-evidence / reproducibility status.
+# A descriptor, never a score.
+_EVIDENCE_STATUS_LABEL: dict[Language, dict[str, str]] = {
+    Language.EN: {
+        "adequate": "adequate", "limited": "limited",
+        "insufficient": "insufficient", "unavailable": "unavailable",
+    },
+    Language.HI: {
+        "adequate": "पर्याप्त", "limited": "सीमित",
+        "insufficient": "अपर्याप्त", "unavailable": "अनुपलब्ध",
+    },
+    Language.KN: {
+        "adequate": "ಸಮರ್ಪಕ", "limited": "ಸೀಮಿತ",
+        "insufficient": "ಅಸಮರ್ಪಕ", "unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+    },
+}
+
 _FRAGMENTS: dict[Language, dict[str, str]] = {
     Language.EN: {
         "risk": "Deterministic marine risk is {level} (score {score}/100).",
@@ -151,6 +168,14 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "env_cmp_chl_unchanged": "Chlorophyll-a is essentially unchanged from the ORCA-computed reference of {ref} mg/m3 ({window}).",
         "env_cmp_unavailable": "A temporal comparison for {var} could not be computed ({reason}).",
         "env_cmp_note": "The reference is an ORCA-computed value over a recent past window, not a climatological normal; a single difference is not a trend.",
+        "env_ev_status": "Environmental data reproducibility is {status}.",
+        "env_ev_var": "{var}: source {src}, observed {when}, validity {validity}.",
+        "env_ev_var_missing": "{var}: no current observation is available.",
+        "env_ev_reference_note": "Historical / reference observations are listed separately from the current observations and are not treated as current measurements.",
+        "env_ev_coastal": "The queried point is near the coastline; satellite ocean-colour retrievals here may be less reliable. Descriptive context only - no environmental value is adjusted.",
+        "env_ev_disclaimer": "Environmental observations and chlorophyll-a are descriptive environmental indicators and do not directly predict fish presence, abundance, or catch.",
+        "env_ev_unknown_source": "an unrecorded source",
+        "env_ev_unknown_time": "an unrecorded time",
         "clarify": "Could you clarify: {q}",
         "understanding_failed": "ORCA could not reliably understand the request. Please rephrase with a location and what you want to know.",
     },
@@ -184,6 +209,14 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "env_cmp_chl_unchanged": "क्लोरोफिल-a ORCA-गणित संदर्भ {ref} mg/m3 से लगभग अपरिवर्तित है ({window})।",
         "env_cmp_unavailable": "{var} के लिए सामयिक तुलना नहीं की जा सकी ({reason})।",
         "env_cmp_note": "संदर्भ हाल की एक पिछली अवधि पर ORCA-गणित मान है, कोई जलवायु सामान्य नहीं; एक अंतर कोई प्रवृत्ति नहीं।",
+        "env_ev_status": "पर्यावरणीय डेटा की पुनरुत्पादकता {status} है।",
+        "env_ev_var": "{var}: स्रोत {src}, प्रेक्षण समय {when}, वैधता {validity}।",
+        "env_ev_var_missing": "{var}: कोई वर्तमान प्रेक्षण उपलब्ध नहीं है।",
+        "env_ev_reference_note": "ऐतिहासिक / संदर्भ प्रेक्षण वर्तमान प्रेक्षणों से अलग सूचीबद्ध हैं और उन्हें वर्तमान माप नहीं माना जाता।",
+        "env_ev_coastal": "प्रश्नित बिंदु तट के निकट है; यहाँ उपग्रह ओशन-कलर रीडिंग कम विश्वसनीय हो सकती है। केवल वर्णनात्मक संदर्भ - कोई पर्यावरणीय मान समायोजित नहीं किया जाता।",
+        "env_ev_disclaimer": "पर्यावरणीय प्रेक्षण और क्लोरोफिल-a वर्णनात्मक पर्यावरणीय संकेतक हैं और यह मछली की उपस्थिति, बहुतायत या पकड़ की सीधे भविष्यवाणी नहीं करते।",
+        "env_ev_unknown_source": "एक अभिलेखित न किया गया स्रोत",
+        "env_ev_unknown_time": "एक अभिलेखित न किया गया समय",
         "clarify": "कृपया स्पष्ट करें: {q}",
         "understanding_failed": "ORCA अनुरोध को विश्वसनीय रूप से नहीं समझ सका। कृपया स्थान और अपनी जानकारी की आवश्यकता के साथ दोबारा लिखें।",
     },
@@ -217,6 +250,14 @@ _FRAGMENTS: dict[Language, dict[str, str]] = {
         "env_cmp_chl_unchanged": "ಕ್ಲೋರೊಫಿಲ್-a ORCA-ಗಣಿತ ಉಲ್ಲೇಖ {ref} mg/m3 ಗಿಂತ ಬಹುತೇಕ ಬದಲಾಗಿಲ್ಲ ({window}).",
         "env_cmp_unavailable": "{var} ಗಾಗಿ ತಾತ್ಕಾಲಿಕ ಹೋಲಿಕೆ ಮಾಡಲಾಗಲಿಲ್ಲ ({reason}).",
         "env_cmp_note": "ಉಲ್ಲೇಖವು ಇತ್ತೀಚಿನ ಹಿಂದಿನ ಅವಧಿಯ ORCA-ಗಣಿತ ಮೌಲ್ಯ, ಹವಾಮಾನ ಸಾಮಾನ್ಯವಲ್ಲ; ಒಂದು ವ್ಯತ್ಯಾಸ ಪ್ರವೃತ್ತಿಯಲ್ಲ.",
+        "env_ev_status": "ಪರಿಸರ ದತ್ತಾಂಶದ ಪುನರುತ್ಪಾದನೀಯತೆ {status}.",
+        "env_ev_var": "{var}: ಮೂಲ {src}, ವೀಕ್ಷಣೆ ಸಮಯ {when}, ಮಾನ್ಯತೆ {validity}.",
+        "env_ev_var_missing": "{var}: ಪ್ರಸ್ತುತ ವೀಕ್ಷಣೆ ಲಭ್ಯವಿಲ್ಲ.",
+        "env_ev_reference_note": "ಐತಿಹಾಸಿಕ / ಉಲ್ಲೇಖ ವೀಕ್ಷಣೆಗಳನ್ನು ಪ್ರಸ್ತುತ ವೀಕ್ಷಣೆಗಳಿಂದ ಪ್ರತ್ಯೇಕವಾಗಿ ಪಟ್ಟಿ ಮಾಡಲಾಗಿದೆ ಮತ್ತು ಅವುಗಳನ್ನು ಪ್ರಸ್ತುತ ಮಾಪನಗಳೆಂದು ಪರಿಗಣಿಸಲಾಗಿಲ್ಲ.",
+        "env_ev_coastal": "ಪ್ರಶ್ನಿತ ಬಿಂದು ಕರಾವಳಿಯ ಸಮೀಪದಲ್ಲಿದೆ; ಇಲ್ಲಿ ಉಪಗ್ರಹ ಸಾಗರ-ಬಣ್ಣ ವಾಚನಗಳು ಕಡಿಮೆ ವಿಶ್ವಾಸಾರ್ಹವಾಗಿರಬಹುದು. ಕೇವಲ ವಿವರಣಾತ್ಮಕ ಸಂದರ್ಭ - ಯಾವುದೇ ಪರಿಸರ ಮೌಲ್ಯವನ್ನು ಸರಿಹೊಂದಿಸಲಾಗಿಲ್ಲ.",
+        "env_ev_disclaimer": "ಪರಿಸರ ವೀಕ್ಷಣೆಗಳು ಮತ್ತು ಕ್ಲೋರೊಫಿಲ್-a ವಿವರಣಾತ್ಮಕ ಪರಿಸರ ಸೂಚಕಗಳು ಮತ್ತು ಅವು ಮೀನಿನ ಇರುವಿಕೆ, ಸಮೃದ್ಧಿ ಅಥವಾ ಹಿಡಿತವನ್ನು ನೇರವಾಗಿ ಊಹಿಸುವುದಿಲ್ಲ.",
+        "env_ev_unknown_source": "ದಾಖಲಾಗದ ಮೂಲ",
+        "env_ev_unknown_time": "ದಾಖಲಾಗದ ಸಮಯ",
         "clarify": "ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟಪಡಿಸಿ: {q}",
         "understanding_failed": "ORCA ವಿನಂತಿಯನ್ನು ವಿಶ್ವಾಸಾರ್ಹವಾಗಿ ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ಥಳ ಮತ್ತು ನಿಮಗೆ ಬೇಕಾದ ಮಾಹಿತಿಯೊಂದಿಗೆ ಮತ್ತೆ ಬರೆಯಿರಿ.",
     },
@@ -254,3 +295,7 @@ def productivity_label(language: Language, level: ProductivityPotential) -> str:
 
 def comparison_direction_label(language: Language, direction: ComparisonDirection) -> str:
     return _CMP_DIRECTION_LABEL[_lang(language)][direction]
+
+
+def evidence_status_label(language: Language, status: str) -> str:
+    return _EVIDENCE_STATUS_LABEL[_lang(language)].get(status, status)

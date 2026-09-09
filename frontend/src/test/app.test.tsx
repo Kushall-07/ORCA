@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import {
   makeComparisonResponse,
   makeEnvironmentalResponse,
+  makeEvidenceResponse,
   makeNoRouteResponse,
   makeNoSafeResponse,
   makeResponse,
@@ -441,5 +442,84 @@ describe("ORCA workspace", () => {
     expect(text).toContain("27.9 °C");
     expect(text).toMatch(/\+1\.2 °C/);
     expect(text).toMatch(/\+64%/);
+  });
+
+  // ---- Phase 9 Step 5: environmental evidence / reproducibility --------
+  it("renders the Evidence & reproducibility section with status, sources and disclaimer", async () => {
+    postQuery.mockResolvedValue(makeEvidenceResponse());
+    render(<App />);
+    await sendQuery("how reproducible is the chlorophyll data near Mangalore");
+    expect(await screen.findByText("Evidence & reproducibility")).toBeInTheDocument();
+    const panel = screen
+      .getByText("Evidence & reproducibility")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    expect(text).toContain("ADEQUATE");
+    expect(text).toContain("open-meteo-marine");
+    expect(text).toContain("noaacwNPPVIIRSchlaDaily");
+    expect(text).toContain("2026-09-07T06:00:00+00:00"); // observation timestamp
+    expect(text).toContain(
+      "do not directly predict fish presence, abundance, or catch",
+    );
+    // categorical status, never a numeric quality score
+    expect(text).not.toMatch(/quality score/i);
+  });
+
+  it("evidence section never implies a fishing outcome", async () => {
+    postQuery.mockResolvedValue(makeEvidenceResponse());
+    render(<App />);
+    await sendQuery("environmental evidence near Mangalore");
+    const panel = (
+      await screen.findByText("Evidence & reproducibility")
+    ).closest(".panel") as HTMLElement;
+    const text = (panel.textContent ?? "").toLowerCase();
+    for (const bad of [
+      "more fish", "fewer fish", "good fishing", "better fishing",
+      "favourable fishing", "favorable fishing", "productive fishing",
+      "higher catch", "expected catch", "guaranteed catch", "yield",
+      "trend", "arrow",
+    ]) {
+      expect(text).not.toContain(bad);
+    }
+  });
+
+  it("exposes a Copy-as-JSON reproducibility bundle button", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    postQuery.mockResolvedValue(makeEvidenceResponse());
+    render(<App />);
+    await sendQuery("reproducibility of the chlorophyll data near Mangalore");
+    await screen.findByText("Evidence & reproducibility");
+    await userEvent.click(screen.getByText("Reproducibility bundle"));
+    await userEvent.click(screen.getByRole("button", { name: /copy as json/i }));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copied = JSON.parse(writeText.mock.calls[0][0]);
+    expect(copied.status).toBe("adequate");
+    expect(copied.items).toHaveLength(2);
+  });
+
+  it("hides the Evidence section when evidence is null", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no evidence
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(
+      screen.queryByText("Evidence & reproducibility"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("evidence keeps source names and numbers across a language switch", async () => {
+    postQuery.mockResolvedValue(makeEvidenceResponse());
+    render(<App />);
+    await sendQuery("reproducibility of the chlorophyll data near Mangalore");
+    await screen.findByText("Evidence & reproducibility");
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[1], "hi");
+    const panel = screen
+      .getByText("साक्ष्य और पुनरुत्पादकता")
+      .closest(".panel") as HTMLElement;
+    const text = panel.textContent ?? "";
+    expect(text).toContain("open-meteo-marine"); // source names not translated
+    expect(text).toContain("noaacwNPPVIIRSchlaDaily");
   });
 });

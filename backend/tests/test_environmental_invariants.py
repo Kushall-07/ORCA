@@ -579,3 +579,174 @@ def test_comparison_modules_have_no_llm_import() -> None:
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     ).stdout.strip()
     assert out.startswith("CLEAN"), out
+
+
+# ==========================================================================
+# Phase 9 Step 5 - the Environmental Evidence Engine + environmental_evidence node
+# ==========================================================================
+EVIDENCE_Q = "how reproducible is the chlorophyll and sea surface temperature data near Mangalore"
+
+
+def _ev_pipeline(**kw):
+    kw.setdefault("weather", FakeWeatherAgent())
+    kw.setdefault("ocean", _ocean_with_sst(29.1))
+    kw.setdefault("environment", FakeEnvironmentalAgent(1.8))
+    return make_pipeline(**kw)
+
+
+async def test_safety_chain_byte_identical_with_evidence_enabled_disabled_failing() -> None:
+    """The strongest Step 5 requirement: enabling / disabling / failing the
+    environmental evidence engine must produce byte-identical risk / safety /
+    decision / route output."""
+
+    class BoomEvidence:
+        version = "environmental-evidence-0.1.0"
+
+        def assess(self, _inputs):
+            raise RuntimeError("evidence engine exploded")
+
+    runs = {
+        "off": _ev_pipeline(evidence_engine=None),
+        "on": _ev_pipeline(),
+        "raises": _ev_pipeline(evidence_engine=BoomEvidence()),
+    }
+    results = {n: await p.run(message=FISHING_Q, session_id=f"s5-{n}", now=NOW)
+               for n, p in runs.items()}
+    baseline = _safety_chain_snapshot(results["off"])
+    for n, r in results.items():
+        assert _safety_chain_snapshot(r) == baseline, f"safety chain moved for {n}"
+
+
+async def test_evidence_present_for_environmental_query_and_absent_otherwise() -> None:
+    # environmental query -> evidence present
+    r_env = await _ev_pipeline().run(message=ENV_Q, session_id="s5-env", now=NOW)
+    assert r_env.environmental is not None
+    assert r_env.environmental.evidence is not None
+    assert "environmental_evidence" in r_env.agent_trace
+
+    # plain fishing query with no usable env data -> no environmental block at all
+    r_fish = await make_pipeline(weather=FakeWeatherAgent(), ocean=FakeOceanAgent()).run(
+        message=FISHING_Q, session_id="s5-fish", now=NOW
+    )
+    assert r_fish.environmental is None
+    assert "environmental_evidence:skip" in r_fish.agent_trace
+
+
+async def test_evidence_engine_failure_is_nonblocking() -> None:
+    class BoomEvidence:
+        version = "x"
+
+        def assess(self, _inputs):
+            raise RuntimeError("boom")
+
+    r = await _ev_pipeline(evidence_engine=BoomEvidence()).run(
+        message=ENV_Q, session_id="s5-boom", now=NOW
+    )
+    assert r.status == "OK"
+    assert r.decision is not None
+    # environmental block still there (productivity), just no evidence sub-block
+    assert r.environmental is not None
+    assert r.environmental.evidence is None
+
+
+async def test_evidence_never_mutates_suitability_risk_decision_route() -> None:
+    without = await _ev_pipeline(evidence_engine=None).run(
+        message=FISHING_Q, session_id="s5-mut-off", now=NOW
+    )
+    with_ev = await _ev_pipeline().run(
+        message=FISHING_Q, session_id="s5-mut-on", now=NOW
+    )
+    assert (with_ev.suitability and (with_ev.suitability.level, with_ev.suitability.score)) == \
+           (without.suitability and (without.suitability.level, without.suitability.score))
+    assert _decision_snapshot(with_ev) == _decision_snapshot(without)
+
+
+def test_risk_engine_input_has_no_evidence_fields() -> None:
+    fields = set(RiskEngineInput.model_fields)
+    for bad in ("reproducibility", "reproducibility_status", "optical_water_hint",
+                "evidence_status", "environmental_evidence", "evidence_bundle"):
+        assert bad not in fields
+
+
+async def test_evidence_provenance_traces_to_root_and_is_the_right_kind() -> None:
+    r = await _ev_pipeline().run(message=ENV_Q, session_id="s5-prov", now=NOW)
+    nodes = r.provenance.get("nodes", [])
+    ev_nodes = [n for n in nodes if n.get("kind") == "environmental_evidence"]
+    assert ev_nodes, "no environmental_evidence provenance node"
+    assert any(n["id"] == "assessment:environment_evidence" for n in nodes)
+    assert any(n["id"] == "agent:environment_evidence" for n in nodes)
+
+    root = r.provenance.get("root_id", "query")
+    incoming: dict[str, list[str]] = {}
+    for e in r.provenance.get("edges", []):
+        incoming.setdefault(e["dst"], []).append(e["src"])
+
+    def traces(nid: str) -> bool:
+        seen, stack = set(), [nid]
+        while stack:
+            cur = stack.pop()
+            if cur == root:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(incoming.get(cur, []))
+        return False
+
+    for n in nodes:
+        assert traces(n["id"]), f"provenance node {n['id']} is orphaned"
+
+
+async def test_evidence_numbers_in_answer_are_grounded() -> None:
+    r = await _ev_pipeline().run(message=ENV_Q, session_id="s5-ground", now=NOW)
+    assert r.environmental.evidence is not None
+    assert r.grounded is True
+
+
+async def test_historical_reference_stays_distinct_from_current_in_evidence() -> None:
+    r = await _cmp_pipeline(
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1)
+    ).run(message=CMP_Q, session_id="s5-hist", now=NOW)
+    ev = r.environmental.evidence
+    assert ev is not None
+    kinds = {(it.variable, it.observation_kind) for it in ev.items}
+    assert any(k[1] == "current" for k in kinds)
+    assert any(k[1] == "historical_reference" for k in kinds)
+    # historical observations are NOT in resp.evidence (the Marine Data Fabric)
+    for e in r.evidence:
+        assert "history" not in (e.source or "").lower()
+
+
+async def test_evidence_answer_makes_no_biological_or_fishing_claim() -> None:
+    r = await _ev_pipeline().run(message=EVIDENCE_Q, session_id="s5-nobio", now=NOW)
+    low = r.answer.lower()
+    for bad in ("more fish", "fewer fish", "good fishing", "better fishing",
+                "favourable fishing", "favorable fishing", "productive fishing",
+                "higher catch", "expected catch", "guaranteed catch", "yield",
+                "chlorophyll proves", "sst proves"):
+        assert bad not in low
+
+
+def test_no_additional_http_calls_added_by_step5() -> None:
+    """The evidence node performs NO network I/O. evidence.py must not import an
+    HTTP client and the node must not touch any *_agent that fetches."""
+    import ast
+    import pathlib
+
+    ev = pathlib.Path(__file__).resolve().parents[1] / "app" / "environmental" / "evidence.py"
+    tree = ast.parse(ev.read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name.split(".")[0] for a in node.names)
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    for banned in ("httpx", "requests", "aiohttp", "urllib3"):
+        assert banned not in imported, f"evidence.py imports {banned}"
+    # the node's source must not await any fetch/query
+    nodes_src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "orchestration" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    node_body = nodes_src.split("async def environmental_evidence_node", 1)[1].split("async def ", 1)[0]
+    assert "fetch(" not in node_body and ".query(" not in node_body
+    assert "fetch_reference" not in node_body

@@ -16,6 +16,11 @@ from app.environmental.engine import (
     EnvironmentalProductivityEngine,
     load_environmental_config,
 )
+from app.environmental.evidence import (
+    EnvironmentalEvidenceEngine,
+    EvidenceConfig,
+    load_evidence_config,
+)
 
 __all__ = [
     "EnvironmentalProductivityEngine",
@@ -24,4 +29,7 @@ __all__ = [
     "EnvironmentalComparisonEngine",
     "ComparisonConfig",
     "load_comparison_config",
+    "EnvironmentalEvidenceEngine",
+    "EvidenceConfig",
+    "load_evidence_config",
 ]

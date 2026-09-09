@@ -190,6 +190,18 @@ The `SourceStatus` on every `FabricRecord` / agent result carries `tier`,
     `direction` ∈ higher / lower / unchanged / unknown — a sign classification
     of one difference, **not** a trend. See
     [`phase9-step4-temporal-comparative-intelligence.md`](phase9-step4-temporal-comparative-intelligence.md).
+- **Step 5 evidence assessment (deterministic, NO new source, ZERO extra HTTP
+  calls):** the Environmental Evidence Engine (`app/environmental/evidence.py`,
+  bands in `app/environmental/evidence_config.yaml`) re-serialises + categorises
+  metadata that already exists — source, dataset id, observation timestamp,
+  validity, tier, pixel distance — into a per-observation reproducibility record
+  and a categorical overall status (`adequate | limited | insufficient |
+  unavailable`, never a numeric score). An optional `optical_water_hint` derived
+  from the existing GIS coastline-distance / depth is a coarse descriptive string
+  only — **not** a Case-1/Case-2 classification and it never corrects a value.
+  Surfaced in the additive `QueryResponse.environmental.evidence` block; never
+  feeds Risk / Safety / Decision / Routing. See
+  [`phase9-step5-environmental-evidence.md`](phase9-step5-environmental-evidence.md).
 
 ---
 

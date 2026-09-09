@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
+    EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
 )
 from app.models.provenance import ProvenanceGraph
@@ -69,6 +70,7 @@ def _engine_values(
     route: RouteResult | None,
     environmental: EnvironmentalProductivityResult | None,
     comparison: EnvironmentalComparisonResult | None,
+    environmental_evidence: EnvironmentalEvidenceResult | None,
     extra: tuple[float, ...],
 ) -> list[float]:
     values: list[float] = list(extra)
@@ -93,6 +95,14 @@ def _engine_values(
                 if n is not None:
                     values += [n, round(n, 1), round(n, 2), round(n), abs(n),
                                round(abs(n), 1), round(abs(n), 2)]
+    if environmental_evidence is not None:
+        # Step 5 explanation text uses categorical words only; these numbers are
+        # added purely as defence-in-depth in case a value / pixel distance is
+        # ever echoed. They are all copies of already-grounded observations.
+        for it in environmental_evidence.items:
+            for n in (it.value, it.spatial_distance_km, it.latitude, it.longitude):
+                if n is not None:
+                    values += [n, round(n, 1), round(n, 2), round(n)]
     if risk is not None:
         values += [risk.overall_score, round(risk.overall_score)]
         for f in risk.factors:
@@ -122,11 +132,12 @@ def ground_text(
     route: RouteResult | None = None,
     environmental: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
+    environmental_evidence: EnvironmentalEvidenceResult | None = None,
     extra_allowed: tuple[float, ...] = (),
 ) -> GroundingReport:
     engine = _engine_values(
         provenance, decision, risk, suitability, route, environmental, comparison,
-        extra_allowed,
+        environmental_evidence, extra_allowed,
     )
     claims: list[GroundingClaim] = []
     unsupported: list[str] = []

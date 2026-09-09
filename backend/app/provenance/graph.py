@@ -10,6 +10,7 @@ from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
     EnvironmentalComparisonResult,
+    EnvironmentalEvidenceResult,
     EnvironmentalProductivityResult,
 )
 from app.models.fabric import MarineDataFabric
@@ -50,6 +51,7 @@ def build_provenance(
     route: RouteResult | None = None,
     productivity: EnvironmentalProductivityResult | None = None,
     comparison: EnvironmentalComparisonResult | None = None,
+    evidence: EnvironmentalEvidenceResult | None = None,
 ) -> ProvenanceGraph:
     nodes: list[ProvNode] = []
     edges: list[ProvEdge] = []
@@ -342,6 +344,81 @@ def build_provenance(
                 ),
                 *dict.fromkeys(cmp_parents),
             )
+
+    # ---- environmental evidence / reproducibility (Phase 9 Step 5; never feeds safety) ----
+    if evidence is not None and evidence.items:
+        ev_agent = add(
+            ProvNode(
+                id="agent:environment_evidence", kind=_AGENT_RESULT,
+                label="environmental evidence assessment (ORCA-derived, reproducibility)",
+                value=evidence.status,
+                source="orca-environmental-evidence-engine",
+            ),
+            parent_for_data,
+        )
+
+        def _ev_parent(var: str) -> str:
+            for cand in (f"comparison:{var}", "productivity"):
+                if any(n.id == cand for n in nodes):
+                    return cand
+            if var in arb_ids:
+                return arb_ids[var]
+            ids = obs_ids.get(var)
+            if ids:
+                return ids[-1]
+            return ev_agent
+
+        item_ids: list[str] = []
+        for it in evidence.items:
+            iid = f"evidence_item:{it.variable}:{it.observation_kind}"
+            idetail = {
+                "variable": it.variable,
+                "observation_kind": it.observation_kind,
+                "reproducibility_status": it.reproducibility_status,
+                "validity": it.validity or "",
+                "age": it.age,
+                "evidence_tier": it.evidence_tier or "",
+                "source_status": it.source_status,
+                "source": it.source or "",
+                "dataset": it.dataset or "",
+                "observation_time": it.observation_time or "",
+            }
+            if it.spatial_distance_km is not None:
+                idetail["spatial_distance_km"] = f"{it.spatial_distance_km}"
+            item_ids.append(
+                add(
+                    ProvNode(
+                        id=iid, kind=ProvNodeKind.ENVIRONMENTAL_EVIDENCE,
+                        label=f"{it.variable} ({it.observation_kind}) evidence record",
+                        value=it.value if it.value is not None else it.reproducibility_status,
+                        unit=it.unit or None,
+                        source=it.source,
+                        validity=it.validity,
+                        detail=idetail,
+                    ),
+                    _ev_parent(it.variable) if it.observation_kind == "current" else ev_agent,
+                )
+            )
+
+        adetail = {
+            "status": evidence.status,
+            "engine_version": evidence.engine_version,
+            "disclaimer": evidence.disclaimer,
+        }
+        if evidence.summary:
+            adetail["summary"] = evidence.summary
+        if evidence.optical_water_hint:
+            adetail["optical_water_hint"] = evidence.optical_water_hint
+        add(
+            ProvNode(
+                id="assessment:environment_evidence",
+                kind=ProvNodeKind.ENVIRONMENTAL_EVIDENCE,
+                label="environmental evidence / reproducibility assessment (ORCA-derived)",
+                value=evidence.status,
+                detail=adetail,
+            ),
+            ev_agent, *dict.fromkeys(item_ids),
+        )
 
     # ---- risk ----
     risk_id = None

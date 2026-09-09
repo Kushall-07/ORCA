@@ -179,6 +179,45 @@ class EnvironmentalComparisonInfo(BaseModel):
     engine_version: str = ""
 
 
+class EnvironmentalEvidenceItemInfo(BaseModel):
+    """Phase 9 Step 5: one environmental observation described for
+    reproducibility. Every field is copied from an observation ORCA already
+    holds - nothing is invented."""
+
+    variable: str
+    value: float | None = None
+    unit: str = ""
+    source: str | None = None
+    dataset: str | None = None
+    observation_time: str | None = None
+    query_time: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    spatial_distance_km: float | None = None
+    validity: str | None = None
+    age: str = "unavailable"                # fresh | stale | outside_window | unavailable
+    evidence_tier: str | None = None
+    source_status: str = "unavailable"      # valid | stale | invalid | missing | conflicted
+    observation_kind: str = "current"       # current | historical_reference
+    reproducibility_status: str = "unavailable"  # adequate | limited | insufficient | unavailable
+    limitations: list[str] = Field(default_factory=list)
+
+
+class EnvironmentalEvidenceInfo(BaseModel):
+    """Phase 9 Step 5: deterministic environmental evidence / reproducibility
+    assessment. Purely informational - it NEVER affects risk, safety, decision,
+    route or fishing suitability, and never predicts fish presence, abundance or
+    catch. The overall ``status`` is a categorical descriptor, not a score."""
+
+    status: str = "unavailable"             # adequate | limited | insufficient | unavailable
+    items: list[EnvironmentalEvidenceItemInfo] = Field(default_factory=list)
+    summary: str = ""
+    optical_water_hint: str | None = None   # coarse descriptive context only
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
 class EnvironmentalInfo(BaseModel):
     """Phase 9 Step 3: deterministic researcher-facing environmental context.
 
@@ -200,6 +239,9 @@ class EnvironmentalInfo(BaseModel):
     # Phase 9 Step 4: optional researcher temporal comparison. Null unless the
     # query was comparative and a reference could be computed.
     comparison: EnvironmentalComparisonInfo | None = None
+    # Phase 9 Step 5: optional deterministic evidence / reproducibility
+    # assessment. Null unless environmental intelligence exists for this query.
+    evidence: EnvironmentalEvidenceInfo | None = None
 
 
 class DataQualityInfo(BaseModel):

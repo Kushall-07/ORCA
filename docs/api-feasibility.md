@@ -93,6 +93,21 @@ to: no "rising/declining trend", "trending up/down", "bloom", "better/worse
 fishing", "higher/lower catch", "yield". **A chlorophyll-a change is never
 interpreted as a fish / catch / productivity change.**
 
+Phase 9 **Step 5** adds a deterministic **Environmental Evidence Engine**
+(`app/environmental/evidence.py`) that re-serialises + categorises metadata ORCA
+already holds — source, dataset, timestamp, validity, tier, pixel distance —
+into a per-observation reproducibility record and a **categorical** overall
+status (`adequate | limited | insufficient | unavailable` — never a numeric
+score). It fetches **nothing** (0 extra HTTP calls), runs **no LLM**, and never
+feeds risk / safety / decision / route. An optional `optical_water_hint` from the
+existing GIS coastline/depth context is a coarse descriptive string only — not a
+Case-1/Case-2 classification, never a measurement correction. Surfaced only in
+the additive `QueryResponse.environmental.evidence` block (see
+`phase9-step5-environmental-evidence.md`). Forbidden wording extends to:
+no "good/favourable/productive fishing", "chlorophyll proves", "SST proves",
+"guarantees catch/fish". **Reproducibility metadata is never a biological or
+fishing claim.**
+
 ---
 
 ## 4. Authoritative vs illustrative data

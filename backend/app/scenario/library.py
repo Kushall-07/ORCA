@@ -433,6 +433,67 @@ SCENARIOS: tuple[Scenario, ...] = (
               "insufficient_history with no fabricated baseline and the main "
               "query still completes.",
     ),
+    # ---- Phase 9 Step 5: environmental evidence / reproducibility ----------
+    # Additive. Scenarios 01-20 above are unchanged. These two exercise the
+    # environmental_evidence node, which fetches nothing and never touches the
+    # safety chain.
+    Scenario(
+        scenario_id="21_researcher_environmental_evidence",
+        title="Researcher: environmental evidence / reproducibility bundle",
+        stakeholder="researcher",
+        fixture="researcher_env_evidence",
+        turns=("How reproducible and auditable are the chlorophyll-a and "
+               "sea-surface temperature observations for Mangalore right now?",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                require_evidence_vars=("sea_surface_temperature", "chlorophyll_a"),
+                provenance_has_kinds=("environmental_evidence",),
+                provenance_complete=True,
+                grounded=True,
+                answer_contains_any=("reproducibility",),
+                answer_excludes_all=(
+                    "more fish", "fewer fish", "good fishing", "better fishing",
+                    "favourable fishing", "favorable fishing", "productive fishing",
+                    "higher catch", "expected catch", "guaranteed catch", "yield",
+                    "chlorophyll proves", "sst proves",
+                ),
+                node_trace_present=True,
+                request_id_present=True,
+            ),
+        ),
+        tags=("phase9", "researcher", "evidence"),
+        notes="The evidence node re-serialises + categorises metadata that "
+              "already exists (source, timestamp, validity, tier). Zero extra "
+              "HTTP calls, no LLM computation of quality, and it never affects "
+              "risk / safety / decision / route.",
+    ),
+    Scenario(
+        scenario_id="22_researcher_environmental_evidence_partial",
+        title="Researcher: environmental evidence with incomplete / stale metadata",
+        stakeholder="researcher",
+        fixture="researcher_env_evidence_partial",
+        turns=("Give me the reproducibility of the chlorophyll-a and sea-surface "
+               "temperature data near Mangalore, including any data-quality caveats.",),
+        expects=(
+            ExpectedBehavior(
+                status_in=("OK",),
+                intent="environmental_conditions",
+                provenance_has_kinds=("environmental_evidence",),
+                provenance_complete=True,
+                grounded=True,
+                answer_excludes_all=(
+                    "more fish", "good fishing", "better fishing", "expected catch",
+                    "productive fishing", "yield",
+                ),
+            ),
+        ),
+        tags=("phase9", "researcher", "evidence", "limitation"),
+        notes="The chlorophyll-a composite is stale; the evidence engine reports "
+              "it honestly as 'limited' with an age limitation and fabricates "
+              "nothing. The main query still completes.",
+    ),
 )
 
 

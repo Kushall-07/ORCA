@@ -497,6 +497,11 @@ def _env_observation(state: OrcaGraphState, fabric, variable: str, *, role: str 
         primary = next((r for r in records if r.is_usable), None) or records[0]
 
     o = primary.observation
+    # ``observed_at`` for a discrete satellite composite; for an Open-Meteo model
+    # field (SST) that has no discrete observation time, fall back to
+    # ``valid_from`` (the real time the model value applies to) - never a
+    # fabricated timestamp.
+    ts = o.observed_at or o.valid_from
     return EnvironmentalObservation(
         variable=variable,
         value=primary.value,
@@ -505,7 +510,7 @@ def _env_observation(state: OrcaGraphState, fabric, variable: str, *, role: str 
         data_tier=primary.source_status.tier.value,
         source=primary.source,
         source_tier=int(o.source_tier),
-        observed_at=o.observed_at.isoformat() if o.observed_at is not None else None,
+        observed_at=ts.isoformat() if ts is not None else None,
         conflicted=conflicted,
         role=role,
     )
@@ -622,6 +627,60 @@ async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  #
     }
 
 
+async def environmental_evidence_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 5: deterministic environmental evidence / reproducibility
+    assessment.
+
+    Runs strictly downstream of decision / alerts / productivity / comparison.
+    It fetches NOTHING (zero HTTP calls), rebuilds NOTHING, invokes no LLM, and
+    NEVER feeds risk, safety, decision, route, suitability or alerts. It only
+    re-serialises and categorises metadata that already exists in state. Skips
+    (result ``None``) when there is no environmental intelligence to describe or
+    the engine is unavailable; any failure is non-blocking.
+    """
+    from app.models.environmental import EnvironmentalEvidenceInputs
+
+    engine = getattr(deps, "evidence_engine", None)
+    productivity = state.get("productivity_result")
+    comparison = state.get("environmental_comparison")
+    fabric = state.get("fabric")
+
+    # Only describe evidence when environmental intelligence exists for this query.
+    if engine is None or (productivity is None and comparison is None):
+        return {
+            "environmental_evidence": None,
+            "agent_trace": ["environmental_evidence:skip"],
+        }
+
+    coord = state.get("resolved_origin")
+    gis = state.get("gis_result")
+    dt = state.get("decision_time")
+    try:
+        result = engine.assess(
+            EnvironmentalEvidenceInputs(
+                sst_current=_env_observation(state, fabric, "sea_surface_temperature", role="current"),
+                chl_current=_env_observation(state, fabric, "chlorophyll_a", role="current"),
+                comparison=comparison,
+                coastline_distance_m=(gis.coastline_distance_m if gis is not None else None),
+                depth_m=(gis.depth_m if gis is not None else None),
+                query_time=(dt.isoformat() if dt is not None else None),
+                latitude=(coord.latitude if coord is not None else None),
+                longitude=(coord.longitude if coord is not None else None),
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise; be defensive
+        logger.warning("environmental evidence engine error: %s", type(exc).__name__)
+        return {
+            "environmental_evidence": None,
+            "agent_trace": ["environmental_evidence:skip"],
+        }
+
+    return {
+        "environmental_evidence": result,
+        "agent_trace": ["environmental_evidence"],
+    }
+
+
 async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     prov = build_provenance(
         message=state["message"],
@@ -640,6 +699,7 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         route=state.get("route_result"),
         productivity=state.get("productivity_result"),
         comparison=state.get("environmental_comparison"),
+        evidence=state.get("environmental_evidence"),
         environment_tier=_tier(state.get("environment_result")),
     )
     return {"provenance": prov, "agent_trace": ["provenance"]}
@@ -661,6 +721,7 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         provenance=state.get("provenance"),
         productivity=state.get("productivity_result"),
         comparison=state.get("environmental_comparison"),
+        environmental_evidence=state.get("environmental_evidence"),
     )
     return {"explanation": expl, "agent_trace": ["explain"]}
 

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type {
   EnvironmentalComparisonInfo,
   EnvironmentalComparisonVariableInfo,
+  EnvironmentalEvidenceInfo,
   EnvironmentalObservationInfo,
   QueryResponse,
 } from "../../types/api";
@@ -116,6 +118,115 @@ function ComparisonBlock({
   );
 }
 
+const _EV_STATUS_KEY: Record<string, StringKey> = {
+  adequate: "env.ev.status.adequate",
+  limited: "env.ev.status.limited",
+  insufficient: "env.ev.status.insufficient",
+  unavailable: "env.ev.status.unavailable",
+};
+
+/**
+ * Phase 9 Step 5 - "Evidence & Reproducibility". Purely a re-serialisation and
+ * categorisation of metadata ORCA already holds. NEVER affects risk / safety /
+ * decision / route / suitability, and never predicts fish presence, abundance
+ * or catch. Neutral only: a categorical status word (no numeric score, no
+ * colour-coded good/bad, no arrows, no trend chart).
+ */
+function EvidenceBlock({
+  evidence,
+  t,
+}: {
+  evidence: EnvironmentalEvidenceInfo;
+  t: (k: StringKey) => string;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (!evidence.items || evidence.items.length === 0) return null;
+
+  const statusKey = _EV_STATUS_KEY[String(evidence.status)] ?? "env.ev.status.unavailable";
+
+  const copy = () => {
+    // Copies ONLY data already present in the response - no new fetch, no
+    // server call, no persistence.
+    void navigator.clipboard
+      ?.writeText(JSON.stringify(evidence, null, 2))
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => undefined);
+  };
+
+  return (
+    <div className="env-ev">
+      <p className="env__section-label">{t("env.ev.title")}</p>
+      <div className="env-ev__status">
+        <span className="env-ev__badge" data-neutral="true">
+          {t(statusKey)}
+        </span>
+        <span className="env-ev__caption">{t("env.ev.status")}</span>
+      </div>
+      {evidence.summary && <p className="env-ev__summary">{evidence.summary}</p>}
+
+      <ul className="env-ev__list">
+        {evidence.items.map((it, i) => (
+          <li key={`${it.variable}-${it.observation_kind}-${i}`} className="env-ev__row">
+            <span className="env-ev__var">
+              {it.variable === "sea_surface_temperature"
+                ? t("env.sst")
+                : t("env.chlorophyll")}{" "}
+              <span className="env-ev__kind">
+                (
+                {it.observation_kind === "historical_reference"
+                  ? t("env.ev.historical")
+                  : t("env.ev.current")}
+                )
+              </span>
+            </span>
+            <span className="env-ev__meta">
+              {t("env.ev.source")}: {it.source ?? "—"}
+              {it.dataset ? ` · ${t("env.ev.dataset")}: ${it.dataset}` : ""}
+              {" · "}
+              {t("env.ev.observed")}: {it.observation_time ?? "—"}
+              {" · "}
+              {t("env.ev.validity")}: {String(it.validity ?? "—")}
+              {it.spatial_distance_km != null
+                ? ` · ${t("env.ev.distance")}: ${it.spatial_distance_km} km`
+                : ""}
+              {it.evidence_tier ? ` · ${t("env.ev.tier")}: ${it.evidence_tier}` : ""}
+              {" · "}
+              {t("env.ev.reproducibility")}: {String(it.reproducibility_status)}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {evidence.optical_water_hint && (
+        <p className="env-ev__hint">
+          <strong>{t("env.ev.opticalHint")}:</strong> {evidence.optical_water_hint}
+        </p>
+      )}
+
+      {evidence.limitations.length > 0 && (
+        <ul className="env__limitations">
+          {evidence.limitations.map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      )}
+
+      <details className="env-ev__bundle">
+        <summary>{t("env.ev.bundle")}</summary>
+        <pre className="env-ev__json">{JSON.stringify(evidence, null, 2)}</pre>
+        <button type="button" className="env-ev__copy" onClick={copy}>
+          {copied ? t("env.ev.copied") : t("env.ev.copyJson")}
+        </button>
+      </details>
+
+      <Disclaimer>{evidence.disclaimer}</Disclaimer>
+    </div>
+  );
+}
+
 /**
  * Phase 9 Step 3 - the smallest possible researcher-facing environmental
  * summary. It is purely informational: environmental productivity potential
@@ -173,6 +284,8 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
         )}
 
         {env.comparison && <ComparisonBlock comparison={env.comparison} t={t} />}
+
+        {env.evidence && <EvidenceBlock evidence={env.evidence} t={t} />}
 
         <p className="env__section-label">{t("env.suggestions")}</p>
         <Chips

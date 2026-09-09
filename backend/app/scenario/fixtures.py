@@ -18,6 +18,7 @@ from app.agents.route import RouteAgent
 from app.core.config import get_settings
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
+from app.environmental.evidence import EnvironmentalEvidenceEngine
 from app.agents.historical_environment import HistoricalReference
 from app.models.common import Coordinate, SignalKind, SourceTier
 from app.models.environmental import EnvironmentalObservation
@@ -366,6 +367,25 @@ _FIXTURES = {
         environment=ScenarioEnvironmentalAgent(1.8),
         historical_environment_agent=ScenarioHistoricalEnvironmentalAgent(sst=None, chl=None),
     ),
+    # Phase 9 Step 5 - environmental evidence / reproducibility fixtures. The
+    # evidence node fetches NOTHING; it re-serialises + categorises metadata that
+    # already exists. It never feeds risk / safety / decision / route.
+    "researcher_env_evidence": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        environment=ScenarioEnvironmentalAgent(1.8),  # valid, sourced, timestamped
+    ),
+    "researcher_env_evidence_partial": lambda: dict(
+        ocean=ScenarioOceanAgent(observations=(
+            _obs("wave_height", 1.2, "m", "open-meteo-marine"),
+            _obs("sea_surface_temperature", 29.1, "°C", "open-meteo-marine"),
+        )),
+        # chlorophyll-a composite older than the fresh window -> STALE -> the
+        # evidence engine reports it honestly as 'limited' with an age limitation.
+        environment=ScenarioEnvironmentalAgent(1.8, days_old=6),
+    ),
 }
 
 
@@ -408,6 +428,7 @@ def make_scenario_pipeline(
         productivity_engine=EnvironmentalProductivityEngine(),
         comparison_engine=EnvironmentalComparisonEngine(),
         historical_environment_agent=historical_environment_agent,
+        evidence_engine=EnvironmentalEvidenceEngine(),
     )
     return OrcaPipeline(deps)
 

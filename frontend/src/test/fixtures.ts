@@ -343,6 +343,81 @@ export function makeComparisonResponse(
   });
 }
 
+// Phase 9 Step 5 - environmental evidence / reproducibility. Additive, neutral,
+// never affects the safety chain, never a fish / catch claim.
+export function makeEvidenceResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  const base = makeEnvironmentalResponse();
+  return makeResponse({
+    ...base,
+    answer:
+      base.answer +
+      " Environmental data reproducibility is adequate. sea-surface temperature: " +
+      "source open-meteo-marine, observed 2026-09-07T06:00:00+00:00, validity VALID. " +
+      "Environmental observations and chlorophyll-a are descriptive environmental " +
+      "indicators and do not directly predict fish presence, abundance, or catch.",
+    environmental: {
+      ...base.environmental!,
+      evidence: {
+        status: "adequate",
+        summary:
+          "Environmental evidence is adequate: current chlorophyll-a and " +
+          "sea-surface temperature observations are valid, sourced and timestamped.",
+        optical_water_hint:
+          "likely open-ocean water, away from the coastline. Descriptive context only.",
+        limitations: [],
+        disclaimer:
+          "Environmental observations and chlorophyll-a are descriptive " +
+          "environmental indicators and do not directly predict fish presence, " +
+          "abundance, or catch.",
+        engine_version: "environmental-evidence-0.1.0",
+        items: [
+          {
+            variable: "sea_surface_temperature",
+            value: 29.0,
+            unit: "°C",
+            source: "open-meteo-marine",
+            dataset: null,
+            observation_time: "2026-09-07T06:00:00+00:00",
+            query_time: "2026-09-09T06:00:00+00:00",
+            latitude: 12.87,
+            longitude: 74.84,
+            spatial_distance_km: null,
+            validity: "VALID",
+            age: "fresh",
+            evidence_tier: "LIVE",
+            source_status: "valid",
+            observation_kind: "current",
+            reproducibility_status: "adequate",
+            limitations: [],
+          },
+          {
+            variable: "chlorophyll_a",
+            value: 1.8,
+            unit: "mg m-3",
+            source: "noaa-coastwatch-erddap:noaacwNPPVIIRSchlaDaily",
+            dataset: "noaacwNPPVIIRSchlaDaily",
+            observation_time: "2026-09-06T00:00:00+00:00",
+            query_time: "2026-09-09T06:00:00+00:00",
+            latitude: 12.87,
+            longitude: 74.84,
+            spatial_distance_km: 4.2,
+            validity: "VALID",
+            age: "fresh",
+            evidence_tier: "LIVE",
+            source_status: "valid",
+            observation_kind: "current",
+            reproducibility_status: "adequate",
+            limitations: [],
+          },
+        ],
+      },
+    },
+    ...overrides,
+  });
+}
+
 export function makeNoRouteResponse(): QueryResponse {
   return makeResponse({
     intent: "ROUTE",

@@ -17,6 +17,7 @@ from app.models.observations import MarineObservation
 from app.models.environmental import EnvironmentalObservation
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
+from app.environmental.evidence import EnvironmentalEvidenceEngine
 from app.agents.historical_environment import HistoricalReference
 from app.orchestration.deps import OrcaDeps
 from app.orchestration.pipeline import OrcaPipeline
@@ -226,6 +227,7 @@ def make_pipeline(
     environment=None,
     productivity_engine=_UNSET,
     comparison_engine=_UNSET,
+    evidence_engine=_UNSET,
     historical_environment_agent=None,
     qu_llm=None,
     explain_llm=None,
@@ -257,6 +259,11 @@ def make_pipeline(
             EnvironmentalComparisonEngine()
             if comparison_engine is _UNSET
             else comparison_engine
+        ),
+        evidence_engine=(
+            EnvironmentalEvidenceEngine()
+            if evidence_engine is _UNSET
+            else evidence_engine
         ),
         historical_environment_agent=historical_environment_agent,
     )

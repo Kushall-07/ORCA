@@ -25,9 +25,18 @@ ENVIRONMENTAL_ENGINE_VERSION = "environmental-0.1.0"
 # Phase 9 Step 4: deterministic temporal / comparative engine.
 ENVIRONMENTAL_COMPARISON_ENGINE_VERSION = "environmental-comparison-0.1.0"
 
+# Phase 9 Step 5: deterministic evidence-assessment / reproducibility engine.
+ENVIRONMENTAL_EVIDENCE_ENGINE_VERSION = "environmental-evidence-0.1.0"
+
 PRODUCTIVITY_DISCLAIMER = (
     "Chlorophyll-a is an environmental productivity proxy and does not indicate "
     "fish presence, abundance, or catch."
+)
+
+# Phase 9 Step 5 - the mandatory disclaimer carried by every evidence assessment.
+ENVIRONMENTAL_EVIDENCE_DISCLAIMER = (
+    "Environmental observations and chlorophyll-a are descriptive environmental "
+    "indicators and do not directly predict fish presence, abundance, or catch."
 )
 
 
@@ -215,3 +224,94 @@ class EnvironmentalComparisonInputs(BaseModel):
     chl_current: EnvironmentalObservation | None = None
     chl_reference: EnvironmentalObservation | None = None
     reference_window: str = ""
+
+
+# ==========================================================================
+# Phase 9 Step 5: Environmental Evidence Assessment & Reproducibility Bundle
+# ==========================================================================
+# A deterministic, LLM-free, I/O-free engine that describes HOW REPRODUCIBLE AND
+# AUDITABLE the environmental observations ORCA already collected are. It never
+# fetches data, never rebuilds the fabric, never touches risk / safety / decision
+# / route / suitability, and never makes a biological or fishing claim. It only
+# re-serialises and categorises metadata that already exists.
+
+
+class ReproducibilityStatus(str, Enum):
+    """Categorical (never a numeric score) reproducibility / data-quality state
+    for one environmental observation or for the assessment overall."""
+
+    ADEQUATE = "adequate"          # valid, identifiable source + timestamp, not conflicted, pixel in-band
+    LIMITED = "limited"            # usable but stale / spatially distant / partial
+    INSUFFICIENT = "insufficient"  # missing required metadata, invalid, or conflicting / unresolved
+    UNAVAILABLE = "unavailable"    # no observation
+
+
+# observation_kind values
+EVIDENCE_KIND_CURRENT = "current"
+EVIDENCE_KIND_REFERENCE = "historical_reference"
+
+
+class EnvironmentalEvidenceItem(BaseModel):
+    """One environmental observation, described for reproducibility. Every field
+    is copied from an observation ORCA already holds - nothing is invented. When
+    a field is genuinely unknown it is ``None`` / an explicit "unknown" string,
+    never a fabricated value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    variable: str
+    value: float | None = None
+    unit: str = ""
+    source: str | None = None
+    dataset: str | None = None                 # parsed from the source string when present
+    observation_time: str | None = None        # ISO - the real composite / model time
+    query_time: str | None = None              # ISO - the decision time the observation was requested for
+    latitude: float | None = None              # the queried point (not a fabricated pixel centre)
+    longitude: float | None = None
+    spatial_distance_km: float | None = None   # queried point -> accepted satellite pixel, when known
+    validity: str | None = None                # VALID | STALE | INVALID | MISSING
+    age: str = "unavailable"                    # descriptive relabel of validity: fresh | stale | outside_window | unavailable
+    evidence_tier: str | None = None           # LIVE | CACHE | REFERENCE | DEMO | MISSING
+    source_status: str = "unavailable"         # valid | stale | invalid | missing | conflicted
+    observation_kind: str = EVIDENCE_KIND_CURRENT  # current | historical_reference
+    reproducibility_status: str = ReproducibilityStatus.UNAVAILABLE.value
+    limitations: tuple[str, ...] = ()
+
+
+class EnvironmentalEvidenceInputs(BaseModel):
+    """Everything the evidence engine needs. The node builds this from existing
+    pipeline state; the engine performs NO I/O."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst_current: EnvironmentalObservation | None = None
+    chl_current: EnvironmentalObservation | None = None
+    comparison: EnvironmentalComparisonResult | None = None
+    coastline_distance_m: float | None = None
+    depth_m: float | None = None
+    query_time: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class EnvironmentalEvidenceResult(BaseModel):
+    """Deterministic output of the Environmental Evidence Engine.
+
+    ``status`` is the overall categorical reproducibility state derived ONLY from
+    the *current* observations; historical / reference observations are listed in
+    ``items`` but kept clearly separate and do not drive ``status``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    status: str = ReproducibilityStatus.UNAVAILABLE.value
+    items: tuple[EnvironmentalEvidenceItem, ...] = ()
+    summary: str = ""
+    optical_water_hint: str | None = None
+    limitations: tuple[str, ...] = ()
+    disclaimer: str = ENVIRONMENTAL_EVIDENCE_DISCLAIMER
+    engine_version: str = ENVIRONMENTAL_EVIDENCE_ENGINE_VERSION
+
+    @property
+    def has_items(self) -> bool:
+        return len(self.items) > 0
