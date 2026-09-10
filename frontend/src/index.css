@@ -62,6 +62,10 @@ button { font-family: inherit; }
   min-height: 0;
   display: grid;
   grid-template-columns: 380px minmax(0, 1fr) 440px;
+  /* Pin the single row to the viewport height so the inner scroll containers
+     (chat + right rail) actually engage instead of the row growing to fit its
+     content and pushing cards past the fold / into each other. */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace__chat {
@@ -86,6 +90,11 @@ button { font-family: inherit; }
   flex-direction: column;
   gap: 0.5rem;
   max-width: 15rem;
+  /* Keep the stacked Data layers / Data provenance panels inside the map on
+     short (e.g. 1366x768) screens: scroll internally instead of overrunning
+     the map or colliding with each other. */
+  max-height: calc(100% - 1.5rem);
+  overflow-y: auto;
 }
 
 .workspace__map-banner {
@@ -144,12 +153,19 @@ button { font-family: inherit; }
 }
 
 .rail__content {
+  flex: 1;
+  min-height: 0;
   padding: 0.75rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
+/* Cards keep their natural height instead of being squeezed by flex-shrink;
+   .panel has overflow:hidden, so a shrunk card would clip its own content.
+   Letting the stack exceed the rail height is what makes .rail__content
+   scroll. */
+.rail__content > * { flex-shrink: 0; }
 
 /* ---------- header ---------- */
 .orca-topbar {
@@ -400,6 +416,87 @@ button { font-family: inherit; }
   line-height: 1.4;
 }
 .chat__textarea:focus { outline: 1px solid var(--orca-accent-2); }
+
+/* ---------- verdict hero (primary operational answer) ---------- */
+/* This card must win the screen: strongest type, a status-coloured edge, and
+   everything a scanning user needs (decision / safety / risk / where / when /
+   short why) before any detail. Detail lives in .disclose sections below. */
+.verdict { border-width: 1px; border-left-width: 4px; }
+.verdict--proceed { border-left-color: var(--ok); }
+.verdict--proceed_with_caution { border-left-color: var(--warn); }
+.verdict--do_not_proceed,
+.verdict--no_safe_recommendation { border-left-color: var(--bad); }
+
+.verdict__body { padding: 0.85rem 0.9rem; }
+.verdict .decision__headline {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.verdict__statusline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.7rem;
+  margin-top: 0.15rem;
+}
+.verdict__risk { display: inline-flex; align-items: baseline; gap: 0.35rem; }
+.verdict__risk .risk__level { font-size: 0.95rem; font-weight: 700; letter-spacing: 0.03em; }
+.verdict__risk-score { color: var(--orca-muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.verdict__risk-score small { color: var(--orca-faint); font-size: 0.68rem; }
+.verdict__bar { margin-top: 0.1rem; }
+.verdict__where { margin: 0.25rem 0 0; font-size: 0.9rem; }
+.verdict__where strong { font-weight: 600; }
+.verdict__when { margin: 0.15rem 0 0; font-size: 0.74rem; color: var(--orca-faint); }
+.verdict__why { display: flex; flex-direction: column; gap: 0.15rem; }
+.verdict__confidence {
+  margin: 0.2rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--orca-border-soft);
+  font-size: 0.76rem;
+  color: var(--orca-muted);
+}
+.verdict__confidence strong { color: var(--orca-text); letter-spacing: 0.04em; }
+
+/* ---------- progressive-disclosure section (tertiary detail) ---------- */
+.rail__group-label {
+  margin: 0.5rem 0 0;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--orca-border);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--orca-faint);
+}
+.disclose {
+  border: 1px solid var(--orca-border-soft);
+  border-radius: 6px;
+  background: var(--orca-panel-2);
+  overflow: hidden;
+}
+.disclose__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--orca-muted);
+}
+.disclose__summary::-webkit-details-marker { display: none; }
+.disclose__summary:hover { color: var(--orca-text); }
+.disclose__chev { font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.12s ease; }
+.disclose[open] .disclose__chev { transform: rotate(90deg); }
+.disclose__body { padding: 0 0.5rem 0.5rem; }
+/* Flatten the nested panel chrome - the summary already labels the section. */
+.disclose__body > .panel { border: none; border-radius: 0; background: transparent; }
+.disclose__body > .panel > .panel__head {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--orca-border-soft);
+}
 
 /* ---------- decision ---------- */
 .decision { display: flex; flex-direction: column; gap: 0.55rem; }

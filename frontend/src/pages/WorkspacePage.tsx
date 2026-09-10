@@ -32,7 +32,7 @@ import {
   DataTierLegend,
   LayerControl,
 } from "../components/map/MapControls";
-import { EmptyNote, Panel } from "../components/common";
+import { Disclose, EmptyNote, Panel } from "../components/common";
 
 const STATIC_LAYER_IDS = new Set<LayerId>(["coastline", "eez", "protected_areas"]);
 
@@ -160,17 +160,48 @@ export default function WorkspacePage() {
               </Panel>
             ) : tab === "decision" ? (
               <>
+                {/* PRIMARY — the operational answer, one scannable block. */}
                 <DecisionCard resp={latest} />
-                <RiskPanel resp={latest} />
+
+                {/* SECONDARY — supporting operational status. */}
                 <SuitabilityPanel resp={latest} />
-                <EnvironmentalPanel resp={latest} />
-                <RoutePanel resp={latest} />
-                <ExplanationPanel resp={latest} />
+                {latest.route && <RoutePanel resp={latest} />}
+
+                {/* TERTIARY — detail, collapsed so it never competes. */}
+                <p className="rail__group-label">
+                  {t("verdict.operationalDetail")}
+                </p>
+                <Disclose title={t("verdict.riskBreakdown")}>
+                  <RiskPanel resp={latest} />
+                </Disclose>
+                <Disclose title={t("verdict.fullExplanation")}>
+                  <ExplanationPanel resp={latest} />
+                </Disclose>
+                {latest.environmental && (
+                  <Disclose title={t("verdict.envContext")}>
+                    <EnvironmentalPanel resp={latest} />
+                  </Disclose>
+                )}
               </>
             ) : tab === "evidence" ? (
               <>
-                <EvidencePanel resp={latest} />
-                <ConflictPanel resp={latest} />
+                <p className="rail__group-label">
+                  {latest.evidence.length} {t("evidence.reviewed")}
+                  {latest.conflicts.length > 0
+                    ? ` · ${latest.conflicts.length} ⚠`
+                    : ""}
+                </p>
+                {latest.conflicts.some((c) => c.severity === "safety_critical") ? (
+                  <>
+                    <ConflictPanel resp={latest} />
+                    <EvidencePanel resp={latest} />
+                  </>
+                ) : (
+                  <>
+                    <EvidencePanel resp={latest} />
+                    <ConflictPanel resp={latest} />
+                  </>
+                )}
                 <ReferencePanel resp={latest} />
               </>
             ) : tab === "provenance" ? (

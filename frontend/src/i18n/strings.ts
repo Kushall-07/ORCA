@@ -178,6 +178,14 @@ export type StringKey =
   | "activity.total"
   | "explanation.why"
   | "explanation.disclaimer"
+  | "verdict.why"
+  | "verdict.location"
+  | "verdict.observed"
+  | "verdict.riskBreakdown"
+  | "verdict.fullExplanation"
+  | "verdict.envContext"
+  | "verdict.operationalDetail"
+  | "evidence.reviewed"
   | "map.layers"
   | "map.legend"
   | "map.legend.live"
@@ -390,6 +398,14 @@ const en: Table = {
   "explanation.why": "Why this decision?",
   "explanation.disclaimer":
     "ORCA is a decision-support system. Verify official marine and weather advisories before operational action.",
+  "verdict.why": "Why",
+  "verdict.location": "Location",
+  "verdict.observed": "Conditions observed",
+  "verdict.riskBreakdown": "Risk breakdown",
+  "verdict.fullExplanation": "Full explanation",
+  "verdict.envContext": "Environmental & research context",
+  "verdict.operationalDetail": "Operational detail",
+  "evidence.reviewed": "evidence records reviewed",
   "map.layers": "Data layers",
   "map.legend": "Data provenance",
   "map.legend.live": "Live observation / forecast",
@@ -602,6 +618,14 @@ const hi: Table = {
   "explanation.why": "यह निर्णय क्यों?",
   "explanation.disclaimer":
     "ORCA एक निर्णय-समर्थन प्रणाली है। परिचालन कार्रवाई से पहले आधिकारिक समुद्री और मौसम सलाह की पुष्टि करें।",
+  "verdict.why": "क्यों",
+  "verdict.location": "स्थान",
+  "verdict.observed": "स्थितियाँ प्रेक्षित",
+  "verdict.riskBreakdown": "जोखिम विवरण",
+  "verdict.fullExplanation": "पूरा स्पष्टीकरण",
+  "verdict.envContext": "पर्यावरण एवं शोध संदर्भ",
+  "verdict.operationalDetail": "परिचालन विवरण",
+  "evidence.reviewed": "साक्ष्य रिकॉर्ड समीक्षित",
   "map.layers": "डेटा परतें",
   "map.legend": "डेटा उत्पत्ति",
   "map.legend.live": "लाइव अवलोकन / पूर्वानुमान",
@@ -814,6 +838,14 @@ const kn: Table = {
   "explanation.why": "ಈ ನಿರ್ಣಯ ಏಕೆ?",
   "explanation.disclaimer":
     "ORCA ಒಂದು ನಿರ್ಣಯ-ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ. ಕಾರ್ಯಾಚರಣೆಯ ಮೊದಲು ಅಧಿಕೃತ ಸಮುದ್ರ ಮತ್ತು ಹವಾಮಾನ ಸಲಹೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+  "verdict.why": "ಏಕೆ",
+  "verdict.location": "ಸ್ಥಳ",
+  "verdict.observed": "ಸ್ಥಿತಿಗಳು ದಾಖಲಾಗಿವೆ",
+  "verdict.riskBreakdown": "ಅಪಾಯ ವಿವರ",
+  "verdict.fullExplanation": "ಪೂರ್ಣ ವಿವರಣೆ",
+  "verdict.envContext": "ಪರಿಸರ ಮತ್ತು ಸಂಶೋಧನಾ ಸಂದರ್ಭ",
+  "verdict.operationalDetail": "ಕಾರ್ಯಾಚರಣೆ ವಿವರ",
+  "evidence.reviewed": "ಸಾಕ್ಷ್ಯ ದಾಖಲೆಗಳು ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
   "map.layers": "ದತ್ತಾಂಶ ಪದರಗಳು",
   "map.legend": "ದತ್ತಾಂಶ ಮೂಲ",
   "map.legend.live": "ನೈಜ ಅವಲೋಕನ / ಮುನ್ಸೂಚನೆ",

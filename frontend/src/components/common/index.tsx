@@ -60,6 +60,32 @@ export function Collapsible({
   );
 }
 
+/**
+ * Disclose: a tertiary, progressively-disclosed section. Uses a native
+ * <details> so the collapsed content stays in the DOM (screen readers, in-page
+ * find, and tests can still reach it) while it is visually out of the way of the
+ * primary operational answer.
+ */
+export function Disclose({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="disclose" open={defaultOpen}>
+      <summary className="disclose__summary">
+        <span className="disclose__chev" aria-hidden>▸</span>
+        <span>{title}</span>
+      </summary>
+      <div className="disclose__body">{children}</div>
+    </details>
+  );
+}
+
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="spinner" role="status" aria-live="polite">
