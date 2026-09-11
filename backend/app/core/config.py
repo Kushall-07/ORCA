@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     orca_grid_cell_deg: float = Field(default=0.05, gt=0.0, le=1.0)
     orca_grid_pad_deg: float = Field(default=0.35, gt=0.0, le=5.0)
 
+    # ---- What-if / scenario-sensitivity simulation (competitor-audit adoption) ----
+    # A completed query turn's realised Risk Engine input is kept on the
+    # in-memory session so a follow-up ``POST /whatif`` can perturb wave height /
+    # wind speed on a COPY and re-run the SAME deterministic Risk -> Safety ->
+    # Decision chain. The baseline is refused once the turn it came from is older
+    # than this - an honest staleness guard, never a re-score of stale data as if
+    # it were current.
+    whatif_baseline_max_age_minutes: int = Field(default=180, ge=1, le=1440)
+
     # ---- Secondary / supplementary data sources (later phases) ----
     mosdac_username: str = Field(default="")
     mosdac_password: str = Field(default="")
@@ -143,6 +152,27 @@ class Settings(BaseSettings):
     # not an acceptable observation. Kept consistent with the Temporal Validity
     # Gate's chlorophyll_a stale window.
     oceancolor_chl_max_age_seconds: int = Field(default=864000, gt=0)   # 10 d
+
+    # ---- Official IMD marine advisory (Sea Area Bulletin) ----
+    # The live API (api.imd.gov.in) requires BOTH an API key header and a
+    # bearer JWT; neither is self-service on the public reference page. With
+    # either blank the advisory agent returns an explicit UNAVAILABLE result -
+    # it never fabricates a warning. Never hard-code a real key/token here.
+    imd_api_base_url: str = Field(default="https://api.imd.gov.in")
+    imd_sea_bulletin_path: str = Field(default="/api/v1/seabulletin")
+    imd_api_key: str = Field(default="")
+    imd_api_bearer_token: str = Field(default="")
+    imd_timeout_seconds: float = Field(default=10.0, gt=0)
+    imd_cache_ttl_seconds: int = Field(default=3600, gt=0)       # 1 h
+    imd_cache_max_age_seconds: int = Field(default=43200, gt=0)  # 12 h
+
+    # ---- Official INCOIS PFZ reference geometry (public, no auth) ----
+    incois_pfz_wfs_base_url: str = Field(default="https://www.incois.gov.in/geoserver")
+    incois_pfz_timeout_seconds: float = Field(default=15.0, gt=0)
+    incois_pfz_cache_ttl_seconds: int = Field(default=21600, gt=0)      # 6 h
+    incois_pfz_cache_max_age_seconds: int = Field(default=86400, gt=0)  # 24 h
+    incois_pfz_match_radius_km: float = Field(default=250.0, gt=0)
+    incois_pfz_max_features: int = Field(default=40, ge=1, le=500)
 
     # ---- Phase 4: data locations + GIS backend ----
     data_static_dir: str = Field(default="data/static")

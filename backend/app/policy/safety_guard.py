@@ -5,23 +5,33 @@ final for safety and must not be overridden downstream.
 
 Rule precedence (first match wins):
 
-  1. Point inside a HARD geofence                 -> BLOCKED
-  2. No risk result, or required evidence missing,
-     or risk marked data-insufficient              -> NO_SAFE_RECOMMENDATION
-  3. Risk level SEVERE                              -> BLOCKED
-  4. Risk level HIGH or MODERATE                    -> CAUTION
-  5. Otherwise                                      -> ALLOWED
+  1. Point inside a HARD geofence                        -> BLOCKED
+  2. Official advisory = DO_NOT_VENTURE and applicable    -> BLOCKED
+  3. No risk result, or required evidence missing,
+     or risk marked data-insufficient                     -> NO_SAFE_RECOMMENDATION
+  4. Risk level SEVERE                                     -> BLOCKED
+  5. Risk level HIGH or MODERATE                            -> CAUTION
+  6. Otherwise                                              -> ALLOWED
+
+Rule 2 is the only place an official advisory can force a decision outright.
+Everything short of DO_NOT_VENTURE (CAUTION, NO_WARNING, or an unavailable /
+inapplicable advisory) participates in safety ONLY through the Risk Engine's
+weighted ``advisory`` factor (see app.risk.engine) - never here. The guard
+never reads or interprets the advisory's free warning text itself; it only
+consumes the already-classified :class:`AdvisorySeverity` (see
+app.risk.advisory_policy), which is deterministic and LLM-free.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
+from app.models.advisory import AdvisorySeverity
 from app.models.geo import GeofenceResult
 from app.models.risk import DataSufficiency, RiskLevel, RiskResult
 from app.models.safety import SafetyGuardInput, SafetyGuardResult, SafetyStatus
 
-GUARD_VERSION: Final[str] = "guard-1.0.0"
+GUARD_VERSION: Final[str] = "guard-1.1.0"
 
 
 def _hard_ids(*results: GeofenceResult | None) -> tuple[str, ...]:
@@ -67,7 +77,24 @@ def evaluate_safety(inp: SafetyGuardInput) -> SafetyGuardResult:
             guard_version=GUARD_VERSION,
         )
 
-    # ---- Rule 2: cannot establish safety -> NO_SAFE_RECOMMENDATION -------
+    # ---- Rule 2: official advisory DO_NOT_VENTURE + applicable -> BLOCKED --
+    if (
+        inp.advisory_severity is AdvisorySeverity.DO_NOT_VENTURE
+        and inp.advisory_applicable
+    ):
+        triggered.append("official_advisory_do_not_venture")
+        area = f" ({inp.advisory_area})" if inp.advisory_area else ""
+        reasons.append(f"official marine advisory{area}: fishermen advised not to venture into the sea")
+        return SafetyGuardResult(
+            status=SafetyStatus.BLOCKED,
+            reasons=tuple(reasons),
+            triggered_rules=tuple(triggered),
+            risk_level=risk_level,
+            data_sufficiency=sufficiency,
+            guard_version=GUARD_VERSION,
+        )
+
+    # ---- Rule 3: cannot establish safety -> NO_SAFE_RECOMMENDATION -------
     if risk is None:
         triggered.append("no_risk_result")
         reasons.append("no risk result available")
@@ -92,7 +119,7 @@ def evaluate_safety(inp: SafetyGuardInput) -> SafetyGuardResult:
 
     assert risk is not None  # narrowed by the checks above
 
-    # ---- Rules 3-5: banded on deterministic risk level ------------------
+    # ---- Rules 4-6: banded on deterministic risk level -------------------
     if risk.risk_level is RiskLevel.SEVERE:
         triggered.append("risk_severe")
         reasons.append(f"risk level SEVERE (score {risk.overall_score:.1f})")

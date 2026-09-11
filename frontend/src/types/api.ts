@@ -295,6 +295,66 @@ export interface GisSummary {
   protected_areas: ProtectedAreaInfo[];
 }
 
+// ---- Official live marine advisory (IMD) --------------------------------
+// Distinct from `risk`/`decision`, which are ORCA's own computed assessment.
+// Never merged into one generic warning with the computed risk.
+export type AdvisoryAvailability =
+  | "available"
+  | "unavailable"
+  | "expired"
+  | "not_yet_valid"
+  | "no_location_match";
+
+export type AdvisorySeverity = "no_warning" | "caution" | "do_not_venture";
+
+export interface AdvisoryInfo {
+  source: string;
+  availability: AdvisoryAvailability | string;
+  area: string | null;
+  severity: AdvisorySeverity | string | null;
+  warning_text: string | null;
+  issued_at: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  retrieved_at: string | null;
+  source_url: string | null;
+  applicable: boolean;
+}
+
+// ---- Official INCOIS PFZ reference ---------------------------------------
+// A fishing-potential reference only - never a safety zone, never ORCA risk,
+// never a recommendation to enter the sea.
+export type PfzAvailability = "available" | "unavailable" | "no_location_match";
+
+export interface PfzLandingCentreInfo {
+  name: string;
+  district: string;
+  sector: string;
+  latitude: number;
+  longitude: number;
+  distance_km: number;
+  direction: string;
+  bearing_deg: number | null;
+  distance_from_nm: number | null;
+  distance_to_nm: number | null;
+  depth_from_m: number | null;
+  depth_to_m: number | null;
+  forecast_date: string | null;
+  valid_until: string | null;
+}
+
+export interface PfzReferenceInfo {
+  source: string;
+  availability: PfzAvailability | string;
+  area_matched: string | null;
+  zone_count: number;
+  nearest_landing_centre: PfzLandingCentreInfo | null;
+  issued_at: string | null;
+  retrieved_at: string | null;
+  source_url: string;
+  disclaimer: string;
+}
+
 export interface ReferenceInfo {
   kind: "PFZ" | "RSMC" | "OTHER";
   title: string;
@@ -409,6 +469,8 @@ export interface QueryResponse {
   route: RouteInfo | null;
   gis: GisSummary | null;
   reference: ReferenceInfo[];
+  advisory?: AdvisoryInfo | null;
+  pfz_reference?: PfzReferenceInfo | null;
   alerts: AlertItem[];
   conflicts: ConflictItem[];
   evidence: EvidenceItem[];
@@ -418,6 +480,68 @@ export interface QueryResponse {
   agent_trace: string[];
   node_trace?: NodeTraceItem[];
   errors: string[];
+}
+
+// ---- What-if / scenario-sensitivity simulation (POST /whatif) ----------
+// Perturbs a completed turn's realised Risk Engine input on a COPY and re-runs
+// the SAME deterministic Risk -> Safety -> Decision chain. Every payload carries
+// `label = "SIMULATION - NOT LIVE DATA"`. It never fetches data, never runs an
+// LLM, and never changes the live decision. The frontend only displays it.
+export interface WhatIfPerturbedInput {
+  variable: string;
+  unit: string;
+  baseline: number;
+  scenario: number;
+  delta_requested: number;
+  floored: boolean;
+}
+
+export interface WhatIfSnapshot {
+  risk: RiskInfo & { overall_score?: number; risk_level?: string };
+  safety: { status: SafetyStatus | string; reasons?: string[] };
+  decision: DecisionInfo;
+}
+
+export interface WhatIfResult {
+  label: string;
+  perturbation: {
+    wave_height_delta_m: number | null;
+    wind_speed_delta_ms: number | null;
+  };
+  perturbed_inputs: WhatIfPerturbedInput[];
+  baseline: WhatIfSnapshot;
+  scenario: WhatIfSnapshot;
+  risk_score_delta: number;
+  decision_changed: boolean;
+  safety_status_changed: boolean;
+  explanation: string;
+  notes: string[];
+  provenance: Record<string, unknown>;
+  whatif_version: string;
+}
+
+export interface WhatIfError {
+  code:
+    | "SCENARIO_BASELINE_UNAVAILABLE"
+    | "SCENARIO_BASELINE_STALE"
+    | "INVALID_PERTURBATION"
+    | string;
+  message: string;
+}
+
+export interface WhatIfResponse {
+  session_id: string;
+  label: string | null;
+  baseline_message: string | null;
+  baseline_age_minutes: number | null;
+  data: WhatIfResult | null;
+  error: WhatIfError | null;
+}
+
+export interface WhatIfRequestBody {
+  session_id: string;
+  wave_height_delta_m?: number | null;
+  wind_speed_delta_ms?: number | null;
 }
 
 export interface QueryRequestBody {

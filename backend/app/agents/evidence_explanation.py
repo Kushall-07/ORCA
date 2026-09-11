@@ -177,6 +177,16 @@ class ExplanationAgent:
             decision, risk, suitability, conflicts, route, alerts, fabric
         )
 
+        # A failed or clarification-needed understanding has no decision, risk,
+        # safety, suitability or route to explain. render_template already
+        # produced the correct deterministic message; sending the near-empty
+        # context to the LLM makes it refuse ("the decision, risk score ... were
+        # not included in the information you provided"). Return the template.
+        if understanding is not None and (
+            understanding.failed or understanding.needs_clarification
+        ):
+            return template.model_copy(update={"generated_via": "template"})
+
         if self.llm is None:
             return template.model_copy(update={"generated_via": "template"})
 

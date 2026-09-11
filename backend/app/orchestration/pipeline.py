@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from app.core.logging import get_logger
 from app.models.api import (
+    AdvisoryInfo,
     AlertItem,
     ConflictItem,
     DataQualityInfo,
@@ -27,6 +28,8 @@ from app.models.api import (
     GisSummary,
     LocationInfo,
     NodeTraceItem,
+    PfzLandingCentreInfo,
+    PfzReferenceInfo,
     ProtectedAreaInfo,
     QueryResponse,
     ReferenceInfo,
@@ -169,6 +172,54 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             pfz_reference_present=suit.pfz_reference_present,
             pfz_note=suit.pfz_reference_note,
             disclaimer=suit.disclaimer,
+        )
+
+    advisory_agent_result = state.get("advisory_result")
+    advisory = getattr(advisory_agent_result, "advisory", None) if advisory_agent_result else None
+    advisory_info = None
+    if advisory is not None:
+        applicable = advisory.is_available and any(
+            r.is_usable for r in fabric.for_variable("advisory_level")
+        ) if fabric is not None else False
+        advisory_info = AdvisoryInfo(
+            source=advisory.source,
+            availability=advisory.availability.value,
+            area=advisory.area,
+            severity=advisory.severity.value if advisory.is_available else None,
+            warning_text=advisory.warning_text if advisory.is_available else None,
+            issued_at=advisory.issued_at.isoformat() if advisory.issued_at else None,
+            valid_from=advisory.valid_from.isoformat() if advisory.valid_from else None,
+            valid_until=advisory.valid_until.isoformat() if advisory.valid_until else None,
+            retrieved_at=advisory.retrieved_at.isoformat() if advisory.retrieved_at else None,
+            source_url=advisory.source_url or None,
+            applicable=applicable,
+        )
+
+    pfz = state.get("pfz_result")
+    pfz_info = None
+    if pfz is not None:
+        nearest = None
+        if pfz.nearest_landing_centre is not None:
+            lc = pfz.nearest_landing_centre
+            nearest = PfzLandingCentreInfo(
+                name=lc.name, district=lc.district, sector=lc.sector,
+                latitude=lc.latitude, longitude=lc.longitude,
+                distance_km=lc.distance_km, direction=lc.direction,
+                bearing_deg=lc.bearing_deg,
+                distance_from_nm=lc.distance_from_nm, distance_to_nm=lc.distance_to_nm,
+                depth_from_m=lc.depth_from_m, depth_to_m=lc.depth_to_m,
+                forecast_date=lc.forecast_date, valid_until=lc.valid_until,
+            )
+        pfz_info = PfzReferenceInfo(
+            source=pfz.source,
+            availability=pfz.availability.value,
+            area_matched=pfz.area_matched,
+            zone_count=pfz.zone_count,
+            nearest_landing_centre=nearest,
+            issued_at=pfz.issued_at,
+            retrieved_at=pfz.retrieved_at.isoformat() if pfz.retrieved_at else None,
+            source_url=pfz.source_url,
+            disclaimer=pfz.disclaimer,
         )
 
     def _obs_info(o):  # type: ignore[no-untyped-def]
@@ -499,6 +550,8 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         route=route_info,
         gis=gis_summary,
         reference=references,
+        advisory=advisory_info,
+        pfz_reference=pfz_info,
         alerts=alerts,
         conflicts=conflicts,
         evidence=evidence,

@@ -5,11 +5,12 @@
       -> (short-circuit) --------------------------> explain
       -> normalize
       -> (needs clarification) -------------------> explain
-      -> [collect_weather | collect_ocean | collect_gis | collect_environment]  (parallel)
+      -> [collect_weather | collect_ocean | collect_gis | collect_environment |
+          collect_advisory]  (parallel)
       -> fabric -> temporal -> fusion -> arbitration -> conflicts
       -> suitability (conditional) -> risk -> policy -> decision
       -> (route requested & allowed) -> route
-      -> alerts -> productivity -> environmental_comparison
+      -> alerts -> pfz -> productivity -> environmental_comparison
       -> environmental_stability -> environmental_neighbourhood
       -> environmental_evidence
       -> provenance -> explain -> assemble -> END
@@ -55,7 +56,10 @@ def _after_normalize(state: OrcaGraphState):  # type: ignore[no-untyped-def]
         return "explain"
     if state.get("resolved_origin") is None:
         return "explain"
-    return ["collect_weather", "collect_ocean", "collect_gis", "collect_environment"]
+    return [
+        "collect_weather", "collect_ocean", "collect_gis",
+        "collect_environment", "collect_advisory",
+    ]
 
 
 def _after_decision(state: OrcaGraphState) -> str:
@@ -89,6 +93,7 @@ def build_orca_graph(deps: OrcaDeps):
     add("collect_ocean", nodes.collect_ocean)
     add("collect_gis", nodes.collect_gis)
     add("collect_environment", nodes.collect_environment)
+    add("collect_advisory", nodes.collect_advisory)
     add("fabric", nodes.fabric_node)
     add("temporal", nodes.temporal_node)
     add("fusion", nodes.fusion_node)
@@ -100,6 +105,7 @@ def build_orca_graph(deps: OrcaDeps):
     add("decision", nodes.decision_node)
     add("route", nodes.route_node)
     add("alerts", nodes.alerts_node)
+    add("pfz", nodes.pfz_node)
     add("productivity", nodes.productivity_node)
     add("environmental_comparison", nodes.environmental_comparison_node)
     add("environmental_stability", nodes.environmental_stability_node)
@@ -114,9 +120,15 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_conditional_edges(
         "normalize",
         _after_normalize,
-        ["collect_weather", "collect_ocean", "collect_gis", "collect_environment", "explain"],
+        [
+            "collect_weather", "collect_ocean", "collect_gis",
+            "collect_environment", "collect_advisory", "explain",
+        ],
     )
-    for src in ("collect_weather", "collect_ocean", "collect_gis", "collect_environment"):
+    for src in (
+        "collect_weather", "collect_ocean", "collect_gis",
+        "collect_environment", "collect_advisory",
+    ):
         g.add_edge(src, "fabric")
     g.add_edge("fabric", "temporal")
     g.add_edge("temporal", "fusion")
@@ -128,7 +140,8 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_edge("policy", "decision")
     g.add_conditional_edges("decision", _after_decision, ["route", "alerts"])
     g.add_edge("route", "alerts")
-    g.add_edge("alerts", "productivity")
+    g.add_edge("alerts", "pfz")
+    g.add_edge("pfz", "productivity")
     g.add_edge("productivity", "environmental_comparison")
     g.add_edge("environmental_comparison", "environmental_stability")
     g.add_edge("environmental_stability", "environmental_neighbourhood")

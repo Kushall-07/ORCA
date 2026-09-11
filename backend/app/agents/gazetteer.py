@@ -32,6 +32,9 @@ _PLACES: dict[str, tuple[float, float]] = {
     "rameswaram": (9.29, 79.31),
     "tuticorin": (8.76, 78.13),
     "thoothukudi": (8.76, 78.13),
+    "kanyakumari": (8.08, 77.55),
+    "kanniyakumari": (8.08, 77.55),
+    "cape comorin": (8.08, 77.55),
     "paradip": (20.26, 86.67),
     "puri": (19.80, 85.82),
     "kolkata": (22.57, 88.36),
@@ -58,6 +61,8 @@ _PLACES: dict[str, tuple[float, float]] = {
     "ಕೊಚ್ಚಿ": (9.97, 76.24),
     "गोवा": (15.30, 73.80),
     "ಗೋವಾ": (15.30, 73.80),
+    "कन्याकुमारी": (8.08, 77.55),
+    "ಕನ್ಯಾಕುಮಾರಿ": (8.08, 77.55),
 }
 
 

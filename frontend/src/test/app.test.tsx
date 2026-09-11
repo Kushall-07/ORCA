@@ -17,6 +17,7 @@ const fetchHealth = vi.fn();
 const fetchGisLayerManifest = vi.fn();
 const fetchGisLayer = vi.fn();
 const fetchReferenceRegistry = vi.fn();
+const fetchPfzLayer = vi.fn();
 
 // Leaflet needs a real layout/SVG engine that jsdom lacks; the map is purely
 // visual, so stub it. All assertions target panels and controls.
@@ -33,6 +34,7 @@ vi.mock("../services/apiClient", async () => {
     fetchGisLayerManifest: (...a: unknown[]) => fetchGisLayerManifest(...a),
     fetchGisLayer: (...a: unknown[]) => fetchGisLayer(...a),
     fetchReferenceRegistry: (...a: unknown[]) => fetchReferenceRegistry(...a),
+    fetchPfzLayer: (...a: unknown[]) => fetchPfzLayer(...a),
   };
 });
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   ]);
   fetchGisLayer.mockResolvedValue({ type: "FeatureCollection", features: [] });
   fetchReferenceRegistry.mockResolvedValue([]);
+  fetchPfzLayer.mockResolvedValue(null);
 });
 
 afterEach(() => cleanup());
@@ -275,6 +278,117 @@ describe("ORCA workspace", () => {
     expect(coastline.disabled).toBe(false);
   });
 
+  it("keeps the PFZ layer non-interactive when no live INCOIS geometry matched this query", async () => {
+    // The fixture carries no `pfz_reference` (no live INCOIS geometry matched
+    // for this query). The map layer must not claim to be available, must
+    // stay unchecked, and ORCA must never synthesise a PFZ polygon from its
+    // own suitability score.
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+
+    const pfz = screen.getByLabelText(/PFZ reference/i) as HTMLInputElement;
+    expect(pfz.disabled).toBe(true);
+    expect(pfz.checked).toBe(false);
+    expect(
+      screen.getByText(/unavailable for map rendering/i),
+    ).toBeInTheDocument();
+  });
+
+  it("still reports the PFZ reference separately even though it is not on the map", async () => {
+    // Separation is preserved: no map geometry, but the official/reference PFZ
+    // advisory is still surfaced as its own note, kept apart from the
+    // ORCA-derived suitability score.
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    expect(
+      await screen.findByText(/An INCOIS PFZ advisory snapshot is available/i),
+    ).toBeInTheDocument();
+  });
+
+  it("enables the PFZ layer when the backend reports live matched geometry", async () => {
+    postQuery.mockResolvedValue(
+      makeResponse({
+        pfz_reference: {
+          source: "INCOIS",
+          availability: "available",
+          area_matched: "KARNATAKA",
+          zone_count: 4,
+          nearest_landing_centre: null,
+          issued_at: "254",
+          retrieved_at: "2026-09-11T12:00:00Z",
+          source_url: "https://www.incois.gov.in/MarineFisheries/PfzWebGis",
+          disclaimer: "Official INCOIS PFZ reference. Not a safety zone.",
+        },
+      }),
+    );
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+
+    const pfz = screen.getByLabelText(/PFZ reference/i) as HTMLInputElement;
+    expect(pfz.disabled).toBe(false);
+    expect(screen.getByText(/4 zone/i)).toBeInTheDocument();
+  });
+
+  // ---- Official live marine advisory (IMD) — distinct from computed risk --
+  it("shows the official advisory separately from ORCA's computed risk/decision", async () => {
+    postQuery.mockResolvedValue(
+      makeResponse({
+        advisory: {
+          source: "IMD",
+          availability: "available",
+          area: "Karnataka Coast",
+          severity: "no_warning",
+          warning_text: "NIL",
+          issued_at: "2026-09-11T06:00:00Z",
+          valid_from: "2026-09-11T06:00:00Z",
+          valid_until: "2026-09-12T06:00:00Z",
+          retrieved_at: "2026-09-11T12:00:00Z",
+          source_url: "https://api.imd.gov.in/api/v1/seabulletin",
+          applicable: true,
+        },
+      }),
+    );
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+
+    expect(screen.getByText("Official Marine Advisory")).toBeInTheDocument();
+    expect(screen.getByText("Karnataka Coast")).toBeInTheDocument();
+    expect(screen.getByText("No Warning")).toBeInTheDocument();
+    expect(
+      screen.getByText(/separate from ORCA's computed risk assessment/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the advisory as unavailable honestly, never substituting another source", async () => {
+    postQuery.mockResolvedValue(
+      makeResponse({
+        advisory: {
+          source: "IMD",
+          availability: "unavailable",
+          area: "Karnataka Coast",
+          severity: null,
+          warning_text: null,
+          issued_at: null,
+          valid_from: null,
+          valid_until: null,
+          retrieved_at: null,
+          source_url: null,
+          applicable: false,
+        },
+      }),
+    );
+    render(<App />);
+    await sendQuery();
+    await screen.findByText("CAUTION");
+
+    expect(screen.getByText("Advisory data unavailable")).toBeInTheDocument();
+  });
+
   // ---- Phase 9 Step 3: researcher environmental panel ------------------
   it("renders the environmental panel with SST, chlorophyll and its disclaimer", async () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
@@ -353,6 +467,78 @@ describe("ORCA workspace", () => {
     await screen.findByText("Environmental Context");
     expect(screen.getAllByText(/UNKNOWN/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/satellite cloud cover or data gap/i)).toBeInTheDocument();
+  });
+
+  // ---- environmental map / status wording reflects the live implementation ----
+  const sstOnlyEnvironmental = {
+    sst: {
+      value: 28.7,
+      unit: "°C",
+      validity: "VALID",
+      data_tier: "LIVE",
+      source: "open-meteo-marine",
+      source_tier: "3",
+      observed_at: null,
+      conflicted: false,
+    },
+    chlorophyll_a: null,
+    chlorophyll_class: null,
+    productivity_potential: "unknown" as const,
+    data_sufficiency: "insufficient",
+    confidence: "none",
+    limitations: [],
+    disclaimer:
+      "Chlorophyll-a is an environmental productivity proxy and does not indicate fish presence, abundance, or catch.",
+    engine_version: "environmental-0.1.0",
+  };
+
+  it("layer control no longer claims SST / chlorophyll are unintegrated", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse());
+    render(<App />);
+    await sendQuery("sst and chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(screen.queryByText(/not yet integrated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No values are shown/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Open-Meteo Marine value/i)).toBeInTheDocument();
+    expect(screen.getByText(/NOAA CoastWatch \(VIIRS\) value/i)).toBeInTheDocument();
+  });
+
+  it("explains a missing chlorophyll layer as cloud / coverage and never invents a value", async () => {
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({ environmental: sstOnlyEnvironmental }),
+    );
+    render(<App />);
+    await sendQuery("chlorophyll near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(
+      screen.getByText(/cloud . data coverage or validity constraints/i),
+    ).toBeInTheDocument();
+    // SST is still reported honestly as an Open-Meteo Marine value
+    expect(screen.getByText(/Open-Meteo Marine value/i)).toBeInTheDocument();
+  });
+
+  it("separates productivity interpretation from evidence quality in wording", async () => {
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({ environmental: sstOnlyEnvironmental }),
+    );
+    render(<App />);
+    await sendQuery("environmental productivity near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(screen.getByText("Productivity interpretation")).toBeInTheDocument();
+    expect(
+      screen.getByText(/productivity potential cannot be assessed/i),
+    ).toBeInTheDocument();
+  });
+
+  it("labels the environmental evidence block as evidence quality", async () => {
+    postQuery.mockResolvedValue(makeEvidenceResponse());
+    render(<App />);
+    await sendQuery("how reproducible is the chlorophyll data near Mangalore");
+    await screen.findByText("Environmental Context");
+    expect(screen.getByText("Evidence quality")).toBeInTheDocument();
+    expect(
+      screen.getByText(/separate from whether productivity could be interpreted/i),
+    ).toBeInTheDocument();
   });
 
   it("keeps environmental numbers when the UI language switches", async () => {

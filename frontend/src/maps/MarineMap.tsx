@@ -51,6 +51,10 @@ const LAYER_STYLE: Record<string, PathOptions> = {
   eez: { color: "#4dabf7", weight: 1.5, dashArray: "6 4", fillOpacity: 0.04 },
   protected_soft: { color: "#f59f00", weight: 1.5, fillOpacity: 0.08 },
   protected_hard: { color: "#c92a2a", weight: 2.5, fillOpacity: 0.16 },
+  // Official INCOIS PFZ reference - visually distinct (teal/dashed) from ORCA
+  // Risk (red-orange), Route (blue) and Protected Areas (orange/red), so a
+  // user never mistakes a fishing-potential reference for a safety layer.
+  pfz: { color: "#0ca678", weight: 2, dashArray: "3 3", fillOpacity: 0 },
 };
 
 function FitController({ resp }: { resp: QueryResponse | null }) {
@@ -82,11 +86,21 @@ function StaticLayer({
   const styleFn = (feature?: Feature<Geometry, Record<string, unknown>>): PathOptions => {
     if (id === "coastline") return LAYER_STYLE.coastline;
     if (id === "eez") return LAYER_STYLE.eez;
+    if (id === "pfz") return LAYER_STYLE.pfz;
     const fk = String(feature?.properties?.layer_kind ?? kind).toUpperCase();
     return fk === "HARD" ? LAYER_STYLE.protected_hard : LAYER_STYLE.protected_soft;
   };
   const onEach = (feature: Feature<Geometry, Record<string, unknown>>, layer: Layer) => {
     const p = feature.properties ?? {};
+    if (id === "pfz") {
+      const state = String(p.State_Name ?? "");
+      const day = String(p.Julian_day ?? "");
+      layer.bindTooltip(
+        `INCOIS PFZ Reference${state ? ` — ${state}` : ""}${day ? ` (day ${day})` : ""}`,
+        { sticky: true },
+      );
+      return;
+    }
     const name = String(p.name ?? p.NAME ?? p.designation ?? id);
     const src = String(p.source ?? p.SOURCE ?? "");
     const dtype = String(p.layer_kind ?? kind);
@@ -145,6 +159,10 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
         ) : null,
       )}
 
+      {activeLayers.has("pfz") && layerData.pfz && (
+        <StaticLayer id="pfz" fc={layerData.pfz} kind="REFERENCE" />
+      )}
+
       {activeLayers.has("route") && route.length >= 2 && (
         <Polyline
           positions={route as [number, number][]}
@@ -186,7 +204,8 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
 
       {activeLayers.has("environmental") &&
         origin &&
-        resp?.environmental?.chlorophyll_a?.value != null && (
+        (resp?.environmental?.chlorophyll_a?.value != null ||
+          resp?.environmental?.sst?.value != null) && (
           <CircleMarker
             center={origin}
             radius={11}
@@ -194,21 +213,21 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
               color: "#ffffff",
               weight: 2,
               fillColor:
-                CHL_CLASS_COLOR[resp.environmental.chlorophyll_class ?? ""] ??
+                CHL_CLASS_COLOR[resp!.environmental!.chlorophyll_class ?? ""] ??
                 "#8aa0ad",
               fillOpacity: 0.85,
             }}
           >
             <Tooltip>
               {t("env.mapPoint")}
-              {" — "}
-              {t("env.chlorophyll")}: {resp.environmental.chlorophyll_a.value}{" "}
-              {resp.environmental.chlorophyll_a.unit}
-              {resp.environmental.chlorophyll_class
-                ? ` (${resp.environmental.chlorophyll_class})`
+              {resp!.environmental!.sst?.value != null
+                ? ` — ${t("env.sst")}: ${resp!.environmental!.sst.value} ${resp!.environmental!.sst.unit}`
                 : ""}
-              {resp.environmental.sst?.value != null
-                ? ` · ${t("env.sst")}: ${resp.environmental.sst.value} ${resp.environmental.sst.unit}`
+              {resp!.environmental!.chlorophyll_a?.value != null
+                ? ` · ${t("env.chlorophyll")}: ${resp!.environmental!.chlorophyll_a.value} ${resp!.environmental!.chlorophyll_a.unit}`
+                : ""}
+              {resp!.environmental!.chlorophyll_class
+                ? ` (${resp!.environmental!.chlorophyll_class})`
                 : ""}
             </Tooltip>
           </CircleMarker>

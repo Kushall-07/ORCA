@@ -11,14 +11,24 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.gis.validation import CoordinateError, validate_latitude, validate_longitude
+from app.models.common import Coordinate
+from app.services.cache import InMemoryCache, JsonCache
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["gis"])
+
+# Process-wide cache for the PFZ WFS fetch, shared across requests so toggling
+# the map layer repeatedly does not re-hit INCOIS on every call (task D).
+# An in-process TTL cache (no Redis dependency) is enough here: the dataset is
+# day-bucketed and a few hundred KB. Swap for a Redis-backed JsonCache the same
+# way the rest of the data agents would be wired for multi-process deployment.
+_pfz_cache = JsonCache(InMemoryCache())
 
 # layer id -> (filename, human name)
 _LAYERS: dict[str, tuple[str, str]] = {
@@ -66,6 +76,44 @@ def list_layers() -> JSONResponse:
             }
         )
     return JSONResponse({"layers": out})
+
+
+@router.get("/gis/layers/pfz")
+async def pfz_layer(
+    lat: float = Query(..., description="Query latitude"),
+    lon: float = Query(..., description="Query longitude"),
+) -> JSONResponse:
+    """Live official INCOIS PFZ reference geometry matched to (lat, lon).
+
+    Not a static file: fetches (cached) the official GeoServer WFS layer and
+    returns only the features matched to the coordinate's marine sector /
+    nearest lines - never the whole country, never a fabricated polygon.
+    ``404`` when the official source is unreachable or no geometry matches;
+    the frontend must show that honestly, not render a circle or synthesise a
+    zone from SST/CHL.
+    """
+    try:
+        latitude = validate_latitude(lat)
+        longitude = validate_longitude(lon)
+    except CoordinateError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    from app.gis.pfz_reference import fetch_matched_lines
+    from app.services.incois_pfz import IncoisPfzError
+
+    settings = get_settings()
+    try:
+        fc = await fetch_matched_lines(
+            Coordinate(latitude=latitude, longitude=longitude),
+            settings=settings,
+            cache=_pfz_cache,
+        )
+    except IncoisPfzError as exc:
+        logger.warning("PFZ layer unavailable", extra={"source": "incois_pfz"})
+        raise HTTPException(status_code=404, detail=f"PFZ reference unavailable: {exc}") from exc
+    if not fc.get("features"):
+        raise HTTPException(status_code=404, detail="no PFZ reference geometry matched this location")
+    return JSONResponse(fc, headers={"Cache-Control": "public, max-age=1800"})
 
 
 @router.get("/gis/layers/{layer_id}")

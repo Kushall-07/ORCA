@@ -28,6 +28,7 @@ from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
 from app.models.geo import GeofenceResult
 from app.models.gis_agent import GisQueryResult
+from app.models.pfz import PfzReferenceResult
 from app.models.provenance import ProvenanceGraph
 from app.models.query import QueryUnderstanding
 from app.models.risk import RiskResult
@@ -71,6 +72,10 @@ class OrcaGraphState(TypedDict, total=False):
     ocean_result: AgentResult | None
     gis_result: GisQueryResult | None
     environment_result: AgentResult | None
+    # Official IMD marine advisory (A). ``AgentResult.advisory`` carries the
+    # full typed :class:`MarineAdvisory` (text, area, validity, severity)
+    # alongside the numeric ``advisory_level`` observation that feeds the fabric.
+    advisory_result: AgentResult | None
 
     # ---- reasoning ----
     fabric: MarineDataFabric | None
@@ -113,6 +118,11 @@ class OrcaGraphState(TypedDict, total=False):
     # one extra batched HTTP request; downstream-only research context; never
     # feeds the safety chain, the fabric, fusion, arbitration or evidence[].
     environmental_neighbourhood: EnvironmentalNeighbourhoodResult | None
+
+    # Official INCOIS PFZ reference (B). Downstream of decision, strictly
+    # isolated from risk / safety / decision / route - a fishing-potential
+    # reference summary only. See app.services.incois_pfz.
+    pfz_result: PfzReferenceResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

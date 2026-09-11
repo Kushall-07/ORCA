@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { useHealth } from "../hooks/useHealth";
 import { useGisLayers } from "../hooks/useGisLayers";
 import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { getStakeholder, type EmphasisTab, type StakeholderId } from "../stakeholders";
 import type { StringKey } from "../i18n/strings";
+import type { GeoJsonFeatureCollection } from "../types/api";
+import { fetchPfzLayer } from "../services/apiClient";
 import MarineMap, { type LayerId } from "../maps/MarineMap";
 import { OrcaHeader } from "../components/header/OrcaHeader";
 import { ChatPanel } from "../components/chat/ChatPanel";
@@ -24,6 +26,8 @@ import {
   ExplanationPanel,
 } from "../components/intel/IntelPanels";
 import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPanel";
+import { AdvisoryPanel } from "../components/advisory/AdvisoryPanel";
+import { WhatIfPanel } from "../components/whatif/WhatIfPanel";
 import { ProvenanceViewer } from "../components/provenance/ProvenanceViewer";
 import { RoutePanel } from "../components/route/RoutePanel";
 import { ReportView } from "../components/report/ReportView";
@@ -82,6 +86,30 @@ export default function WorkspacePage() {
     }
   }, [activeLayers, gis]);
 
+  // The official INCOIS PFZ layer is query-location-scoped (not a static
+  // country-wide file), so it is fetched separately, keyed to the current
+  // query's coordinate. The backend caches the underlying INCOIS WFS fetch,
+  // so repeated toggling for the same location does not re-hit INCOIS.
+  const [pfzData, setPfzData] = useState<GeoJsonFeatureCollection | null>(null);
+  const pfzRequestedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const loc = latest?.location;
+    if (!activeLayers.has("pfz") || !loc) return;
+    const key = `${loc.latitude.toFixed(3)},${loc.longitude.toFixed(3)}`;
+    if (pfzRequestedFor.current === key) return;
+    pfzRequestedFor.current = key;
+    const controller = new AbortController();
+    fetchPfzLayer(loc.latitude, loc.longitude, controller.signal)
+      .then(setPfzData)
+      .catch(() => setPfzData(null));
+    return () => controller.abort();
+  }, [activeLayers, latest?.location]);
+
+  const layerData = useMemo(
+    () => (pfzData ? { ...gis.data, pfz: pfzData } : gis.data),
+    [gis.data, pfzData],
+  );
+
   const toggles = useMemo(
     () => buildLayerToggles(latest, gis.manifest),
     [latest, gis.manifest],
@@ -118,7 +146,7 @@ export default function WorkspacePage() {
         </aside>
 
         <main className="workspace__map">
-          <MarineMap resp={latest} activeLayers={activeLayers} layerData={gis.data} />
+          <MarineMap resp={latest} activeLayers={activeLayers} layerData={layerData} />
           <div className="workspace__map-overlay">
             <LayerControl toggles={toggles} active={activeLayers} onToggle={onToggleLayer} />
             <DataTierLegend />
@@ -163,6 +191,10 @@ export default function WorkspacePage() {
                 {/* PRIMARY — the operational answer, one scannable block. */}
                 <DecisionCard resp={latest} />
 
+                {/* LIVE OFFICIAL ADVISORY — deliberately separate from the
+                    computed decision/risk above and below it. */}
+                {latest.advisory && <AdvisoryPanel resp={latest} />}
+
                 {/* SECONDARY — supporting operational status. */}
                 <SuitabilityPanel resp={latest} />
                 {latest.route && <RoutePanel resp={latest} />}
@@ -180,6 +212,11 @@ export default function WorkspacePage() {
                 {latest.environmental && (
                   <Disclose title={t("verdict.envContext")}>
                     <EnvironmentalPanel resp={latest} />
+                  </Disclose>
+                )}
+                {latest.decision && latest.status === "OK" && (
+                  <Disclose title={t("verdict.whatIf")}>
+                    <WhatIfPanel resp={latest} />
                   </Disclose>
                 )}
               </>

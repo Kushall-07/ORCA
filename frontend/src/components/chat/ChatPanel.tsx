@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n";
 import { getStakeholder, type StakeholderId } from "../../stakeholders";
 import type { ChatMessage } from "../../hooks/useOrcaQuery";
+import { useSpeechInput } from "../../hooks/useSpeechInput";
+import { useSpeechOutput } from "../../hooks/useSpeechOutput";
 import { Spinner } from "../common";
 
 function StatusLine({ msg }: { msg: ChatMessage }) {
@@ -30,6 +32,38 @@ function StatusLine({ msg }: { msg: ChatMessage }) {
   );
 }
 
+function ReadAloudButton({ msg }: { msg: ChatMessage }) {
+  const { t, lang } = useI18n();
+  const tts = useSpeechOutput();
+  const speaking = tts.speakingId === msg.id;
+  // Speak only the concise assistant explanation — never JSON / provenance.
+  const text = msg.text?.trim() ?? "";
+  if (!text) return null;
+
+  const label = !tts.supported
+    ? t("voice.tts.unsupported")
+    : speaking
+      ? t("voice.tts.stop")
+      : t("voice.tts.play");
+
+  return (
+    <button
+      type="button"
+      className={`msg__tts ${speaking ? "is-speaking" : ""}`}
+      onClick={() => (speaking ? tts.stop() : tts.speak(msg.id, text, lang))}
+      disabled={!tts.supported}
+      aria-pressed={speaking}
+      aria-label={label}
+      title={label}
+    >
+      <span aria-hidden>{speaking ? "■" : "🔊"}</span>
+      <span className="msg__tts-label">
+        {speaking ? t("voice.speaking") : t("voice.tts.play")}
+      </span>
+    </button>
+  );
+}
+
 function MessageBubble({ msg, onRetry }: { msg: ChatMessage; onRetry: () => void }) {
   const { t } = useI18n();
   const isUser = msg.role === "user";
@@ -53,6 +87,7 @@ function MessageBubble({ msg, onRetry }: { msg: ChatMessage; onRetry: () => void
               <p className="msg__clarify">{msg.response.clarification_question}</p>
             )}
           {!isUser && <StatusLine msg={msg} />}
+          {!isUser && msg.text && <ReadAloudButton msg={msg} />}
         </div>
       )}
     </div>
@@ -78,6 +113,13 @@ export function ChatPanel({
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const suggestions = getStakeholder(stakeholder).suggestions[lang];
+
+  // Speech-to-text: recognised text is appended to the draft only. The user
+  // still reviews / edits and presses Send, so the normal ORCA pipeline
+  // (Query Understanding → LangGraph → deterministic core) is always used.
+  const mic = useSpeechInput(lang, (text) => {
+    setDraft((d) => (d.trim() ? `${d.trimEnd()} ${text}` : text));
+  });
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -166,10 +208,42 @@ export function ChatPanel({
             }
           }}
         />
+        <button
+          type="button"
+          className={`btn chat__mic ${mic.listening ? "is-listening" : ""}`}
+          onClick={mic.toggle}
+          disabled={loading || !mic.supported}
+          aria-pressed={mic.listening}
+          aria-label={
+            !mic.supported
+              ? t("voice.mic.unsupported")
+              : mic.listening
+                ? t("voice.mic.stop")
+                : t("voice.mic.start")
+          }
+          title={
+            !mic.supported
+              ? t("voice.mic.unsupported")
+              : mic.listening
+                ? t("voice.mic.stop")
+                : t("voice.mic.start")
+          }
+        >
+          <span aria-hidden>{mic.listening ? "■" : "🎤"}</span>
+        </button>
         <button type="submit" className="btn btn--primary" disabled={loading || !draft.trim()}>
           {t("chat.send")}
         </button>
       </form>
+      {(mic.listening || mic.error) && (
+        <p
+          className={`chat__voice-status ${mic.error ? "is-error" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          {mic.error ? t("voice.mic.error") : t("voice.listening")}
+        </p>
+      )}
     </div>
   );
 }

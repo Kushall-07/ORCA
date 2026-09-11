@@ -14,6 +14,7 @@ from app.agents.environmental import EnvironmentalAgent
 from app.agents.evidence_explanation import ExplanationAgent
 from app.agents.historical_environment import HistoricalEnvironmentalAgent
 from app.agents.gis_geofencing import GisGeofencingAgent
+from app.agents.marine_advisory import MarineAdvisoryAgent
 from app.agents.oceanographic import OceanographicAgent
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
@@ -30,6 +31,7 @@ from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
 from app.reasoning.arbitration import HierarchyArbitrator
 from app.risk.engine import RiskEngine
+from app.services.cache import InMemoryCache, JsonCache
 from app.services.llm import build_llm_client
 from app.session.store import InMemorySessionStore, SessionStore
 from app.suitability.engine import SuitabilityEngine
@@ -88,6 +90,14 @@ class OrcaDeps:
     neighbourhood_engine: EnvironmentalNeighbourhoodEngine | None = None
     neighbourhood_probe: object = None  # async (lat, lon, when, *, half_width_deg, settings[, client]) -> ChlorophyllNeighbourhood
 
+    # Official IMD marine advisory (A). Optional / non-blocking; when absent
+    # the collect_advisory node simply skips (advisory stays "unavailable").
+    advisory_agent: object = None  # MarineAdvisoryAgent-like: async fetch(coord, when) -> AgentResult
+    # Official INCOIS PFZ reference (B). Shared cache for the pfz_node and the
+    # /gis/layers/pfz endpoint so repeated map-layer toggling does not re-fetch
+    # INCOIS on every request. Strictly isolated from Risk / Safety / Decision.
+    pfz_cache: JsonCache = field(default_factory=lambda: JsonCache(InMemoryCache()))
+
 
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
     settings = settings or get_settings()
@@ -113,4 +123,6 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         stability_engine=EnvironmentalStabilityEngine(),
         neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
         neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
+        advisory_agent=MarineAdvisoryAgent(settings=settings),
+        pfz_cache=JsonCache(InMemoryCache()),
     )

@@ -9,6 +9,8 @@ import type {
   QueryRequestBody,
   QueryResponse,
   ReferenceRegistryEntry,
+  WhatIfRequestBody,
+  WhatIfResponse,
 } from "../types/api";
 
 export class ApiError extends Error {
@@ -107,6 +109,50 @@ export async function postQuery(
   });
 }
 
+/**
+ * POST /whatif - deterministic scenario / sensitivity simulation.
+ *
+ * The backend returns a structured `{ error: { code, message } }` body (HTTP
+ * 422) for the expected failure modes - no baseline yet, stale baseline, invalid
+ * perturbation - so this resolves with that body instead of throwing. It throws
+ * an `ApiError` only for a network / timeout / non-JSON failure.
+ */
+export async function postWhatIf(
+  body: WhatIfRequestBody,
+  signal?: AbortSignal,
+): Promise<WhatIfResponse> {
+  const controller = new AbortController();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  const timer = window.setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/whatif`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    window.clearTimeout(timer);
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new ApiError("The what-if request to ORCA timed out.", "timeout");
+    }
+    throw new ApiError(
+      err instanceof Error ? err.message : "Marine intelligence service unreachable.",
+      "network",
+    );
+  }
+  window.clearTimeout(timer);
+  try {
+    return (await response.json()) as WhatIfResponse;
+  } catch {
+    throw new ApiError("ORCA returned an unreadable what-if response.", "parse");
+  }
+}
+
 export async function fetchGisLayerManifest(
   signal?: AbortSignal,
 ): Promise<GisLayerMeta[]> {
@@ -132,6 +178,32 @@ export async function fetchReferenceRegistry(
     return data.entries ?? [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Live official INCOIS PFZ reference geometry matched to (lat, lon).
+ * Unlike the static layers, this is fetched fresh per query location - the
+ * backend caches the underlying INCOIS WFS fetch, so repeated layer toggles
+ * for the same location do not re-hit INCOIS. Returns `null` (not a throw)
+ * when the official source has no geometry for this location - the caller
+ * must show that honestly, never render a circle or a fabricated zone.
+ */
+export async function fetchPfzLayer(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+): Promise<GeoJsonFeatureCollection | null> {
+  try {
+    return await request<GeoJsonFeatureCollection>(
+      `/gis/layers/pfz?lat=${lat}&lon=${lon}`,
+      { signal },
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.kind === "http" && err.status === 404) {
+      return null;
+    }
+    throw err;
   }
 }
 

@@ -199,6 +199,25 @@ async def collect_environment(deps, state: OrcaGraphState) -> dict:  # type: ign
     return {"environment_result": res, "agent_trace": [token]}
 
 
+async def collect_advisory(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Official IMD marine advisory (A). Strictly non-blocking: no advisory
+    agent, a short-circuited pipeline, an unresolved location, or any agent
+    failure all resolve to a structured "unavailable" result - never a graph
+    failure. Location -> marine-area matching and severity classification are
+    both deterministic (app.agents.marine_area / app.risk.advisory_policy) -
+    no LLM ever decides applicability or severity."""
+    coord = state.get("resolved_origin")
+    agent = getattr(deps, "advisory_agent", None)
+    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None or agent is None:
+        return {"advisory_result": None, "agent_trace": ["advisory:skip"]}
+    try:
+        res = await agent.fetch(coord, state["decision_time"])
+    except Exception as exc:  # noqa: BLE001 - the agent should not raise, but be defensive
+        res = missing_result("advisory", coord, state["decision_time"], f"advisory agent error: {exc}")
+    token = "advisory" if res.has_data else "advisory:skip"
+    return {"advisory_result": res, "agent_trace": [token]}
+
+
 # ---- fabric / reasoning -------------------------------------------------
 async def fabric_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     if state.get("pipeline_status") in _SHORT_CIRCUIT:
@@ -212,6 +231,7 @@ async def fabric_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         ocean=state.get("ocean_result"),
         gis=state.get("gis_result"),
         environment=state.get("environment_result"),
+        advisory=state.get("advisory_result"),
         references=refs,
         now=_now(state),
     )
@@ -367,6 +387,7 @@ async def risk_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
         wave_height_m=pick("wave_height"),
         wind_speed_ms=pick("wind_speed"),
         min_pressure_hpa=pick("mean_sea_level_pressure"),
+        advisory_level=pick("advisory_level"),
         weather_codes=weather_codes,
         geofence_result=dest_geofence,
         evidence=evidence,
@@ -398,15 +419,42 @@ async def policy_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         if ocean is None or not ocean.has_data:
             required_present = required_present  # risk engine already flags wave missing
 
+    advisory_severity, advisory_availability, advisory_applicable, advisory_area = (
+        _advisory_safety_inputs(state)
+    )
+
     safety = evaluate_safety(
         SafetyGuardInput(
             risk=risk,
             destination_geofence=state.get("dest_geofence"),
             route_geofence=None,
             required_evidence_present=required_present,
+            advisory_severity=advisory_severity,
+            advisory_availability=advisory_availability,
+            advisory_applicable=advisory_applicable,
+            advisory_area=advisory_area,
         )
     )
     return {"safety_result": safety, "agent_trace": ["policy"]}
+
+
+def _advisory_safety_inputs(state: OrcaGraphState):  # type: ignore[no-untyped-def]
+    """Deterministic projection of the official advisory onto the Safety
+    Guard's inputs. "Applicable" reuses the Temporal Validity Gate's own
+    verdict on the fabric's ``advisory_level`` record (VALID/STALE) rather
+    than a parallel temporal check - one gate, one answer."""
+    agent_result = state.get("advisory_result")
+    advisory = getattr(agent_result, "advisory", None) if agent_result is not None else None
+    if advisory is None:
+        return None, None, False, None
+
+    fabric = state.get("fabric")
+    applicable = False
+    if fabric is not None:
+        records = fabric.for_variable("advisory_level")
+        applicable = advisory.is_available and any(r.is_usable for r in records)
+
+    return advisory.severity, advisory.availability, applicable, advisory.area
 
 
 async def decision_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
@@ -456,6 +504,29 @@ async def alerts_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         conflicts=tuple(state.get("conflicts", ())),
     )
     return {"alerts": alerts, "agent_trace": ["alerts"]}
+
+
+async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Official INCOIS PFZ reference (B). Strictly downstream of decision and
+    completely isolated from Risk / Safety / Decision / routing - a
+    fishing-potential reference summary only, never merged into ORCA's
+    computed suitability or risk. Non-blocking: any failure (network, schema,
+    no coordinate) resolves to a skipped/unavailable result, never a graph
+    failure."""
+    coord = state.get("resolved_origin")
+    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None:
+        return {"pfz_result": None, "agent_trace": ["pfz:skip"]}
+    try:
+        from app.gis.pfz_reference import build_pfz_reference
+
+        result = await build_pfz_reference(
+            coord, settings=deps.settings, cache=deps.pfz_cache
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("pfz node error: %s", type(exc).__name__)
+        return {"pfz_result": None, "agent_trace": ["pfz:skip"]}
+    token = "pfz" if result.zone_count > 0 or result.nearest_landing_centre else "pfz:skip"
+    return {"pfz_result": result, "agent_trace": [token]}
 
 
 _ENV_VARS = ("sea_surface_temperature", "chlorophyll_a")
@@ -881,6 +952,9 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         stability=state.get("environmental_stability"),
         neighbourhood=state.get("environmental_neighbourhood"),
         environment_tier=_tier(state.get("environment_result")),
+        advisory=getattr(state.get("advisory_result"), "advisory", None),
+        advisory_tier=_tier(state.get("advisory_result")),
+        pfz=state.get("pfz_result"),
     )
     return {"provenance": prov, "agent_trace": ["provenance"]}
 
@@ -913,12 +987,26 @@ async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
     decision = state.get("decision")
     status = state.get("pipeline_status") or STATUS_OK
     if u is not None:
+        # Carry the realised Risk Engine input so a follow-up POST /whatif can
+        # perturb a COPY of it and re-run the SAME deterministic chain. Purely
+        # additive; nothing on the live path reads this back.
+        safety = state.get("safety_result")
+        required_evidence_present = not (
+            safety is not None
+            and "required_evidence_missing" in safety.triggered_rules
+        )
         deps.session_store.append(
             state["session_id"],
             SessionTurn(
                 message=state["message"],
                 understanding=u,
                 decision_status=decision.status.value if decision else None,
+                risk_input=state.get("risk_input"),
+                required_evidence_present=(
+                    required_evidence_present
+                    if state.get("risk_input") is not None
+                    else None
+                ),
             ),
         )
     return {"pipeline_status": status, "agent_trace": ["assemble"]}

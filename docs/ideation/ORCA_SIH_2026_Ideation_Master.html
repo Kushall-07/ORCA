@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ORCA — SIH 2026 Ideation Master</title>
+<style>
+  :root{
+    --navy:#0B2545;
+    --navy-2:#13315C;
+    --navy-3:#1B3A5C;
+    --blue:#2A6F97;
+    --cyan:#3FA9C9;
+    --ink:#1b2733;
+    --muted:#5b6b7a;
+    --line:#d5dee7;
+    --tint:#eef4fa;
+    --tint-2:#e3edf6;
+    --warn-bg:#fdf3e7;
+    --warn-line:#e6b980;
+    --ok-bg:#eaf5ee;
+    --ok-line:#9fccb0;
+    --page: 210mm;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{ margin:0; padding:0; }
+
+  body{
+    font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color:var(--ink);
+    font-size:9.9pt;
+    line-height:1.42;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  /* ---------- page model ---------- */
+  @page{
+    size:A4;
+    margin:14mm 15mm 15mm 15mm;
+  }
+
+  .sheet{ position:relative; }
+
+  /* Sections flow to fill pages; strong rule divides them. Hard page
+     breaks are reserved for the major sections (class "pb"). */
+  section.part{
+    break-before:auto;
+    margin-top:8mm;
+    padding-top:5mm;
+    border-top:2pt solid var(--navy);
+  }
+  section.part.pb{ break-before:page; margin-top:0; padding-top:0; border-top:0; }
+  section.sheet{ break-before:auto; }
+  .no-break{ break-inside:avoid; }
+  h1,h2,h3,h4{ break-after:avoid; }
+  .partno{ break-after:avoid; break-inside:avoid; }
+  .lead{ break-before:avoid; }
+  table{ break-inside:auto; }
+  tr{ break-inside:avoid; }
+  thead{ display:table-header-group; }
+
+  /* ---------- cover ---------- */
+  .cover{
+    break-after:page;
+    margin:-14mm -15mm -15mm -15mm;
+    background:
+      radial-gradient(1200px 600px at 78% -8%, rgba(63,169,201,.28), transparent 60%),
+      radial-gradient(900px 500px at 8% 110%, rgba(42,111,151,.32), transparent 55%),
+      linear-gradient(160deg, #0B2545 0%, #0d2a4f 45%, #0a1f3c 100%);
+    color:#eaf2f8;
+    min-height:297mm;
+    padding:32mm 26mm 26mm 26mm;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .cover .kicker{
+    font-size:9pt;
+    letter-spacing:.34em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    font-weight:600;
+  }
+  .cover h1.title{
+    font-size:52pt;
+    line-height:1.02;
+    margin:14mm 0 4mm 0;
+    font-weight:700;
+    letter-spacing:.01em;
+  }
+  .cover .expand{
+    font-size:14.5pt;
+    color:#bcd3e4;
+    font-weight:400;
+    max-width:150mm;
+    line-height:1.4;
+  }
+  .cover .rule{
+    height:3pt; width:44mm;
+    background:linear-gradient(90deg,var(--cyan),transparent);
+    margin:10mm 0;
+  }
+  .cover .meta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6mm 14mm;
+    font-size:10pt;
+    max-width:170mm;
+  }
+  .cover .meta .k{
+    color:var(--cyan);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    font-size:7.6pt;
+    font-weight:700;
+    margin-bottom:1.5mm;
+  }
+  .cover .meta .v{ color:#e7f0f7; }
+  .cover .principle{
+    margin-top:12mm;
+    border-left:3pt solid var(--cyan);
+    padding:4mm 0 4mm 8mm;
+    font-family:Georgia,"Times New Roman",serif;
+    font-size:12pt;
+    font-style:italic;
+    color:#d6e6f1;
+    max-width:165mm;
+  }
+  .cover .foot{
+    font-size:8.4pt;
+    color:#8fb0c7;
+    display:flex;
+    justify-content:space-between;
+    border-top:1pt solid rgba(255,255,255,.16);
+    padding-top:4mm;
+  }
+
+  /* ---------- section dividers ---------- */
+  h2.h{
+    font-size:17.5pt;
+    color:var(--navy);
+    margin:0 0 1mm 0;
+    letter-spacing:.005em;
+  }
+  .partno{
+    font-size:7.6pt;
+    font-weight:700;
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--blue);
+    margin-bottom:1.5mm;
+  }
+  .lead{
+    font-size:10.4pt;
+    color:var(--navy-2);
+    border-bottom:1.2pt solid var(--tint-2);
+    padding-bottom:2mm;
+    margin-bottom:3mm;
+  }
+  h3{ font-size:11pt; color:var(--navy-2); margin:4mm 0 1mm; }
+  h4{ font-size:9.9pt; color:var(--navy-2); margin:3mm 0 .8mm; }
+  p{ margin:0 0 2mm; }
+  ul,ol{ margin:0 0 2.4mm; padding-left:5mm; }
+  li{ margin:0 0 1mm; }
+  strong{ color:var(--navy); }
+  em.q{ font-family:Georgia,serif; color:var(--navy-2); }
+
+  a{ color:var(--blue); text-decoration:none; }
+
+  /* ---------- callouts ---------- */
+  .box{
+    border:.8pt solid var(--line);
+    border-left:3pt solid var(--blue);
+    background:var(--tint);
+    padding:2.8mm 3.4mm;
+    margin:2.6mm 0 3mm;
+    font-size:9.3pt;
+  }
+  .box .bt{
+    font-weight:700;
+    color:var(--navy);
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    font-size:7.6pt;
+    margin-bottom:1.2mm;
+  }
+  .box.warn{ background:var(--warn-bg); border-left-color:#c98a2e; }
+  .box.warn .bt{ color:#8a5a12; }
+  .box.ok{ background:var(--ok-bg); border-left-color:#3f9066; }
+  .box.ok .bt{ color:#2c6a49; }
+
+  .pullquote{
+    font-family:Georgia,serif;
+    font-size:11.5pt;
+    font-style:italic;
+    color:var(--navy);
+    border-left:3pt solid var(--cyan);
+    padding:1.5mm 0 1.5mm 6mm;
+    margin:3.5mm 0;
+    line-height:1.38;
+  }
+
+  /* ---------- tags ---------- */
+  .tag{
+    display:inline-block;
+    font-size:7pt;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:1pt 5pt;
+    border-radius:2pt;
+    vertical-align:middle;
+  }
+  .t-impl{ background:#dced e0; background:#daeee2; color:#1f5c3d; border:.6pt solid #9fccb0; }
+  .t-ext{ background:#e5edf6; color:#274b73; border:.6pt solid #a9c2de; }
+  .t-fut{ background:#efe9f4; color:#5a3f77; border:.6pt solid #c3aed8; }
+
+  /* ---------- tables ---------- */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:8.7pt;
+    margin:2.4mm 0 3mm;
+  }
+  caption{
+    caption-side:top;
+    text-align:left;
+    font-size:7.8pt;
+    color:var(--muted);
+    padding-bottom:1mm;
+    letter-spacing:.03em;
+  }
+  th{
+    background:var(--navy);
+    color:#fff;
+    text-align:left;
+    padding:1.6mm 2.2mm;
+    font-size:8pt;
+    letter-spacing:.03em;
+    vertical-align:top;
+  }
+  td{
+    border-bottom:.6pt solid var(--line);
+    padding:1.5mm 2.2mm;
+    vertical-align:top;
+  }
+  tr:nth-child(even) td{ background:#f6f9fc; }
+  td.y{ color:#1f6b45; font-weight:700; text-align:center; }
+  td.n{ color:#9aa7b2; text-align:center; }
+
+  /* ---------- flow diagram ---------- */
+  .flow{ margin:3mm 0 3.5mm; }
+  .flow .step{
+    border:.9pt solid var(--line);
+    background:#fff;
+    border-radius:3pt;
+    padding:1.7mm 3mm;
+    font-size:8.6pt;
+    position:relative;
+    margin:0 auto;
+    max-width:120mm;
+    text-align:center;
+  }
+  .flow .step .s-t{ font-weight:700; color:var(--navy); }
+  .flow .step .s-d{ color:var(--muted); font-size:7.6pt; }
+  .flow .step.llm{ border-color:var(--cyan); background:#f0f9fc; }
+  .flow .step.det{ border-color:#a9c2de; background:#f2f7fc; }
+  .flow .step.safe{ border-color:#e0b06b; background:var(--warn-bg); }
+  .flow .arrow{
+    text-align:center;
+    color:var(--blue);
+    font-size:8pt;
+    line-height:1;
+    margin:.7mm auto;
+  }
+  .flow .parallel{
+    display:flex;
+    gap:3mm;
+    justify-content:center;
+    margin:0 auto;
+    max-width:170mm;
+  }
+  .flow .parallel .step{ flex:1; max-width:none; }
+
+  .legendrow{ display:flex; gap:5mm; flex-wrap:wrap; font-size:8pt; color:var(--muted); margin-top:2mm; }
+  .legendrow span b{ display:inline-block; width:8pt; height:8pt; border-radius:2pt; vertical-align:middle; margin-right:3pt; border:.8pt solid var(--line); }
+  .sw-llm{ background:#f0f9fc; border-color:var(--cyan) !important; }
+  .sw-det{ background:#f2f7fc; border-color:#a9c2de !important; }
+  .sw-safe{ background:var(--warn-bg); border-color:#e0b06b !important; }
+
+  /* ---------- two-column helper ---------- */
+  .cols2{ display:grid; grid-template-columns:1fr 1fr; gap:0 8mm; }
+  .cols2 .box{ margin-top:0; }
+
+  .mini{
+    font-size:8.4pt;
+    color:var(--muted);
+    border-top:.6pt solid var(--line);
+    padding-top:2mm;
+    margin-top:3mm;
+  }
+
+  /* contents */
+  .toc{ font-size:9.4pt; }
+  .toc .row{ display:flex; justify-content:space-between; border-bottom:.5pt dotted var(--line); padding:1mm 0; }
+  .toc .row .n{ color:var(--blue); font-weight:700; width:13mm; }
+  .toc .row .t{ flex:1; }
+  .toc .grp{ margin-top:2.6mm; margin-bottom:.6mm; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.14em; font-size:7.4pt; }
+
+  .kicker-note{ font-size:8.6pt; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover">
+  <div>
+    <div class="kicker">Smart India Hackathon 2026 &nbsp;·&nbsp; Ideation / Evaluation Brief</div>
+    <h1 class="title">ORCA</h1>
+    <div class="expand">Marine EcOsystem Reasoning with Collaborative Agents<br>
+      <span style="font-size:11pt;color:#9dbdd3">An evidence-grounded, safety-constrained, multi-agent decision-support system for the sea.</span>
+    </div>
+    <div class="rule"></div>
+    <div class="meta">
+      <div><div class="k">Problem Statement</div><div class="v">SIH26176 — Marine intelligence, fishing safety &amp; coastal decision support</div></div>
+      <div><div class="k">Sponsor / Domain</div><div class="v">ISRO — Disaster Management · Marine Intelligence · Fishing Safety</div></div>
+      <div><div class="k">Status of build</div><div class="v">Working software system — deterministic core, agentic pipeline, operator frontend, environmental research layer</div></div>
+      <div><div class="k">This document</div><div class="v">Explains the <em>implemented</em> project. Every capability claim is checked against the repository.</div></div>
+    </div>
+    <div class="principle">
+      &ldquo;The LLM interprets and explains. Deterministic code computes and enforces safety.
+      Evidence supports every claim. The human makes the final decision.&rdquo;
+    </div>
+  </div>
+  <div class="foot">
+    <span>Prepared for the ideation discussion</span>
+    <span>Implemented&nbsp;·&nbsp;Reference/external&nbsp;·&nbsp;Future scope are labelled throughout</span>
+  </div>
+</div>
+
+<!-- ============================ CONTENTS ============================ -->
+<section class="sheet">
+  <div class="partno">Navigation</div>
+  <h2 class="h">Contents</h2>
+  <div class="lead">Read top-to-bottom for the argument: problem → impact → gap → ORCA → how it works → why it is different → what is built → impact.</div>
+
+  <div class="toc">
+    <div class="grp">The case</div>
+    <div class="row"><span class="n">1</span><span class="t">Executive summary</span></div>
+    <div class="row"><span class="n">2</span><span class="t">The problem statement</span></div>
+    <div class="row"><span class="n">3</span><span class="t">How the problem affects society and people</span></div>
+    <div class="row"><span class="n">4</span><span class="t">Existing ecosystem &amp; current approaches</span></div>
+    <div class="row"><span class="n">5</span><span class="t">The gap ORCA fills</span></div>
+
+    <div class="grp">How ORCA works</div>
+    <div class="row"><span class="n">6</span><span class="t">How ORCA solves the problem — the pipeline</span></div>
+    <div class="row"><span class="n">7</span><span class="t">The agents</span></div>
+    <div class="row"><span class="n">8</span><span class="t">The deterministic core</span></div>
+    <div class="row"><span class="n">9</span><span class="t">Data fabric and evidence intelligence</span></div>
+    <div class="row"><span class="n">10</span><span class="t">The risk engine</span></div>
+    <div class="row"><span class="n">11</span><span class="t">Safety architecture</span></div>
+    <div class="row"><span class="n">12</span><span class="t">Fishing suitability vs operational safety</span></div>
+    <div class="row"><span class="n">13</span><span class="t">Environmental intelligence</span></div>
+    <div class="row"><span class="n">14</span><span class="t">Handling missing / conflicting data</span></div>
+    <div class="row"><span class="n">15</span><span class="t">Provenance and reproducibility</span></div>
+
+    <div class="grp">Why it matters</div>
+    <div class="row"><span class="n">16</span><span class="t">How ORCA is better than existing approaches</span></div>
+    <div class="row"><span class="n">17</span><span class="t">Why this is not just a chatbot</span></div>
+    <div class="row"><span class="n">18</span><span class="t">What has actually been implemented</span></div>
+    <div class="row"><span class="n">19</span><span class="t">Multilingual capability</span></div>
+    <div class="row"><span class="n">20</span><span class="t">Real-world use cases</span></div>
+    <div class="row"><span class="n">21</span><span class="t">What makes ORCA innovative</span></div>
+    <div class="row"><span class="n">22</span><span class="t">Impact</span></div>
+    <div class="row"><span class="n">23</span><span class="t">Limitations and responsible AI</span></div>
+    <div class="row"><span class="n">24</span><span class="t">Future scope</span></div>
+    <div class="row"><span class="n">25</span><span class="t">Why ORCA matters</span></div>
+    <div class="row"><span class="n">26</span><span class="t">Judge takeaways</span></div>
+    <div class="row"><span class="n">—</span><span class="t">References</span></div>
+  </div>
+
+  <div class="box no-break" style="margin-top:6mm">
+    <div class="bt">How claims are labelled in this document</div>
+    <p style="margin-bottom:1.5mm"><span class="tag t-impl">Implemented now</span> &nbsp; A capability present in the ORCA repository today, covered by the automated test suites.</p>
+    <p style="margin-bottom:1.5mm"><span class="tag t-ext">Reference / external</span> &nbsp; An existing external system or dataset ORCA consumes or points to — not built by ORCA.</p>
+    <p style="margin-bottom:0"><span class="tag t-fut">Future scope</span> &nbsp; A realistic next step that is <em>not</em> built yet and is not implied to be.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 1 ============================ -->
+<section class="part sheet pb">
+  <div class="partno">Part 1</div>
+  <h2 class="h">Executive summary</h2>
+  <div class="lead">ORCA is not another chatbot for fishermen. It is a controlled reasoning pipeline that turns fragmented marine data into an explainable, safety-checked decision — with a human always in the loop.</div>
+
+  <h3>What is ORCA?</h3>
+  <p>ORCA — <strong>Marine EcOsystem Reasoning with Collaborative Agents</strong> — is a software-only, agentic decision-support platform for the sea. A user asks a plain-language question (&ldquo;Can I go fishing tomorrow morning from Mangalore?&rdquo;, &ldquo;What is the safest route to Kochi?&rdquo;, &ldquo;Compare chlorophyll-a near Mangalore with the last month&rdquo;). ORCA collects the relevant weather, ocean, spatial and environmental intelligence in parallel, validates it, arbitrates between conflicting sources, computes risk deterministically, enforces safety policy that the language model cannot override, and returns a decision together with the evidence and the reasoning graph behind it.</p>
+
+  <h3>What problem does it solve?</h3>
+  <p>Marine decision-making needs weather, waves, wind, swell, pressure, marine forecasts, official advisories, spatial restrictions (protected areas, EEZ, coastal boundaries), reference fishing-zone advisories, and environmental observations. <strong>This data largely exists — but it is fragmented, heterogeneous, differently timed, and hard to turn into one contextual decision.</strong> A person today must open several portals and maps, interpret domain products, and mentally fuse them to answer a single question: &ldquo;Is it safe to proceed, why, where can I go, and what supports that?&rdquo;</p>
+
+  <h3>Who is affected, and why it matters</h3>
+  <p>Fishermen and small marine operators making pre-departure calls; coastal communities whose livelihoods track the sea; disaster-management staff who must synthesise many feeds quickly during hazardous weather; and researchers who need reproducible environmental context. Fragmented information <strong>increases decision-making burden</strong> and <strong>can contribute to poor situational awareness</strong> and slower interpretation when conditions change.</p>
+
+  <h3>What is fundamentally different about ORCA?</h3>
+  <p>The intelligence is <strong>the whole controlled pipeline</strong>, not the language model alone. ORCA combines, in one workflow:</p>
+  <ul>
+    <li><strong>LLM interpretation</strong> of the question and <strong>LLM explanation</strong> of the result — and nothing else;</li>
+    <li><strong>multi-source marine intelligence</strong> collected in parallel with per-source provenance;</li>
+    <li><strong>deterministic computation</strong> of every number — risk, distances, polygon intersection, routing;</li>
+    <li><strong>evidence arbitration</strong> over a fixed five-tier hierarchy, with conflicts preserved, never averaged away;</li>
+    <li><strong>spatial / geofencing intelligence</strong> as a first-class part of reasoning, not a separate map;</li>
+    <li><strong>risk and fishing-suitability kept deliberately separate</strong>, so &ldquo;good conditions for fish&rdquo; is never confused with &ldquo;safe to go to sea&rdquo;;</li>
+    <li><strong>a safety policy layer the LLM cannot override</strong>;</li>
+    <li><strong>a decision provenance graph</strong> and numeric grounding so every figure in the answer traces to a source;</li>
+    <li><strong>a human-readable explanation</strong> in English, Hindi or Kannada that can describe a decision but never change it.</li>
+  </ul>
+
+  <div class="pullquote">LLM interprets and explains &rarr; deterministic code computes and enforces safety &rarr; evidence supports the decision &rarr; the human decides.</div>
+
+  <h3>What has actually been implemented <span class="tag t-impl">Implemented now</span></h3>
+  <p>A working system: a deterministic core (domain models, risk engine, GIS primitives, safety guard, decision engine, A* routing with three-layer hard-geofence protection); a LangGraph pipeline of 25 typed nodes with the LLM confined to two of them; seven collaborating agents plus non-blocking environmental data agents; a Marine Data Fabric with a Temporal Validity Gate, Spatial-Temporal Fusion, a deterministic Evidence Arbitration hierarchy and Conflict Detection; a Decision Provenance Graph with numeric grounding; a deterministic Environmental Productivity / Comparison / Evidence / Stability / Neighbourhood research layer that is provably isolated from safety; a React operator workspace (chat, map, decision, evidence, provenance, alerts, activity, report); English / Hindi / Kannada throughout; a deterministic 26-scenario demo suite executed through the real pipeline; and roughly 780 backend plus 36 frontend automated tests (per the project&rsquo;s Phase 9 records), all run with external APIs and the LLM mocked.</p>
+
+  <div class="box warn no-break">
+    <div class="bt">What ORCA is not</div>
+    <p style="margin:0">ORCA does not perform certified real-time cyclone or lightning detection; it does not predict fish presence, abundance or catch; its environmental indicators do not determine fishing safety; and it does not replace official marine or weather advisories. Those remain authoritative. ORCA is decision <em>support</em>, not autonomous command.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 2 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 2</div>
+  <h2 class="h">The problem statement</h2>
+  <div class="lead">The deeper problem is not that marine data is unavailable. It is that the data exists but is fragmented, heterogeneous, and hard to turn into a single contextual decision.</div>
+
+  <h3>2.1 &nbsp; Core problem</h3>
+  <p>A marine decision — go or don&rsquo;t go, which route, is this area allowed — depends on many inputs at once:</p>
+  <div class="cols2">
+    <ul>
+      <li>weather: wind, temperature, precipitation, pressure</li>
+      <li>ocean: significant wave height, wave direction and period, swell</li>
+      <li>marine forecasts and sea-state outlooks</li>
+      <li>official advisories and cyclone bulletins</li>
+    </ul>
+    <ul>
+      <li>geospatial restrictions: protected areas, EEZ, coastal zones</li>
+      <li>reference fishing-zone (PFZ) advisories</li>
+      <li>environmental observations: SST, ocean-colour / chlorophyll-a</li>
+      <li>historical context for what is normal here</li>
+    </ul>
+  </div>
+  <p>Each lives in a different system, with a different interface, a different update rhythm, and a different intended audience. To answer one question a user must consult several of them and fuse the result in their head, under time pressure, often on a phone at the shore.</p>
+
+  <h3>2.2 &nbsp; Information fragmentation</h3>
+  <p>Source A gives weather. Source B gives ocean conditions. Source C gives spatial restrictions. Source D gives environmental observations. Source E may carry advisories. Individually, each is valuable and often excellent. Together, they are <strong>not a decision</strong>.</p>
+  <div class="pullquote">The data exists, but it is fragmented, heterogeneous and hard to turn into a single contextual decision.</div>
+  <p>A data portal is not a decision-support system. Raw availability of a satellite product does not, by itself, tell a fisherman whether tomorrow morning is safe, or a route planner which corridor avoids a restricted zone.</p>
+
+  <h3>2.3 &nbsp; Temporal uncertainty</h3>
+  <p>Marine information carries different timestamps and validity periods. A wave forecast valid for 06:00 tomorrow, a satellite composite from two days ago, an advisory issued this morning, and a cached value from six hours back are <em>not</em> interchangeable. Stale readings, mismatched observation times, missing observations, conflicting sources and different refresh rates can all push a naive summary toward a misleading conclusion. ORCA therefore needs an explicit notion of <strong>temporal validity</strong> and evidence handling — not a single &ldquo;latest value&rdquo;.</p>
+
+  <h3>2.4 &nbsp; Spatial uncertainty</h3>
+  <p>Marine decisions are inherently spatial: protected areas, EEZ boundaries, coastal zones, operator geofences, route restrictions, the origin and destination themselves, depth, and distance from the coastline. A text-only assistant cannot adequately reason about &ldquo;is this point inside a restricted polygon&rdquo; or &ldquo;does this corridor cross a hard boundary&rdquo;. That requires real geometry.</p>
+
+  <h3>2.5 &nbsp; Human interpretation burden</h3>
+  <p>A fisherman, operator or researcher should not have to manually reconcile several dashboards, maps, weather variables and restriction layers just to answer:</p>
+  <div class="box no-break" style="border-left-color:var(--cyan)">
+    <p style="margin:0"><em class="q">&ldquo;Is it safe to proceed?&rdquo; &nbsp;·&nbsp; &ldquo;Why?&rdquo; &nbsp;·&nbsp; &ldquo;Where can I go?&rdquo; &nbsp;·&nbsp; &ldquo;What evidence supports this?&rdquo;</em></p>
+  </div>
+  <p>Reducing that burden — while keeping every step transparent and keeping the human as the decision-maker — is one of ORCA&rsquo;s central motivations.</p>
+</section>
+
+<!-- ============================ PART 3 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 3</div>
+  <h2 class="h">How the problem affects society and people</h2>
+  <div class="lead">Fragmented marine information is not an abstract inconvenience. It changes the quality and speed of decisions for people whose safety and livelihoods depend on the sea.</div>
+
+  <h3>3.1 &nbsp; Fishermen and marine operators</h3>
+  <p>For a small-boat fisherman or a coastal operator, fragmented information can:</p>
+  <ul>
+    <li>weaken situational awareness before departure;</li>
+    <li>make the pre-departure &ldquo;go / no-go&rdquo; call harder and slower;</li>
+    <li>make it difficult to re-interpret conditions quickly when they change;</li>
+    <li>make spatial restrictions easy to misunderstand;</li>
+    <li>increase the cognitive burden of a routine decision;</li>
+    <li>and in the worst case, contribute to unnecessary exposure to marine hazards.</li>
+  </ul>
+  <p class="kicker-note">ORCA states these as decision-quality effects. It does not attach casualty or financial figures it cannot verify.</p>
+
+  <h3>3.2 &nbsp; Coastal communities</h3>
+  <p>Whole communities depend on the sea for income and food. Their fishing operations, trip planning, weather awareness, operational certainty and access to resources are all shaped by how well marine conditions and changes can be understood locally. Better access to <em>understandable</em> marine information supports steadier planning.</p>
+
+  <h3>3.3 &nbsp; Disaster management</h3>
+  <p>During hazardous conditions, a disaster-management user needs current conditions, warnings, spatial context, supporting evidence, an explicit confidence level, stated limitations, and explainable decisions — quickly, and from one place. A unified interface can reduce information fragmentation and speed synthesis, <strong>while official authorities remain the source of operational instructions</strong>.</p>
+
+  <h3>3.4 &nbsp; Researchers</h3>
+  <p>Researchers need a different kind of intelligence: environmental context (SST, chlorophyll-a), historical comparison, bounded stability, spatial representativeness, reproducibility, and clear source provenance. Crucially, this research information <strong>should not be blindly mixed into safety decisions</strong> — the two have different standards of evidence and different consequences.</p>
+
+  <h3>3.5 &nbsp; The system-level problem</h3>
+  <div class="pullquote">The problem is not simply a lack of marine data. It is the absence of an integrated, evidence-aware, spatial-temporal and safety-controlled reasoning layer over the data that already exists.</div>
+  <p>That missing layer is exactly what ORCA is built to be.</p>
+</section>
+
+<!-- ============================ PART 4 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 4</div>
+  <h2 class="h">Existing ecosystem &amp; current approaches</h2>
+  <div class="lead">India&rsquo;s marine information ecosystem is strong. These services provide valuable, authoritative data. ORCA&rsquo;s contribution is the integration and reasoning layer between those services and the decision-maker — not a replacement for any of them.</div>
+
+  <table class="no-break">
+    <caption>Existing capabilities and the burden that remains on the user&rsquo;s side of the decision</caption>
+    <thead><tr><th style="width:24%">Existing capability <span class="tag t-ext">external</span></th><th style="width:38%">What it provides</th><th style="width:38%">Remaining user burden (decision-making view)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>INCOIS — SAMUDRA app &amp; Ocean State Forecast</strong></td>
+        <td>Five-day ocean-state forecasts, PFZ advisories, high-wave / swell-surge / tsunami alerts; delivered to a large fisher population via app and SMS, in multiple coastal languages.</td>
+        <td>A forecast and an advisory are inputs, not a fused go / no-go with its own evidence trail. Spatial restrictions, routing and cross-source conflict handling sit outside the product.</td>
+      </tr>
+      <tr>
+        <td><strong>INCOIS — PFZ advisory service</strong></td>
+        <td>Potential Fishing Zone advisories built by oceanographers and remote-sensing experts from satellite SST and chlorophyll fronts, issued a few times per week.</td>
+        <td>Delivered as periodic advisories/graphics requiring interpretation; not combined with live operational safety, geofencing, or a per-query reasoning record.</td>
+      </tr>
+      <tr>
+        <td><strong>IMD / RSMC New Delhi</strong></td>
+        <td>Authoritative marine weather forecasts and the four-stage tropical-cyclone warning system for the Bay of Bengal and Arabian Sea.</td>
+        <td>Bulletins are authoritative but must be manually cross-referenced with ocean state, local restrictions and the specific trip. Machine-readable per-point integration is limited.</td>
+      </tr>
+      <tr>
+        <td><strong>MOSDAC (ISRO / SAC)</strong></td>
+        <td>Satellite meteorological and oceanographic data archive and derived products (cyclone genesis, rainfall alerts, short-range forecasts); free for non-commercial use.</td>
+        <td>A data and product portal aimed at researchers and analysts; domain knowledge needed to turn products into an operational decision for one location.</td>
+      </tr>
+      <tr>
+        <td><strong>Open-Meteo (weather &amp; marine API)</strong></td>
+        <td>Free, keyless weather and marine forecast API (wind, waves, pressure, weather codes, SST) under CC-BY 4.0, sourced from national weather services.</td>
+        <td>A raw API. No fusion, no spatial reasoning, no safety policy, no explanation, no provenance — by design.</td>
+      </tr>
+      <tr>
+        <td><strong>NOAA CoastWatch / Copernicus Marine (ocean colour)</strong></td>
+        <td>Global satellite chlorophyll-a and ocean-colour products via ERDDAP / a data toolbox.</td>
+        <td>Environmental observation products. They do not claim operational safety meaning, and require handling of cloud gaps and coastal-water optical complexity.</td>
+      </tr>
+      <tr>
+        <td><strong>Reference GIS layers</strong> (Marine Regions EEZ v12, Natural Earth coastline, GEBCO bathymetry, WDPA)</td>
+        <td>Curated spatial reference layers for boundaries, coastline and depth.</td>
+        <td>Static layers a user must load and interpret in a separate GIS tool; not fused into a live decision or a route constraint automatically.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="box no-break">
+    <div class="bt">The fair reading</div>
+    <p style="margin:0">These systems are <strong>not</strong> deficient at what they do. Each is a valuable, often authoritative, source. The gap is structural: <strong>information is distributed across services with different interfaces and purposes</strong>; users must manually cross-reference; environmental data is not automatically operational safety intelligence; spatial restrictions need separate interpretation; and provenance and uncertainty are not unified across all of them. ORCA addresses that integration-and-reasoning layer.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 5 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 5</div>
+  <h2 class="h">The gap ORCA fills</h2>
+  <div class="lead">Today the integration step is done by a person, under time pressure, with no record of how. ORCA makes that step an explicit, testable, reproducible software layer.</div>
+
+  <div class="cols2 no-break">
+    <div>
+      <h4>Existing ecosystem — the human is the integrator</h4>
+      <div class="flow">
+        <div class="step">Weather service</div><div class="arrow">&darr;</div>
+        <div class="step">Marine / ocean-state data</div><div class="arrow">&darr;</div>
+        <div class="step">PFZ / reference advisories</div><div class="arrow">&darr;</div>
+        <div class="step">GIS layers &amp; restrictions</div><div class="arrow">&darr;</div>
+        <div class="step">Environmental data</div><div class="arrow">&darr;</div>
+        <div class="step" style="border-style:dashed">Several different interfaces</div><div class="arrow">&darr;</div>
+        <div class="step safe">Human manually integrates it all</div><div class="arrow">&darr;</div>
+        <div class="step">Decision <span style="color:var(--muted)">(reasoning not recorded)</span></div>
+      </div>
+    </div>
+    <div>
+      <h4>ORCA — the integration layer is software</h4>
+      <div class="flow">
+        <div class="step">Multiple sources, in parallel</div><div class="arrow">&darr;</div>
+        <div class="step det">Marine Data Fabric</div><div class="arrow">&darr;</div>
+        <div class="step det">Temporal Validity Gate</div><div class="arrow">&darr;</div>
+        <div class="step det">Spatial-Temporal Fusion</div><div class="arrow">&darr;</div>
+        <div class="step det">Evidence Arbitration &rarr; Conflict Detection</div><div class="arrow">&darr;</div>
+        <div class="step det">Deterministic Risk Engine</div><div class="arrow">&darr;</div>
+        <div class="step safe">Policy &amp; Safety Guard</div><div class="arrow">&darr;</div>
+        <div class="step det">Decision Engine</div><div class="arrow">&darr;</div>
+        <div class="step">Provenance graph + grounded explanation</div><div class="arrow">&darr;</div>
+        <div class="step safe">Human decision-maker</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Why this is a meaningful technical gap</h3>
+  <p>The hard parts of marine decision support are exactly the parts that fall <em>between</em> the existing systems: reconciling timestamps and validity windows; deciding which source wins when two disagree, and saying so out loud when neither can; keeping spatial restrictions inside the reasoning rather than on a separate map; computing risk the same way every time; and enforcing a safety rule that a fluent language model cannot talk its way around. ORCA implements that middle layer as deterministic, tested software with a recorded reasoning trail.</p>
+</section>
+
+<!-- ============================ PART 6 ============================ -->
+<section class="part sheet pb">
+  <div class="partno">Part 6</div>
+  <h2 class="h">How ORCA solves the problem — the pipeline</h2>
+  <div class="lead">One query travels through a fixed, typed pipeline of 25 orchestrated nodes. The language model touches exactly two of them. Everything that computes a number or enforces a rule is deterministic.</div>
+
+  <div class="flow no-break">
+    <div class="step">User query &nbsp;<span class="s-d">natural language · EN / HI / KN</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step llm"><span class="s-t">Language detection &amp; Query Understanding Agent</span><div class="s-d">LLM (Groq) or deterministic rule parser — classifies intent, place, date, flags. Never answers, never judges safety.</div></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det"><span class="s-t">LangGraph orchestrator</span><div class="s-d">typed graph state — no free-form dictionaries between nodes</div></div>
+    <div class="arrow">&darr;</div>
+    <div class="parallel">
+      <div class="step det">Weather Intelligence</div>
+      <div class="step det">Oceanographic Intelligence</div>
+      <div class="step det">GIS &amp; Geofencing Intelligence</div>
+      <div class="step det">Environmental collection <span class="s-d">(non-blocking)</span></div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Marine Data Fabric &nbsp;<span class="s-d">every datum stamped with source, tier, timestamp, validity, coordinates</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Temporal Validity Gate &nbsp;<span class="s-d">VALID / STALE / INVALID / MISSING — never upgrades STALE</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Spatial-Temporal Fusion &nbsp;<span class="s-d">aligns by ≤ 25 km / ≤ 3 h; conflicts preserved, no averaging</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Evidence Arbitration &nbsp;<span class="s-d">deterministic five-tier hierarchy; higher authority wins; equal-authority disagreement stays unresolved</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Conflict Detection / Resolution &nbsp;<span class="s-d">typed records; unresolved safety-critical &rarr; no safe recommendation</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="parallel">
+      <div class="step det">Fishing Suitability Engine <span class="s-d">(fishing intents only; separate from safety)</span></div>
+      <div class="step det">Risk Engine <span class="s-d">deterministic, weighted factors</span></div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="step safe"><span class="s-t">Policy &amp; Safety Guard</span><div class="s-d">ALLOWED / CAUTION / BLOCKED / NO&nbsp;SAFE&nbsp;RECOMMENDATION — fixed precedence, final for safety</div></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Decision Engine &nbsp;<span class="s-d">fixed map to PROCEED / PROCEED&nbsp;WITH&nbsp;CAUTION / DO&nbsp;NOT&nbsp;PROCEED / NO&nbsp;SAFE&nbsp;RECOMMENDATION</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Conditional Route Agent &nbsp;<span class="s-d">only if routing was asked and the decision permits it; re-runs the Safety Guard on the finished route</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step det">Decision Provenance Graph &nbsp;<span class="s-d">query &rarr; intent &rarr; data &rarr; validity &rarr; fusion &rarr; arbitration &rarr; risk &rarr; policy &rarr; decision &rarr; route</span></div>
+    <div class="arrow">&darr;</div>
+    <div class="step llm"><span class="s-t">Evidence &amp; Explanation Agent</span><div class="s-d">LLM explains a decision it cannot change; every number is grounded or the text falls back to a deterministic template</div></div>
+    <div class="arrow">&darr;</div>
+    <div class="step">Chat &nbsp;·&nbsp; Map &nbsp;·&nbsp; Alerts &nbsp;·&nbsp; Reports</div>
+  </div>
+
+  <div class="legendrow no-break">
+    <span><b class="sw-llm"></b>LLM node (2 of 25)</span>
+    <span><b class="sw-det"></b>Deterministic node</span>
+    <span><b class="sw-safe"></b>Safety-critical / human</span>
+  </div>
+
+  <div class="box no-break" style="margin-top:4mm">
+    <div class="bt">Read this diagram once and the rest follows</div>
+    <p style="margin:0">The independent data agents run in parallel. Graph state is strongly typed. The two blue nodes are the only places a language model runs, and neither can change a safety outcome. The whole pipeline also runs with <em>no LLM at all</em> via deterministic fallbacks — used in every automated test.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 7 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 7</div>
+  <h2 class="h">The agents</h2>
+  <div class="lead">Seven collaborating agents, orchestrated by LangGraph, plus non-blocking environmental data agents. Each has a narrow job and an explicit list of things it does <em>not</em> decide.</div>
+
+  <table>
+    <thead><tr><th style="width:15%">Agent</th><th style="width:19%">Purpose</th><th style="width:16%">Input</th><th style="width:18%">Output</th><th style="width:16%">Why it exists</th><th style="width:16%">Does NOT decide</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Query Understanding</strong></td>
+        <td>Turn an untrusted sentence into a strict structured request.</td>
+        <td>Raw message; optional language / stakeholder hint; recent session turns.</td>
+        <td>Typed object: language, intent, origin / destination, date &amp; time, route / risk / comparison flags, confidence.</td>
+        <td>Everything downstream consumes structure, never free text.</td>
+        <td>Anything about safety, thresholds, geofences or the answer itself.</td>
+      </tr>
+      <tr>
+        <td><strong>Weather Intelligence</strong></td>
+        <td>Retrieve and normalise weather.</td>
+        <td>Resolved coordinate and time.</td>
+        <td>Wind, temperature, precipitation, pressure, WMO weather code, forecast time — each with source tier.</td>
+        <td>Weather is a primary risk input and must be provenance-stamped.</td>
+        <td>Risk level, safety, or whether codes 95&ndash;99 mean &ldquo;lightning detected&rdquo; (they are a proxy).</td>
+      </tr>
+      <tr>
+        <td><strong>Oceanographic Intelligence</strong></td>
+        <td>Retrieve and normalise marine / ocean data.</td>
+        <td>Resolved coordinate and time.</td>
+        <td>Significant wave height, wave direction / period, swell, sea state where supported.</td>
+        <td>Wave and swell are the heaviest safety-critical factors.</td>
+        <td>Risk, suitability, or the final decision.</td>
+      </tr>
+      <tr>
+        <td><strong>GIS &amp; Geofencing</strong></td>
+        <td>Resolve the spatial context of a point.</td>
+        <td>Coordinate; configured layers.</td>
+        <td>EEZ membership and boundary distance, protected-area hits, coastline distance, depth, hard / soft geofence status, spatial evidence.</td>
+        <td>Spatial restriction is part of reasoning, not a separate map.</td>
+        <td>Whether a restriction blocks the trip — the Safety Guard does that.</td>
+      </tr>
+      <tr>
+        <td><strong>Risk &amp; Suitability</strong></td>
+        <td>Coordinate the deterministic Risk Engine and Fishing Suitability Engine.</td>
+        <td>Arbitrated, validity-gated values.</td>
+        <td>A <code>RiskResult</code> (score, band, per-factor detail, data sufficiency) and a separate suitability result.</td>
+        <td>Bridges agent data to the deterministic engines without the LLM.</td>
+        <td>Nothing by itself — the engines are pure deterministic code.</td>
+      </tr>
+      <tr>
+        <td><strong>Route</strong> (conditional)</td>
+        <td>Plan a sea route only when asked and permitted.</td>
+        <td>Origin, destination, hard-geofence polygons, grid.</td>
+        <td>Waypoints and an explicit <code>RouteStatus</code>, or a structured no-route reason.</td>
+        <td>Routing must obey the same hard-geofence and safety rules as everything else.</td>
+        <td>It cannot bypass the Safety Guard — the finished route is re-checked.</td>
+      </tr>
+      <tr>
+        <td><strong>Evidence &amp; Explanation</strong></td>
+        <td>Explain the already-computed result in the user&rsquo;s language.</td>
+        <td>Decision, risk, conflicts, provenance.</td>
+        <td>A grounded natural-language explanation, or a deterministic template.</td>
+        <td>People need a readable &ldquo;why&rdquo; without new numbers appearing.</td>
+        <td>It invents no numbers and <strong>cannot alter the decision</strong>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="mini">The obsolete agents <code>planner.py</code>, <code>fisheries.py</code>, <code>ocean.py</code>, <code>geo_safety.py</code> are retired and not recreated. Groq is the sole LLM provider; there is no second provider, no vector database and no extra microservices.</p>
+</section>
+
+<!-- ============================ PART 8 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 8</div>
+  <h2 class="h">The deterministic core</h2>
+  <div class="lead">ORCA does not let the language model decide whether something is safe. The LLM understands language and explains results. Deterministic code computes and enforces everything else.</div>
+
+  <div class="cols2 no-break">
+    <div class="box" style="background:#f0f9fc;border-left-color:var(--cyan)">
+      <div class="bt" style="color:#1c6a80">The LLM does</div>
+      <ul style="margin:0">
+        <li>understand natural language</li>
+        <li>identify intent</li>
+        <li>extract place, date, time, flags</li>
+        <li>explain the finished result</li>
+      </ul>
+    </div>
+    <div class="box" style="background:#f2f7fc;border-left-color:#a9c2de">
+      <div class="bt" style="color:#274b73">Deterministic code does</div>
+      <ul style="margin:0">
+        <li>validate data and temporal validity</li>
+        <li>compute risk and distances</li>
+        <li>apply geofencing and polygon intersection</li>
+        <li>evaluate fishing suitability</li>
+        <li>resolve evidence and safety precedence</li>
+        <li>select ALLOWED / RESTRICTED / BLOCKED states</li>
+        <li>plan and validate routes</li>
+      </ul>
+    </div>
+  </div>
+
+  <table class="no-break">
+    <caption>Division of authority</caption>
+    <thead><tr><th style="width:52%">Function</th><th>LLM</th><th>Deterministic system</th></tr></thead>
+    <tbody>
+      <tr><td>Understand the query</td><td class="y">Yes</td><td class="n">&mdash;</td></tr>
+      <tr><td>Explain the result in EN / HI / KN</td><td class="y">Yes</td><td class="n">&mdash;</td></tr>
+      <tr><td>Compute risk score and band</td><td class="n">&mdash;</td><td class="y">Yes</td></tr>
+      <tr><td>Apply geofence / polygon intersection</td><td class="n">&mdash;</td><td class="y">Yes</td></tr>
+      <tr><td>Enforce safety precedence</td><td class="n">&mdash;</td><td class="y">Yes</td></tr>
+      <tr><td>Select the final safety state</td><td class="n">&mdash;</td><td class="y">Yes</td></tr>
+      <tr><td>Plan and independently validate a route</td><td class="n">&mdash;</td><td class="y">Yes</td></tr>
+      <tr><td>Generate the natural-language explanation</td><td class="y">Yes</td><td class="n">&mdash;</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Why this matters</h3>
+  <p>Confining the LLM to interpretation and explanation buys properties that a &ldquo;let the model reason about safety&rdquo; design cannot offer:</p>
+  <ul>
+    <li><strong>Reproducibility</strong> — same input plus same config yields the same output; the core runs with no network and no randomness.</li>
+    <li><strong>Auditability</strong> — every number has a code path and a provenance node.</li>
+    <li><strong>Safety</strong> — a prompt cannot move a threshold or force an &ldquo;allowed&rdquo; result.</li>
+    <li><strong>Consistency</strong> — two similar queries are scored by the same function, not by model mood.</li>
+    <li><strong>Reduced hallucination risk</strong> — ungrounded numbers in the explanation trigger a regenerate and then a deterministic template.</li>
+    <li><strong>Predictability</strong> — behaviour is covered by unit tests and architecture-invariant tests, including a subprocess check that the deterministic core never imports the LLM module.</li>
+  </ul>
+</section>
+
+<!-- ============================ PART 9 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 9</div>
+  <h2 class="h">Data fabric and evidence intelligence</h2>
+  <div class="lead">ORCA does not just collect data. It asks whether each observation is valid, fresh, spatially appropriate, from which tier, in conflict with another source, and reproducible.</div>
+
+  <h3>What flows in</h3>
+  <ul>
+    <li><strong>Live weather and marine conditions</strong> <span class="tag t-ext">external</span> — Open-Meteo weather and marine APIs (wind, waves, swell, pressure, weather codes, SST).</li>
+    <li><strong>GIS / reference layers</strong> <span class="tag t-ext">external</span> — Marine Regions EEZ v12, Natural Earth coastline, GEBCO bathymetry, WDPA protected areas.</li>
+    <li><strong>Environmental observations</strong> <span class="tag t-ext">external</span> — NOAA CoastWatch ERDDAP VIIRS chlorophyll-a; SST via the Open-Meteo marine path.</li>
+    <li><strong>Official reference snapshots</strong> <span class="tag t-ext">external</span> — INCOIS PFZ advisory and RSMC / IMD tropical-weather bulletins, carried with metadata, never merged into a computed value.</li>
+  </ul>
+
+  <h3>Every datum is stamped</h3>
+  <p>Each record carries its <strong>source</strong>, <strong>source tier</strong>, <strong>retrieval / observation timestamp</strong>, <strong>validity window</strong>, and <strong>coordinates</strong>. Nothing enters reasoning as a bare number.</p>
+
+  <table class="no-break">
+    <caption>The five-tier evidence hierarchy used by Evidence Arbitration</caption>
+    <thead><tr><th style="width:12%">Tier</th><th>Meaning</th><th style="width:34%">Examples in ORCA</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1</strong></td><td>Authoritative official source</td><td>Official advisory / bulletin references</td></tr>
+      <tr><td><strong>2</strong></td><td>Trusted operational / public source</td><td>Established public operational feeds</td></tr>
+      <tr><td><strong>3</strong></td><td>Verified model / API source</td><td>Open-Meteo forecast values; satellite model fields</td></tr>
+      <tr><td><strong>4</strong></td><td>Cached historical data</td><td>A recent live payload replayed from Redis, flagged stale past its TTL</td></tr>
+      <tr><td><strong>5</strong></td><td>Illustrative / demo / reference data</td><td>Clearly-labelled demo fixtures; reference snapshots</td></tr>
+    </tbody>
+  </table>
+
+  <h3>How arbitration behaves</h3>
+  <p>Per variable, ORCA ranks the aligned and valid candidates by <em>(tier, validity, time gap, distance, source)</em>. A higher-authority source <strong>wins</strong> a disagreement — and the conflict is still recorded. An equal-authority disagreement stays <strong>unresolved</strong>: no value is chosen, nothing is averaged, and no language model breaks the tie. Fusion aligns candidates only when they are within ~25 km and ~3 hours; it never averages and never silently picks a winner.</p>
+
+  <div class="box ok no-break">
+    <div class="bt">The question the fabric answers for every observation</div>
+    <p style="margin:0">Is it valid? &nbsp;Is it fresh? &nbsp;Which source produced it, and at which tier? &nbsp;Is it spatially appropriate to the query point? &nbsp;Does another source conflict with it? &nbsp;Can the result be reproduced from recorded metadata?</p>
+  </div>
+</section>
+
+<!-- ============================ PART 10 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 10</div>
+  <h2 class="h">The risk engine</h2>
+  <div class="lead">A deterministic, weighted, fully configurable marine-risk computation. It produces a 0&ndash;100 score and a band — as engineering guidance, not a certified safety verdict.</div>
+
+  <table class="no-break">
+    <caption>Implemented risk factors (weights sum to 1.0; values are ORCA MVP thresholds in a validated config file, not official IMD / ISRO / INCOIS limits)</caption>
+    <thead><tr><th style="width:20%">Factor</th><th style="width:12%">Weight</th><th style="width:14%">Signal kind</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Wave</strong> (significant height)</td><td>0.30</td><td>observed</td><td><strong>Required for safety.</strong> Missing &rarr; data insufficient, never a zero score.</td></tr>
+      <tr><td><strong>Wind</strong> (sustained speed)</td><td>0.25</td><td>observed</td><td><strong>Required for safety.</strong> Same missing-data rule as wave.</td></tr>
+      <tr><td><strong>Cyclone proxy</strong></td><td>0.20</td><td>model-derived</td><td>Derived from model pressure / gust sub-signals. <strong>Not certified real-time detection.</strong></td></tr>
+      <tr><td><strong>Advisory</strong></td><td>0.10</td><td>reference</td><td>Normalised advisory severity index, 0&ndash;1.</td></tr>
+      <tr><td><strong>Lightning proxy</strong></td><td>0.10</td><td>proxy</td><td>From WMO weather codes 95&ndash;99. <strong>Not lightning-strike detection.</strong></td></tr>
+      <tr><td><strong>Geofence distance</strong></td><td>0.05</td><td>model-derived</td><td>Distance to the nearest hard geofence; hard geofences are additionally enforced by the Safety Guard.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>How the score is built</h3>
+  <p>Each factor maps its input value through a piecewise-linear curve to a 0&ndash;1 sub-score; the contribution is <em>weight &times; sub-score &times; 100</em>; the overall score is the sum of the contributions that were actually evaluated. Bands are <strong>LOW / MODERATE / HIGH / SEVERE</strong> at 25 / 50 / 75. The config file is loaded and validated on start; a malformed file fails loudly — the engine never silently substitutes built-in numbers.</p>
+
+  <h3>What the score means — and does not</h3>
+  <ul>
+    <li>If a <strong>required</strong> factor (wave or wind) has no input, the result is marked <strong>data-insufficient</strong>. Weights are <em>not</em> renormalised, so a partial score is an explicit <strong>lower bound</strong>, never a reassuring &ldquo;low risk&rdquo;.</li>
+    <li>The score is <strong>decision-support guidance</strong>, not a certified prediction of outcomes at sea.</li>
+    <li>Cyclone and lightning contributions are <strong>proxies</strong>. Official RSMC / IMD advisories remain authoritative; ORCA integrates no live authoritative cyclone API.</li>
+  </ul>
+</section>
+
+<!-- ============================ PART 11 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 11</div>
+  <h2 class="h">Safety architecture</h2>
+  <div class="lead">Data &rarr; reasoning &rarr; safety policy &rarr; decision. The safety policy is deterministic and final. The language model cannot override it.</div>
+
+  <h3>Safety Guard precedence (first match wins)</h3>
+  <ol>
+    <li>Point (or route sample) inside a <strong>hard geofence</strong> &rarr; <strong>BLOCKED</strong>.</li>
+    <li>No risk result, or required safety evidence missing, or risk marked data-insufficient &rarr; <strong>NO&nbsp;SAFE&nbsp;RECOMMENDATION</strong>.</li>
+    <li>Risk band <strong>SEVERE</strong> &rarr; <strong>BLOCKED</strong>.</li>
+    <li>Risk band <strong>HIGH</strong> or <strong>MODERATE</strong> &rarr; <strong>CAUTION</strong>.</li>
+    <li>Otherwise &rarr; <strong>ALLOWED</strong>.</li>
+  </ol>
+  <p>A hard geofence <strong>outranks</strong> missing data. The Decision Engine then maps that status by a fixed table to <code>PROCEED</code> / <code>PROCEED&nbsp;WITH&nbsp;CAUTION</code> / <code>DO&nbsp;NOT&nbsp;PROCEED</code> / <code>NO&nbsp;SAFE&nbsp;RECOMMENDATION</code>; routing is offered only for the two proceed states.</p>
+
+  <h3>What the safety layer guarantees</h3>
+  <ul>
+    <li><strong>Hard geofence, three layers deep</strong> — the polygon is rasterised conservatively into the routing grid, the A* search refuses to traverse it, and an <em>independent</em> post-hoc validator re-tests the finished geometry against the original polygons. A route can never cross a hard geofence.</li>
+    <li><strong>Fail safe</strong> — if safety cannot be established, the answer is <code>NO&nbsp;SAFE&nbsp;RECOMMENDATION</code>, not a guess. The frontend gives that state its own prominent layout.</li>
+    <li><strong>Missing-data honesty</strong> — a missing required input produces insufficiency, not a zero.</li>
+    <li><strong>Lower-bound warnings</strong> — a partial risk score is labelled as a floor.</li>
+    <li><strong>Route re-check</strong> — the conditional Route Agent re-samples the finished route and re-runs the Safety Guard; a route cannot bypass the guard.</li>
+  </ul>
+
+  <div class="box warn no-break">
+    <div class="bt">The rule, in one line</div>
+    <p style="margin:0">If an area is unsafe because of a hard restriction, the LLM <strong>cannot</strong> respond &ldquo;but conditions look good, so proceed.&rdquo; The deterministic safety layer wins, every time. This precedence is covered by dedicated invariant tests.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 12 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 12</div>
+  <h2 class="h">Fishing suitability vs operational safety</h2>
+  <div class="lead">ORCA keeps these two questions structurally apart, because conflating them is dangerous.</div>
+
+  <div class="cols2 no-break">
+    <div class="box" style="border-left-color:#c98a2e;background:var(--warn-bg)">
+      <div class="bt" style="color:#8a5a12">Operational safety</div>
+      <p style="margin:0">Can a vessel go to sea here, now, given waves, wind, proxy hazards and hard restrictions? Computed by the Risk Engine and the Safety Guard.</p>
+    </div>
+    <div class="box" style="border-left-color:#3f9066;background:var(--ok-bg)">
+      <div class="bt" style="color:#2c6a49">Fishing suitability</div>
+      <p style="margin:0">Are environmental conditions here potentially favourable for fishing activity? Computed by a separate Fishing Suitability Engine that imports nothing from the safety code.</p>
+    </div>
+  </div>
+
+  <p>The two can point in <strong>opposite directions</strong>. A location can have potentially favourable environmental conditions while still being unsafe to operate in. A location can be operationally safe while having low environmental suitability. Presenting one as if it were the other — &ldquo;good fishing conditions&rdquo; read as &ldquo;safe to go to sea&rdquo; — is exactly the failure mode ORCA is designed to prevent.</p>
+
+  <h3>The PFZ / reference distinction</h3>
+  <p>Official Potential Fishing Zone information is an <strong>external reference advisory</strong> <span class="tag t-ext">external</span>, built by INCOIS from satellite SST and chlorophyll fronts and issued a few times a week. ORCA carries it as a labelled reference snapshot with its metadata. ORCA&rsquo;s own derived fishing suitability is a <strong>separate</strong> quantity and is never presented as an official PFZ advisory; the reference is never folded into the derived score. When a PFZ reference and ORCA suitability disagree, that disagreement is shown, not hidden.</p>
+</section>
+
+<!-- ============================ PART 13 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 13</div>
+  <h2 class="h">Environmental intelligence</h2>
+  <div class="lead">A deterministic research layer for SST and chlorophyll-a — five engines, built to be scientifically careful and provably isolated from the safety decision.</div>
+
+  <table class="no-break">
+    <thead><tr><th style="width:22%">Engine <span class="tag t-impl">implemented</span></th><th>What it does</th><th style="width:26%">What it does NOT do</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Productivity</strong></td>
+        <td>Maps chlorophyll-a to a descriptive trophic class (oligotrophic &lt; 0.1 &le; low &lt; 1 &le; moderate &lt; 3 &le; elevated &lt; 10 &le; high, mg m&#8315;&sup3;) and a qualitative <code>productivity_potential</code> from chlorophyll-a <strong>alone</strong>. SST is context only.</td>
+        <td>No fish-abundance or catch threshold; chlorophyll-a is not a required non-<code>unknown</code> input when missing.</td>
+      </tr>
+      <tr>
+        <td><strong>Comparison</strong></td>
+        <td>Compares the current SST / chlorophyll-a value with an <strong>ORCA-computed reference</strong> — the median of what the source returned over a recent past window (default 30 days). SST reports an absolute change; chlorophyll-a also a percentage change (epsilon-guarded). Direction is <code>higher / lower / unchanged / unknown</code>.</td>
+        <td>Not a climatological normal, not a slope, trend, regression, forecast, seasonality or spatial field. At most two extra HTTP calls, fetched outside the fabric.</td>
+      </tr>
+      <tr>
+        <td><strong>Evidence &amp; reproducibility</strong></td>
+        <td>Zero extra HTTP calls, no LLM. Re-serialises existing metadata (source, dataset, timestamp, validity, tier, pixel distance) into a per-observation record and a categorical overall status (<code>adequate / limited / insufficient / unavailable</code>). Optional coarse coastal-water hint from GIS depth / coastline distance.</td>
+        <td>No numeric score, no weighted formula; the coastal-water hint is not a Case-1 / Case-2 classification and never corrects a value.</td>
+      </tr>
+      <tr>
+        <td><strong>Stability &amp; coverage</strong></td>
+        <td>Zero extra HTTP calls, no LLM. Describes the dispersion (nearest-rank quartiles, IQR, min / max / range, median) and observational coverage of the accepted 30-day series. Needs at least three observations.</td>
+        <td>No slope, trend, rate of change, seasonality, bloom or forecast. Observation order is never read as a direction in time.</td>
+      </tr>
+      <tr>
+        <td><strong>Neighbourhood representativeness</strong></td>
+        <td>One batched ERDDAP box request (&plusmn; ~0.09&deg;, ~20 km) — only for an environmental query that already has a usable chlorophyll-a pixel. Reports whether that central pixel sits within / above / below the spread of valid nearby pixels on the same composite.</td>
+        <td>No interpolation, spatial field, gradient, front, plume, eddy, bloom or hotspot. Missing / cloud pixels stay missing, never zero-filled.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>What the environmental layer explicitly is not</h3>
+  <ul>
+    <li>Environmental observations are <strong>descriptive indicators</strong>.</li>
+    <li>Chlorophyll-a <strong>does not</strong> predict fish presence, abundance or catch — every environmental result carries that disclaimer, and a deterministic guard rejects biological / catch / trend / bloom wording in the explanation.</li>
+    <li>Environmental information is <strong>not an operational safety input</strong>. SST is context, not a safety driver.</li>
+  </ul>
+
+  <div class="box ok no-break">
+    <div class="bt">The isolation invariant (tested)</div>
+    <p style="margin:0">Risk, safety, decision and route output is <strong>byte-identical</strong> whether the environmental engines are enabled, disabled, or raising an error. No environmental field is ever added to the risk-engine input. This is asserted by architecture tests and regression tests on every release of the layer.</p>
+  </div>
+</section>
+
+<!-- ============================ PART 14 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 14</div>
+  <h2 class="h">Handling missing / conflicting data</h2>
+  <div class="lead">Real marine data is imperfect. ORCA is built to say so, clearly, instead of presenting a clean answer it cannot support.</div>
+
+  <div class="cols2">
+    <div>
+      <h4>The failure modes ORCA expects</h4>
+      <ul>
+        <li>missing chlorophyll-a (monsoon cloud cover)</li>
+        <li>an advisory or bulletin that is unavailable</li>
+        <li>a geofence geometry that cannot be loaded</li>
+        <li>two sources that disagree beyond tolerance</li>
+        <li>a stale observation past its validity window</li>
+        <li>a cloud-covered satellite composite</li>
+      </ul>
+    </div>
+    <div>
+      <h4>The data tiers, in order</h4>
+      <div class="flow">
+        <div class="step det">LIVE — fetched now, schema-validated</div><div class="arrow">&darr;</div>
+        <div class="step det">CACHE — recent live payload, flagged stale past TTL</div><div class="arrow">&darr;</div>
+        <div class="step det">REFERENCE / DEMO — curated snapshot or labelled demo</div><div class="arrow">&darr;</div>
+        <div class="step safe">MISSING — structured &ldquo;unavailable&rdquo;, never fabricated</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>How ORCA communicates uncertainty</h3>
+  <ul>
+    <li>The <strong>Temporal Validity Gate</strong> marks each record <code>VALID / STALE / INVALID / MISSING</code> and <strong>never</strong> upgrades <code>STALE</code> back to <code>VALID</code>.</li>
+    <li>A missing <strong>required</strong> safety input drives <code>NO&nbsp;SAFE&nbsp;RECOMMENDATION</code>, with the missing factors named.</li>
+    <li>An <strong>unresolved safety-critical conflict</strong> is treated as missing required evidence — again <code>NO&nbsp;SAFE&nbsp;RECOMMENDATION</code>, never a forced &ldquo;allowed&rdquo;.</li>
+    <li>The response exposes a <strong>data-quality</strong> summary and an <strong>evidence table</strong>; the frontend renders a <strong>provenance legend</strong> distinguishing live / reference / derived / demo / missing, and shows conflicts as preserved disagreement.</li>
+  </ul>
+  <p>This transparency is an advantage over any interface that only ever shows a single tidy verdict.</p>
+</section>
+
+<!-- ============================ PART 15 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 15</div>
+  <h2 class="h">Provenance and reproducibility</h2>
+  <div class="lead">Every important figure in an ORCA answer can be traced back to the query through an explicit graph — and numbers that cannot be traced do not survive.</div>
+
+  <h3>Decision Provenance Graph <span class="tag t-impl">implemented</span></h3>
+  <p>ORCA builds an explicit node / edge graph for each query:</p>
+  <div class="flow no-break">
+    <div class="step">Query &rarr; Intent</div><div class="arrow">&darr;</div>
+    <div class="step">Agent results &amp; observations &rarr; temporal validity</div><div class="arrow">&darr;</div>
+    <div class="step">Fusion &rarr; arbitration &rarr; conflicts</div><div class="arrow">&darr;</div>
+    <div class="step">Suitability &nbsp;·&nbsp; Risk (with per-factor nodes)</div><div class="arrow">&darr;</div>
+    <div class="step">Policy &rarr; Decision &rarr; Route</div><div class="arrow">&darr;</div>
+    <div class="step">Grounded explanation</div>
+  </div>
+  <p>Every node traces back to the query root. The frontend renders this as an interactive graph in a dedicated tab.</p>
+
+  <h3>Numeric grounding</h3>
+  <p>Every number in the final explanation must match either a provenance numeric node or a deterministic scalar — exactly for small structural integers and WMO codes, within a small tolerance otherwise. An ungrounded number, or an explanation that asserts safety for a negative decision, triggers <strong>one</strong> regeneration and then a deterministic templated answer. The explanation can never change the decision result.</p>
+
+  <h3>Environmental reproducibility bundle</h3>
+  <p>For environmental queries, ORCA additionally emits a per-observation reproducibility record (source, dataset id, observation time, validity, tier, pixel distance) and a categorical data-quality status, copyable as JSON from the UI — with no new endpoint and no server-side persistence.</p>
+
+  <div class="box no-break">
+    <div class="bt">Why provenance is a feature, not decoration</div>
+    <p style="margin:0">It underpins <strong>trust</strong> (a user can see the basis), <strong>auditing</strong> (an authority can review a past decision), <strong>research</strong> (a result can be reproduced), <strong>debugging</strong> (a wrong answer can be traced to a source), and <strong>operational / government use</strong> (decisions have a record).</p>
+  </div>
+</section>
+
+<!-- ============================ PART 16 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 16</div>
+  <h2 class="h">How ORCA is better than existing approaches</h2>
+  <div class="lead">Not &ldquo;because it uses AI&rdquo;. Because it integrates capabilities that are otherwise spread across separate tools into one explainable decision-support workflow.</div>
+
+  <table>
+    <thead><tr><th style="width:22%">Capability</th><th style="width:39%">Fragmented existing workflow</th><th style="width:39%">ORCA <span class="tag t-impl">implemented</span></th></tr></thead>
+    <tbody>
+      <tr><td>Multiple marine sources</td><td>User opens several portals and combines them mentally</td><td>Unified intelligence layer collects them in parallel</td></tr>
+      <tr><td>Natural-language interaction</td><td>Mostly service-specific forms and products</td><td>Plain-language query in EN / HI / KN</td></tr>
+      <tr><td>Spatial reasoning</td><td>A separate GIS tool / map</td><td>GIS &amp; geofencing inside the reasoning pipeline</td></tr>
+      <tr><td>Temporal validation</td><td>Left to the user to notice</td><td>Explicit Temporal Validity Gate</td></tr>
+      <tr><td>Evidence arbitration</td><td>Manual judgement</td><td>Deterministic five-tier hierarchy</td></tr>
+      <tr><td>Conflict handling</td><td>Manual, often invisible</td><td>Typed conflict records, preserved not averaged</td></tr>
+      <tr><td>Risk computation</td><td>Separate or informal</td><td>Deterministic, weighted, configurable Risk Engine</td></tr>
+      <tr><td>Safety enforcement</td><td>User&rsquo;s own interpretation</td><td>Policy &amp; Safety Guard with fixed precedence</td></tr>
+      <tr><td>Hard geofencing</td><td>A separate GIS overlay</td><td>Integrated constraint, three-layer route protection</td></tr>
+      <tr><td>Explanation</td><td>Not central</td><td>Evidence-grounded, decision cannot be altered by it</td></tr>
+      <tr><td>Provenance</td><td>Fragmented across systems</td><td>One decision provenance graph per query</td></tr>
+      <tr><td>Environmental research</td><td>A separate analysis exercise</td><td>Integrated, isolated research context layer</td></tr>
+      <tr><td>Missing-data transparency</td><td>Varies by product</td><td>Explicit data-sufficiency and tier labelling</td></tr>
+      <tr><td>Safety vs suitability</td><td>Easy to conflate</td><td>Structurally separated engines</td></tr>
+      <tr><td>Route planning</td><td>Separate / manual</td><td>Conditional Route Agent, guard-re-checked</td></tr>
+      <tr><td>Multilingual interaction</td><td>Limited across systems together</td><td>English / Hindi / Kannada end to end</td></tr>
+      <tr><td>Unified operator interface</td><td>Several tabs and tools</td><td>A single ORCA workspace</td></tr>
+    </tbody>
+  </table>
+
+  <p class="mini">The claim is integration, not exclusivity: several existing systems do individual rows well. ORCA&rsquo;s contribution is bringing these into one decision-support workflow with a shared evidence, spatial-temporal and safety layer.</p>
+</section>
+
+<!-- ============================ PART 17 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 17</div>
+  <h2 class="h">Why this is not just a chatbot</h2>
+  <div class="lead">A chatbot is model-in, text-out. ORCA is a controlled pipeline in which the model is a small, bounded part.</div>
+
+  <div class="cols2 no-break">
+    <div>
+      <h4>A normal chatbot</h4>
+      <div class="flow">
+        <div class="step">User</div><div class="arrow">&darr;</div>
+        <div class="step llm">LLM</div><div class="arrow">&darr;</div>
+        <div class="step">Answer</div>
+      </div>
+    </div>
+    <div>
+      <h4>ORCA</h4>
+      <div class="flow">
+        <div class="step">User</div><div class="arrow">&darr;</div>
+        <div class="step llm">Query Understanding</div><div class="arrow">&darr;</div>
+        <div class="step det">Orchestrated agents (parallel)</div><div class="arrow">&darr;</div>
+        <div class="step det">Live / reference data + validation</div><div class="arrow">&darr;</div>
+        <div class="step det">Fusion &rarr; evidence arbitration</div><div class="arrow">&darr;</div>
+        <div class="step det">Deterministic risk</div><div class="arrow">&darr;</div>
+        <div class="step safe">Safety policy</div><div class="arrow">&darr;</div>
+        <div class="step det">Decision &rarr; provenance</div><div class="arrow">&darr;</div>
+        <div class="step llm">Grounded explanation</div><div class="arrow">&darr;</div>
+        <div class="step">User</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pullquote">The intelligence is not the LLM alone. The intelligence is the entire controlled pipeline — and the LLM cannot change a single number or a single safety outcome inside it.</div>
+</section>
+
+<!-- ============================ PART 18 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 18</div>
+  <h2 class="h">What has actually been implemented</h2>
+  <div class="lead">Organised by layer. Every item below exists in the repository today and is exercised by the automated test suites. <span class="tag t-impl">Implemented now</span></div>
+
+  <div class="cols2">
+    <div>
+      <h3>Interface</h3>
+      <ul>
+        <li>conversational &ldquo;Ask ORCA&rdquo; chat</li>
+        <li>Leaflet / OpenStreetMap operator map</li>
+        <li>decision dashboard (with a distinct no-safe-recommendation layout)</li>
+        <li>evidence table &amp; conflict panel</li>
+        <li>interactive provenance graph</li>
+        <li>alerts panel (proxy wording preserved)</li>
+        <li>agent activity / execution timing view</li>
+        <li>print / export report view</li>
+        <li>English / Hindi / Kannada UI</li>
+        <li>stakeholder context (UX only — never changes reasoning)</li>
+      </ul>
+
+      <h3>Intelligence (agents)</h3>
+      <ul>
+        <li>Query Understanding (Groq + deterministic rule fallback, prompt-injection-hardened, one-shot retry)</li>
+        <li>Weather Intelligence</li>
+        <li>Oceanographic Intelligence</li>
+        <li>GIS &amp; Geofencing</li>
+        <li>Risk &amp; Suitability coordination</li>
+        <li>Environmental &amp; historical-environmental data agents (non-blocking)</li>
+        <li>Conditional Route Agent (guard re-check)</li>
+        <li>Evidence &amp; Explanation (grounded, cannot alter the decision)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Deterministic core</h3>
+      <ul>
+        <li>Marine Data Fabric</li>
+        <li>Temporal Validity Gate</li>
+        <li>Spatial-Temporal Fusion</li>
+        <li>Evidence Arbitration (five-tier hierarchy)</li>
+        <li>Conflict Detection / Resolution</li>
+        <li>Fishing Suitability Engine (isolated from safety)</li>
+        <li>Risk Engine + validated weights config</li>
+        <li>Policy &amp; Safety Guard</li>
+        <li>Decision Engine (incl. no-safe-recommendation)</li>
+        <li>A* routing + 3-layer hard-geofence protection + independent validator</li>
+        <li>Decision Provenance Graph + numeric grounding</li>
+        <li>Environmental Productivity / Comparison / Evidence / Stability / Neighbourhood engines</li>
+        <li>Alert Engine; i18n templates; multi-turn session state</li>
+        <li>LangGraph orchestration (25 typed nodes)</li>
+        <li>Observability: real-timed execution trace, end-to-end request-id</li>
+        <li>Deterministic Scenario Engine — 26 scenarios through the real pipeline</li>
+      </ul>
+
+      <h3>Data <span class="tag t-ext">external sources</span></h3>
+      <ul>
+        <li>Open-Meteo weather &amp; marine APIs (incl. SST)</li>
+        <li>NOAA CoastWatch ERDDAP VIIRS chlorophyll-a</li>
+        <li>static GIS: Marine Regions EEZ v12, Natural Earth coastline, GEBCO bathymetry, WDPA</li>
+        <li>INCOIS PFZ &amp; RSMC / IMD bulletin reference snapshots (metadata-carried)</li>
+        <li>Redis cache tier; historical-window comparison fetch</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="mini">Approximate scale (from the project&rsquo;s own phase records): ~780 backend tests across ~60 modules, 36 frontend component tests, 26 pipeline scenarios — all deterministic, external APIs and the LLM mocked, no live network in tests. Docker Compose is defined for all four services; a full Docker runtime end-to-end was not executed in the build environment (CLI unavailable) and the compose file was validated by inspection.</p>
+</section>
+
+<!-- ============================ PART 19 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 19</div>
+  <h2 class="h">Multilingual capability</h2>
+  <div class="lead">English, Hindi and Kannada — end to end, not just a UI toggle.</div>
+
+  <ul>
+    <li><strong>Detection</strong> — the language is detected from the message script; an optional UI hint only fills an <code>unknown</code> detection, it never overrides it.</li>
+    <li><strong>Understanding</strong> — the Query Understanding Agent classifies intent and entities in all three languages (LLM path and deterministic rule path).</li>
+    <li><strong>Explanation</strong> — the Evidence &amp; Explanation Agent responds in the detected language; deterministic EN / HI / KN templates are the fallback and the source of truth for every status.</li>
+    <li><strong>Consistency</strong> — numbers, units and source names stay consistent and untranslated across languages; UI chrome follows the selector while the backend answer text stays in the language the query was asked in.</li>
+  </ul>
+
+  <p>Why it matters: marine decision support in India cannot be limited to technical English. The people making the highest-stakes calls at the shoreline are not, in general, reading English weather products.</p>
+
+  <p class="mini">ORCA does not claim perfect translation or perfect language understanding. The deterministic templates guarantee that a correct, safe answer is always available even when the model&rsquo;s phrasing is not used.</p>
+</section>
+
+<!-- ============================ PART 20 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 20</div>
+  <h2 class="h">Real-world use cases</h2>
+  <div class="lead">Concrete walk-throughs of the same pipeline serving different people. These mirror scenarios in ORCA&rsquo;s deterministic demo suite.</div>
+
+  <h3>Scenario 1 &mdash; Fisherman, routine pre-departure</h3>
+  <p><em class="q">&ldquo;Can I go fishing tomorrow morning from Mangalore?&rdquo;</em></p>
+  <p>Query Understanding &rarr; intent <code>fishing_safety</code>, place = Mangalore, time = tomorrow morning &rarr; Weather + Ocean + GIS collected in parallel &rarr; fabric + validity + fusion + arbitration &rarr; deterministic risk &rarr; Safety Guard &rarr; decision (PROCEED / CAUTION / DO NOT PROCEED / NO SAFE RECOMMENDATION depending on the actual conditions) &rarr; grounded explanation, with the wave and wind evidence and the provenance graph attached.</p>
+
+  <h3>Scenario 2 &mdash; Unsafe conditions</h3>
+  <p>High waves or a strong cyclone / lightning proxy push the risk band to SEVERE &rarr; the Safety Guard returns BLOCKED &rarr; the Decision Engine returns DO NOT PROCEED. If a required input (wave or wind) is missing instead, the result is NO SAFE RECOMMENDATION with the missing factor named — never a reassuring low score.</p>
+
+  <h3>Scenario 3 &mdash; Geofence affects the route</h3>
+  <p><em class="q">&ldquo;Plan a route for a vessel from Mangalore to Kochi.&rdquo;</em> If the destination lies inside a hard geofence, the planner rejects it <strong>before</strong> A* runs (<code>DESTINATION_BLOCKED</code>). If a hard geofence lies across the corridor, A* routes around it and an independent validator confirms zero violations on the finished geometry.</p>
+
+  <h3>Scenario 4 &mdash; Researcher, environmental context</h3>
+  <p><em class="q">&ldquo;Compare chlorophyll-a and SST near Mangalore for our survey.&rdquo;</em> &rarr; environmental collection &rarr; Productivity (trophic class), Comparison (vs a 30-day ORCA-computed reference), Stability (dispersion &amp; coverage of the accepted series), Neighbourhood (is the central pixel representative of nearby pixels), Evidence (reproducibility bundle). Risk / safety / decision output is byte-identical to a run with the environmental layer switched off.</p>
+
+  <h3>Scenario 5 &mdash; Missing satellite data</h3>
+  <p>Monsoon cloud cover means no valid chlorophyll-a pixel. ORCA reports the observation as <strong>unavailable</strong> and returns an honest <code>insufficient</code> / <code>unavailable</code> environmental status — it does not invent a productivity conclusion, and the main query still completes.</p>
+
+  <h3>Scenario 6 &mdash; Disaster management</h3>
+  <p><em class="q">&ldquo;Which coastal areas near Mangalore currently have elevated marine-weather risk?&rdquo;</em> ORCA returns the scoped single-point assessment with its evidence, proxy hazards clearly labelled, and provenance — and explicitly notes that it assesses the queried point, not a multi-region aggregation. Official authority instructions remain the operational source.</p>
+</section>
+
+<!-- ============================ PART 21 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 21</div>
+  <h2 class="h">What makes ORCA innovative</h2>
+  <div class="lead">Architecture, not vocabulary.</div>
+
+  <ol>
+    <li><strong>Evidence-grounded marine reasoning.</strong> Every important claim in an answer is tied to a stamped observation and a provenance node; ungrounded numbers are removed automatically.</li>
+    <li><strong>Deterministic safety beneath an LLM interface.</strong> The model is confined to two nodes and cannot move a threshold, a geofence, or the final safety state.</li>
+    <li><strong>Spatial-temporal marine intelligence.</strong> Validity windows and real geometry are inside the reasoning, not on a side panel.</li>
+    <li><strong>Explicit evidence arbitration.</strong> A fixed five-tier hierarchy decides which source wins — and records when none can.</li>
+    <li><strong>Conflict-aware reasoning.</strong> Disagreements are typed, preserved and surfaced; an unresolved safety-critical conflict fails safe.</li>
+    <li><strong>Safety / suitability separation.</strong> &ldquo;Good for fish&rdquo; and &ldquo;safe to sail&rdquo; are computed by different engines that do not import each other.</li>
+    <li><strong>Hard geofence enforcement, three layers deep.</strong> Raster block, search refusal, and an independent post-hoc geometry validator.</li>
+    <li><strong>Decision provenance graph.</strong> A per-query node/edge trace from question to decision, rendered interactively.</li>
+    <li><strong>Research-grade environmental context, provably isolated.</strong> Five deterministic engines whose output is byte-identical-irrelevant to safety, by test.</li>
+    <li><strong>Missing-data transparency.</strong> LIVE &rarr; CACHE &rarr; REFERENCE/DEMO &rarr; MISSING, with staleness that never silently heals.</li>
+    <li><strong>Conditional route intelligence.</strong> Routing runs only when asked and permitted, and the finished route is re-checked by the Safety Guard.</li>
+    <li><strong>Multilingual marine decision support.</strong> EN / HI / KN across understanding, explanation and templates, with deterministic fallbacks.</li>
+  </ol>
+</section>
+
+<!-- ============================ PART 22 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 22</div>
+  <h2 class="h">Impact</h2>
+  <div class="lead">Stated as expected effects on decision quality and workflow — not as invented numbers.</div>
+
+  <table class="no-break">
+    <thead><tr><th style="width:22%">Who</th><th>Expected impact</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Fishermen</strong></td><td>Better situational awareness before departure and an easier, faster interpretation of changing conditions, in their own language.</td></tr>
+      <tr><td><strong>Coastal communities</strong></td><td>Better access to understandable marine information for routine planning around the sea.</td></tr>
+      <tr><td><strong>Disaster management</strong></td><td>Faster synthesis of multiple information sources into one evidence-carrying view, with official advisories still authoritative.</td></tr>
+      <tr><td><strong>Researchers</strong></td><td>More reproducible environmental context — comparison, stability and representativeness with a copyable evidence bundle.</td></tr>
+      <tr><td><strong>Authorities</strong></td><td>Traceable, evidence-aware decision support with a recorded reasoning graph for each query.</td></tr>
+      <tr><td><strong>System level</strong></td><td>Reduced fragmentation between data, intelligence and decision-making — the integration step becomes explicit, testable software.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================ PART 23 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 23</div>
+  <h2 class="h">Limitations and responsible AI</h2>
+  <div class="lead">Stated plainly. Transparent limitations are part of why the system can be trusted.</div>
+
+  <ul>
+    <li><strong>Official advisories remain authoritative.</strong> ORCA is decision support; it does not replace INCOIS, IMD / RSMC or local authority instructions.</li>
+    <li><strong>Cyclone and lightning are proxies.</strong> The cyclone contribution is model-derived from pressure / wind; the lightning contribution is derived from WMO weather codes 95&ndash;99. Neither is certified real-time detection. No live authoritative cyclone API is integrated.</li>
+    <li><strong>Environmental data does not predict catch.</strong> Chlorophyll-a is a phytoplankton-biomass proxy; ORCA never equates it with fish presence, abundance or fishing success.</li>
+    <li><strong>Satellite ocean-colour data has real gaps.</strong> Cloud cover (especially in the south-west monsoon) and coastal optical complexity make &ldquo;unavailable&rdquo; a common, honest outcome.</li>
+    <li><strong>Missing data is surfaced, not filled.</strong> A missing required input yields insufficiency, not a zero.</li>
+    <li><strong>ORCA assesses a queried point</strong>, not a multi-region spatial risk aggregation — a documented gap and a future direction.</li>
+    <li><strong>Risk thresholds are ORCA engineering / MVP values</strong> in a validated config file, expected to be reviewed against authoritative guidance before any operational use.</li>
+    <li><strong>Reference datasets may not be real-time.</strong> PFZ and RSMC references are curated snapshots carried with their metadata.</li>
+    <li><strong>PFZ reference information is separate</strong> from ORCA-derived suitability and is never presented as an official prediction.</li>
+    <li><strong>The human is the final decision-maker.</strong> ORCA is not autonomous command.</li>
+    <li><strong>Docker runtime end-to-end was not executed</strong> in the build environment; the compose configuration was validated by inspection.</li>
+  </ul>
+</section>
+
+<!-- ============================ PART 24 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 24</div>
+  <h2 class="h">Future scope</h2>
+  <div class="lead">Realistic next steps. None of the following is implemented today, and nothing above implies that it is. <span class="tag t-fut">Future scope</span></div>
+
+  <div class="cols2">
+    <ul>
+      <li>richer integration of official marine advisory feeds where machine-readable access exists</li>
+      <li>broader satellite coverage and additional environmental observations</li>
+      <li>expanded regional and coastal reference datasets</li>
+      <li>regional spatial risk aggregation (a risk view across an area, not one point)</li>
+      <li>multi-year climatology tables and longer environmental time-series analysis</li>
+    </ul>
+    <ul>
+      <li>improved route intelligence (vessel classes, weather routing)</li>
+      <li>stronger alerting and subscription delivery</li>
+      <li>additional Indian languages</li>
+      <li>field validation with fishing and operator communities</li>
+      <li>integration with institutional systems, and calibrated domain-specific models reviewed against authoritative guidance</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ PART 25 ============================ -->
+<section class="part sheet">
+  <div class="partno">Part 25</div>
+  <h2 class="h">Why ORCA matters</h2>
+
+  <div class="pullquote" style="font-size:14pt">
+    The ocean already generates enormous amounts of information. The challenge is converting fragmented information into trustworthy, contextual and explainable decisions. ORCA is designed as the reasoning layer between marine data and the people who must act on it.
+  </div>
+
+  <div class="flow no-break" style="margin-top:8mm">
+    <div class="parallel">
+      <div class="step det" style="font-size:11pt"><span class="s-t">DATA</span></div>
+      <div class="step det" style="font-size:11pt"><span class="s-t">INTELLIGENCE</span></div>
+      <div class="step det" style="font-size:11pt"><span class="s-t">EVIDENCE</span></div>
+      <div class="step safe" style="font-size:11pt"><span class="s-t">SAFETY</span></div>
+      <div class="step" style="font-size:11pt"><span class="s-t">DECISION</span></div>
+    </div>
+  </div>
+
+  <p style="margin-top:8mm">Existing marine services provide valuable, often authoritative, information. ORCA does not compete with them — it connects them into an explainable decision-support workflow, adds the evidence, spatial-temporal and safety layer that sits between them and the decision-maker, and keeps the human in charge.</p>
+</section>
+
+<!-- ============================ PART 26 ============================ -->
+<section class="part sheet pb">
+  <div style="background:radial-gradient(900px 500px at 85% -10%, rgba(63,169,201,.22), transparent 60%), linear-gradient(160deg,#0B2545,#0a1f3c); color:#eaf2f8; margin:0 -15mm -16mm -15mm; padding:26mm 16mm 22mm; min-height:264mm; display:flex; flex-direction:column;">
+    <div style="font-size:8pt;letter-spacing:.3em;text-transform:uppercase;color:var(--cyan);font-weight:700">Part 26 — Judge takeaways</div>
+    <h2 style="font-size:23pt;margin:5mm 0 2mm;color:#fff">If a judge remembers only seven things</h2>
+    <div style="height:2.5pt;width:40mm;background:linear-gradient(90deg,var(--cyan),transparent);margin:4mm 0 8mm"></div>
+
+    <ol style="font-size:11.5pt;line-height:1.5;padding-left:6mm;margin:0">
+      <li style="margin-bottom:4mm"><strong style="color:#fff">Marine data already exists — ORCA integrates it.</strong> <span style="color:#bcd3e4">The gap is the reasoning layer between the data and the decision-maker.</span></li>
+      <li style="margin-bottom:4mm"><strong style="color:#fff">ORCA is not just a chatbot.</strong> <span style="color:#bcd3e4">The intelligence is the whole controlled pipeline of 25 typed nodes; the LLM runs in only two.</span></li>
+      <li style="margin-bottom:4mm"><strong style="color:#fff">LLM interprets; deterministic code controls safety.</strong> <span style="color:#bcd3e4">A prompt cannot move a threshold or force an &ldquo;allowed&rdquo; outcome.</span></li>
+      <li style="margin-bottom:4mm"><strong style="color:#fff">Risk and fishing suitability are deliberately separated.</strong> <span style="color:#bcd3e4">&ldquo;Good for fish&rdquo; is never confused with &ldquo;safe to go to sea.&rdquo;</span></li>
+      <li style="margin-bottom:4mm"><strong style="color:#fff">Evidence, uncertainty and provenance are explicit.</strong> <span style="color:#bcd3e4">Every figure traces to a source; ungrounded numbers are removed; missing data is surfaced, not filled.</span></li>
+      <li style="margin-bottom:4mm"><strong style="color:#fff">GIS and geofencing are part of the reasoning pipeline.</strong> <span style="color:#bcd3e4">Hard geofences are enforced three layers deep; a route can never cross one.</span></li>
+      <li style="margin-bottom:0"><strong style="color:#fff">ORCA turns fragmented marine intelligence into an explainable decision-support workflow</strong> <span style="color:#bcd3e4">— in English, Hindi and Kannada, with the human as the final decision-maker.</span></li>
+    </ol>
+
+    <div style="margin-top:auto; padding-top:12mm; border-top:1pt solid rgba(255,255,255,.18); font-family:Georgia,serif; font-style:italic; font-size:12.5pt; line-height:1.4; color:#d6e6f1;">
+      LLM interprets and explains &rarr; deterministic code computes and enforces safety &rarr; evidence supports the decision &rarr; the user decides.
+    </div>
+  </div>
+</section>
+
+<!-- ============================ REFERENCES ============================ -->
+<section class="part sheet pb">
+  <div class="partno">References</div>
+  <h2 class="h">References &amp; sources</h2>
+  <div class="lead">External factual claims in Parts 4, 10, 13 and 23 draw on the following authoritative sources. ORCA implementation claims are verified against the project repository and its architecture and phase documentation.</div>
+
+  <h3>External systems &amp; datasets</h3>
+  <ol style="font-size:9pt">
+    <li>Indian National Centre for Ocean Information Services (INCOIS) — <em>SAMUDRA</em> mobile application. incois.gov.in/site/SAMUDRA/</li>
+    <li>INCOIS — Potential Fishing Zone (PFZ) advisory service and methodology (satellite SST + chlorophyll fronts). incois.gov.in/geoportal/MFASPFZ/</li>
+    <li>INCOIS — Ocean State Forecast services. incois.gov.in</li>
+    <li>India Meteorological Department — RSMC New Delhi, Tropical Cyclone warning services and the four-stage warning system. rsmcnewdelhi.imd.gov.in</li>
+    <li>India Meteorological Department — Mausam marine weather services. mausam.imd.gov.in</li>
+    <li>Meteorological &amp; Oceanographic Satellite Data Archival Centre (MOSDAC), Space Applications Centre / ISRO. mosdac.gov.in ; isro.gov.in/MOSDAC.html</li>
+    <li>Open-Meteo — Weather API and Marine Weather API; data licensed CC-BY 4.0 (sources: national weather services incl. DWD ICON). open-meteo.com/en/docs/marine-weather-api ; open-meteo.com/en/licence</li>
+    <li>NOAA CoastWatch — ERDDAP, VIIRS S-NPP near-real-time chlorophyll-a, global 4 km Level 3 daily (dataset <code>noaacwNPPVIIRSchlaDaily</code>). coastwatch.noaa.gov/erddap/</li>
+    <li>Copernicus Marine Service — ocean-colour / chlorophyll products and the Copernicus Marine Toolbox. marine.copernicus.eu ; data.marine.copernicus.eu</li>
+    <li>Flanders Marine Institute — Marine Regions, World EEZ v12 (2023-10-25). marineregions.org/downloads.php</li>
+    <li>Natural Earth — 1:10m physical coastline (public domain). naturalearthdata.com</li>
+    <li>GEBCO — global gridded bathymetry grid (15 arc-second). gebco.net</li>
+    <li>UNEP-WCMC &amp; IUCN — World Database on Protected Areas (WDPA), Protected Planet. protectedplanet.net</li>
+    <li>World Meteorological Organization — Marine Meteorological and Oceanographic Services; Regional Specialized Meteorological Centres framework. wmo.int</li>
+  </ol>
+
+  <h3>ORCA project documentation (source of truth for implementation claims)</h3>
+  <ol style="font-size:9pt">
+    <li><code>docs/architecture.md</code> — frozen architecture, end-to-end pipeline, safety-critical invariants, phase-by-phase implementation record.</li>
+    <li><code>docs/data-sources.md</code> — data tiers, attribution, and terminology rules.</li>
+    <li><code>docs/api-feasibility.md</code> — data-source strategy and mandatory proxy / hazard terminology.</li>
+    <li><code>docs/phase9-step3&hellip;step7-*.md</code> — the environmental intelligence engines and their isolation invariants.</li>
+    <li><code>README.md</code> — status, technology stack, endpoints, and test summary.</li>
+    <li>Backend test suites (<code>backend/tests/</code>), the deterministic Scenario Engine (<code>python -m app.scenario.run</code>), and frontend component tests (<code>frontend/src/test/</code>).</li>
+  </ol>
+
+  <div class="box no-break" style="margin-top:5mm">
+    <div class="bt">Claims intentionally excluded because they could not be verified</div>
+    <ul style="margin:0">
+      <li>Any casualty, death, injury, financial-loss or economic-impact figure attributable to fragmented marine information.</li>
+      <li>Any accuracy percentage, adoption / user count, or certification for ORCA.</li>
+      <li>Any claim of certified real-time cyclone or lightning detection.</li>
+      <li>Any claim that ORCA predicts fish presence, abundance or catch, or that environmental indicators determine fishing safety.</li>
+      <li>Any claim that a full Docker runtime end-to-end deployment has been executed.</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>

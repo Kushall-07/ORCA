@@ -6,6 +6,7 @@ user query. Numeric nodes are what the grounding check verifies against.
 
 from __future__ import annotations
 
+from app.models.advisory import MarineAdvisory
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
@@ -17,6 +18,7 @@ from app.models.environmental import (
 )
 from app.models.fabric import MarineDataFabric
 from app.models.gis_agent import GisQueryResult
+from app.models.pfz import PfzReferenceResult
 from app.models.provenance import (
     ProvEdge,
     ProvenanceGraph,
@@ -41,6 +43,9 @@ def build_provenance(
     weather_tier: str | None = None,
     ocean_tier: str | None = None,
     environment_tier: str | None = None,
+    advisory: MarineAdvisory | None = None,
+    advisory_tier: str | None = None,
+    pfz: PfzReferenceResult | None = None,
     gis: GisQueryResult | None = None,
     fabric: MarineDataFabric | None = None,
     fusion: FusionResult | None = None,
@@ -101,6 +106,14 @@ def build_provenance(
         add(ProvNode(id="agent:environment", kind=_AGENT_RESULT,
                      label="environmental (ocean-colour) agent",
                      value=environment_tier, source="noaa-coastwatch-erddap"), parent_for_data)
+    advisory_agent_id = None
+    if advisory_tier:
+        advisory_agent_id = add(
+            ProvNode(id="agent:advisory", kind=_AGENT_RESULT,
+                     label="official marine advisory agent (IMD)",
+                     value=advisory_tier, source="imd-sea-area-bulletin"),
+            parent_for_data,
+        )
 
     # ---- observations + validity ----
     obs_ids: dict[str, list[str]] = {}
@@ -114,6 +127,8 @@ def build_provenance(
                 else "agent:environment" if str(o.source).startswith(
                     ("noaa-coastwatch-erddap", "incois-erddap", "orca-demo-environmental")
                 ) and any(n.id == "agent:environment" for n in nodes)
+                else "agent:advisory" if str(o.source).startswith("imd-sea-area-bulletin")
+                and any(n.id == "agent:advisory" for n in nodes)
                 else "agent:gis" if any(n.id == "agent:gis" for n in nodes)
                 else parent_for_data
             )
@@ -634,6 +649,41 @@ def build_provenance(
             ev_agent, *dict.fromkeys(item_ids),
         )
 
+    # ---- official marine advisory (A8): retrieval -> temporal validation ->
+    # location applicability, separate from the generic obs/validity nodes
+    # above so the area-matching + severity classification are explicit and
+    # traceable back to the query, even when the advisory could not be
+    # matched/fetched at all. ----
+    if advisory is not None:
+        adv_parent = None
+        ids = obs_ids.get("advisory_level")
+        if ids:
+            adv_parent = f"validity:advisory_level:{ids[-1].rsplit(':', 1)[-1]}"
+            if not any(n.id == adv_parent for n in nodes):
+                adv_parent = ids[-1]
+        if adv_parent is None:
+            adv_parent = advisory_agent_id or parent_for_data
+        add(
+            ProvNode(
+                id="advisory:assessment", kind=ProvNodeKind.ADVISORY,
+                label=f"official marine advisory applicability ({advisory.area})",
+                value=advisory.severity.value,
+                source=advisory.source,
+                timestamp=advisory.retrieved_at,
+                detail={
+                    "area": advisory.area,
+                    "availability": advisory.availability.value,
+                    "warning_text": advisory.warning_text or "(none)",
+                    "issued_at": advisory.issued_at.isoformat() if advisory.issued_at else "",
+                    "valid_from": advisory.valid_from.isoformat() if advisory.valid_from else "",
+                    "valid_until": advisory.valid_until.isoformat() if advisory.valid_until else "",
+                    "source_url": advisory.source_url,
+                    "raw_id": advisory.raw_id or "",
+                },
+            ),
+            adv_parent,
+        )
+
     # ---- risk ----
     risk_id = None
     if risk is not None:
@@ -718,5 +768,46 @@ def build_provenance(
             if route.grid_path_cost is not None:
                 add(ProvNode(id="route:grid_cost", kind=ProvNodeKind.ROUTE,
                              label="A* grid path cost", value=route.grid_path_cost), "route")
+
+    # ---- official INCOIS PFZ reference (B7): retrieval -> spatial match ->
+    # map/reference presentation. Deliberately parented directly off the query
+    # / intent, NEVER off risk/policy/decision - PFZ is a fishing-potential
+    # reference only and must stay out of the safety provenance chain. ----
+    if pfz is not None:
+        pfz_agent = add(
+            ProvNode(
+                id="agent:pfz", kind=_AGENT_RESULT,
+                label="official INCOIS PFZ reference retrieval",
+                value=pfz.availability.value,
+                source=pfz.source,
+            ),
+            parent_for_data,
+        )
+        detail = {
+            "availability": pfz.availability.value,
+            "area_matched": pfz.area_matched or "",
+            "zone_count": str(pfz.zone_count),
+            "issued_at": pfz.issued_at or "",
+            "source_url": pfz.source_url,
+        }
+        if pfz.nearest_landing_centre is not None:
+            lc = pfz.nearest_landing_centre
+            detail.update(
+                {
+                    "nearest_landing_centre": lc.name,
+                    "nearest_landing_centre_distance_km": str(lc.distance_km),
+                    "nearest_landing_centre_direction": lc.direction,
+                }
+            )
+        add(
+            ProvNode(
+                id="pfz:spatial_match", kind=ProvNodeKind.PFZ_REFERENCE,
+                label="INCOIS PFZ spatial match (fishing-potential reference only)",
+                value=pfz.zone_count,
+                unit="zones",
+                detail=detail,
+            ),
+            pfz_agent,
+        )
 
     return ProvenanceGraph(root_id="query", nodes=tuple(nodes), edges=tuple(edges))

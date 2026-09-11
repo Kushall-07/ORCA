@@ -47,7 +47,7 @@ export const STAKEHOLDERS: Stakeholder[] = [
         "ಈ ಪ್ರದೇಶಕ್ಕೆ INCOIS PFZ ಸಲಹೆ ಇದೆಯೇ?",
       ],
     },
-    defaultLayers: ["coastline", "eez", "protected_areas", "risk", "pfz"],
+    defaultLayers: ["coastline", "eez", "protected_areas", "risk"],
     emphasisTab: "decision",
   },
   {

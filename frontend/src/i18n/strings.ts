@@ -55,6 +55,22 @@ export type StringKey =
   | "risk.notComputed"
   | "suitability.derived"
   | "suitability.pfzNote"
+  | "panel.advisory"
+  | "advisory.distinctNote"
+  | "advisory.area"
+  | "advisory.status.no_warning"
+  | "advisory.status.caution"
+  | "advisory.status.do_not_venture"
+  | "advisory.availability.unavailable"
+  | "advisory.availability.expired"
+  | "advisory.availability.not_yet_valid"
+  | "advisory.availability.no_location_match"
+  | "advisory.valid"
+  | "advisory.validFrom"
+  | "advisory.retrieved"
+  | "advisory.retrievedLive"
+  | "advisory.source"
+  | "advisory.notApplicable"
   | "panel.environmental"
   | "env.productivity"
   | "env.sst"
@@ -185,6 +201,7 @@ export type StringKey =
   | "verdict.fullExplanation"
   | "verdict.envContext"
   | "verdict.operationalDetail"
+  | "verdict.whatIf"
   | "evidence.reviewed"
   | "map.layers"
   | "map.legend"
@@ -198,6 +215,16 @@ export type StringKey =
   | "map.noRoute"
   | "map.origin"
   | "map.destination"
+  | "layer.group.marineBase"
+  | "layer.group.orcaAnalysis"
+  | "layer.group.fishingEnvironment"
+  | "layer.badge.orca"
+  | "layer.badge.incois"
+  | "layer.badge.live"
+  | "layer.source.reference"
+  | "layer.source.orca"
+  | "layer.source.incois"
+  | "layer.source.live"
   | "layer.risk"
   | "layer.coastline"
   | "layer.eez"
@@ -205,9 +232,27 @@ export type StringKey =
   | "layer.geofences"
   | "layer.route"
   | "layer.pfz"
+  | "layer.pfz.noGeometry"
+  | "layer.pfz.zoneCount"
   | "layer.sst"
   | "layer.chlorophyll"
-  | "sst.unavailable"
+  | "layer.sst.available"
+  | "layer.sst.unavailable"
+  | "layer.chlorophyll.available"
+  | "layer.chlorophyll.unavailable"
+  | "env.interp"
+  | "env.interp.limited"
+  | "env.interp.limitedNote"
+  | "env.ev.qualityNote"
+  | "voice.mic.start"
+  | "voice.mic.stop"
+  | "voice.mic.unsupported"
+  | "voice.mic.error"
+  | "voice.listening"
+  | "voice.tts.play"
+  | "voice.tts.stop"
+  | "voice.tts.unsupported"
+  | "voice.speaking"
   | "common.expand"
   | "common.collapse"
   | "common.print"
@@ -268,6 +313,23 @@ const en: Table = {
   "risk.notComputed": "Risk was not computed for this query.",
   "suitability.derived": "ORCA-derived — separate from operational safety",
   "suitability.pfzNote": "PFZ reference",
+  "panel.advisory": "Official Marine Advisory",
+  "advisory.distinctNote":
+    "Live official IMD advisory — separate from ORCA's computed risk assessment below.",
+  "advisory.area": "Marine area",
+  "advisory.status.no_warning": "No Warning",
+  "advisory.status.caution": "Caution",
+  "advisory.status.do_not_venture": "Fishermen advised not to venture into the sea",
+  "advisory.availability.unavailable": "Advisory data unavailable",
+  "advisory.availability.expired": "Advisory has expired",
+  "advisory.availability.not_yet_valid": "Advisory not yet in force",
+  "advisory.availability.no_location_match": "No official advisory area for this location",
+  "advisory.valid": "Valid",
+  "advisory.validFrom": "Valid from",
+  "advisory.retrieved": "Retrieved",
+  "advisory.retrievedLive": "Live",
+  "advisory.source": "Source",
+  "advisory.notApplicable": "Not applicable to the requested time",
   "panel.environmental": "Environmental Context",
   "env.productivity": "Environmental productivity potential",
   "env.sst": "Sea-surface temperature",
@@ -297,7 +359,7 @@ const en: Table = {
   "env.cmp.unavailable": "A temporal comparison could not be computed.",
   "env.cmp.note": "The reference is an ORCA-computed value over a recent past window, not a climatological normal. A single difference is not a trend.",
   "env.ev.title": "Evidence & reproducibility",
-  "env.ev.status": "Data reproducibility",
+  "env.ev.status": "Evidence quality",
   "env.ev.summary": "Summary",
   "env.ev.current": "current",
   "env.ev.historical": "historical / reference",
@@ -405,6 +467,7 @@ const en: Table = {
   "verdict.fullExplanation": "Full explanation",
   "verdict.envContext": "Environmental & research context",
   "verdict.operationalDetail": "Operational detail",
+  "verdict.whatIf": "What-if simulation",
   "evidence.reviewed": "evidence records reviewed",
   "map.layers": "Data layers",
   "map.legend": "Data provenance",
@@ -418,17 +481,51 @@ const en: Table = {
   "map.noRoute": "No safe route",
   "map.origin": "Origin",
   "map.destination": "Destination",
+  "layer.group.marineBase": "Marine base",
+  "layer.group.orcaAnalysis": "ORCA analysis",
+  "layer.group.fishingEnvironment": "Fishing & environment",
+  "layer.badge.orca": "ORCA",
+  "layer.badge.incois": "INCOIS",
+  "layer.badge.live": "LIVE",
+  "layer.source.reference": "Official reference layer",
+  "layer.source.orca": "Computed by ORCA",
+  "layer.source.incois": "INCOIS official reference",
+  "layer.source.live": "Live observation",
   "layer.risk": "Risk",
   "layer.coastline": "Coastline",
   "layer.eez": "Indian EEZ",
   "layer.protected_areas": "Protected areas",
   "layer.geofences": "Geofences",
   "layer.route": "Route",
-  "layer.pfz": "PFZ reference",
+  "layer.pfz": "INCOIS PFZ Reference",
+  "layer.pfz.noGeometry":
+    "Official INCOIS reference unavailable for map rendering at this location.",
+  "layer.pfz.zoneCount": "Official INCOIS reference — {count} zone(s)",
   "layer.sst": "Sea surface temperature",
   "layer.chlorophyll": "Chlorophyll-a",
-  "sst.unavailable":
-    "Satellite SST / chlorophyll are not yet integrated. No values are shown.",
+  "layer.sst.available":
+    "Open-Meteo Marine value — shown on the Environmental sample point marker (no gridded overlay).",
+  "layer.sst.unavailable":
+    "SST unavailable for this query — no valid Open-Meteo Marine value.",
+  "layer.chlorophyll.available":
+    "NOAA CoastWatch (VIIRS) value — shown on the Environmental sample point marker (no gridded overlay).",
+  "layer.chlorophyll.unavailable":
+    "Chlorophyll-a unavailable — likely satellite cloud / data coverage or validity constraints. No value is shown.",
+  "env.interp": "Productivity interpretation",
+  "env.interp.limited": "LIMITED",
+  "env.interp.limitedNote":
+    "Chlorophyll-a unavailable; environmental productivity potential cannot be assessed.",
+  "env.ev.qualityNote":
+    "Whether the underlying SST / chlorophyll-a observations are valid, sourced and timestamped — separate from whether productivity could be interpreted.",
+  "voice.mic.start": "Speak your question",
+  "voice.mic.stop": "Stop listening",
+  "voice.mic.unsupported": "Speech input is not supported in this browser",
+  "voice.mic.error": "Microphone unavailable — you can still type your question",
+  "voice.listening": "Listening…",
+  "voice.tts.play": "Read aloud",
+  "voice.tts.stop": "Stop reading",
+  "voice.tts.unsupported": "Read aloud is not supported in this browser",
+  "voice.speaking": "Speaking…",
   "common.expand": "Expand",
   "common.collapse": "Collapse",
   "common.print": "Print / export",
@@ -489,6 +586,23 @@ const hi: Table = {
   "risk.notComputed": "इस प्रश्न के लिए जोखिम की गणना नहीं की गई।",
   "suitability.derived": "ORCA-निर्मित — सुरक्षा से अलग",
   "suitability.pfzNote": "PFZ संदर्भ",
+  "panel.advisory": "आधिकारिक समुद्री सलाह",
+  "advisory.distinctNote":
+    "लाइव आधिकारिक IMD सलाह — नीचे दिए गए ORCA के गणना किए गए जोखिम आकलन से अलग।",
+  "advisory.area": "समुद्री क्षेत्र",
+  "advisory.status.no_warning": "कोई चेतावनी नहीं",
+  "advisory.status.caution": "सावधानी",
+  "advisory.status.do_not_venture": "मछुआरों को समुद्र में न जाने की सलाह",
+  "advisory.availability.unavailable": "सलाह डेटा अनुपलब्ध",
+  "advisory.availability.expired": "सलाह समाप्त हो चुकी है",
+  "advisory.availability.not_yet_valid": "सलाह अभी प्रभावी नहीं है",
+  "advisory.availability.no_location_match": "इस स्थान के लिए कोई आधिकारिक सलाह क्षेत्र नहीं",
+  "advisory.valid": "मान्य",
+  "advisory.validFrom": "इस समय से मान्य",
+  "advisory.retrieved": "प्राप्त किया गया",
+  "advisory.retrievedLive": "लाइव",
+  "advisory.source": "स्रोत",
+  "advisory.notApplicable": "अनुरोधित समय पर लागू नहीं",
   "panel.environmental": "पर्यावरणीय संदर्भ",
   "env.productivity": "पर्यावरणीय उत्पादकता क्षमता",
   "env.sst": "समुद्री सतह तापमान",
@@ -518,7 +632,7 @@ const hi: Table = {
   "env.cmp.unavailable": "सामयिक तुलना नहीं की जा सकी।",
   "env.cmp.note": "संदर्भ हाल की एक पिछली अवधि पर ORCA-गणित मान है, कोई जलवायु सामान्य नहीं। एक अंतर कोई प्रवृत्ति नहीं।",
   "env.ev.title": "साक्ष्य और पुनरुत्पादकता",
-  "env.ev.status": "डेटा पुनरुत्पादकता",
+  "env.ev.status": "साक्ष्य गुणवत्ता",
   "env.ev.summary": "सारांश",
   "env.ev.current": "वर्तमान",
   "env.ev.historical": "ऐतिहासिक / संदर्भ",
@@ -625,6 +739,7 @@ const hi: Table = {
   "verdict.fullExplanation": "पूरा स्पष्टीकरण",
   "verdict.envContext": "पर्यावरण एवं शोध संदर्भ",
   "verdict.operationalDetail": "परिचालन विवरण",
+  "verdict.whatIf": "काल्पनिक परिदृश्य अनुकरण",
   "evidence.reviewed": "साक्ष्य रिकॉर्ड समीक्षित",
   "map.layers": "डेटा परतें",
   "map.legend": "डेटा उत्पत्ति",
@@ -638,17 +753,50 @@ const hi: Table = {
   "map.noRoute": "कोई सुरक्षित मार्ग नहीं",
   "map.origin": "आरंभ",
   "map.destination": "गंतव्य",
+  "layer.group.marineBase": "समुद्री आधार",
+  "layer.group.orcaAnalysis": "ORCA विश्लेषण",
+  "layer.group.fishingEnvironment": "मत्स्यन एवं पर्यावरण",
+  "layer.badge.orca": "ORCA",
+  "layer.badge.incois": "INCOIS",
+  "layer.badge.live": "लाइव",
+  "layer.source.reference": "आधिकारिक संदर्भ परत",
+  "layer.source.orca": "ORCA द्वारा गणना",
+  "layer.source.incois": "INCOIS आधिकारिक संदर्भ",
+  "layer.source.live": "लाइव अवलोकन",
   "layer.risk": "जोखिम",
   "layer.coastline": "तटरेखा",
   "layer.eez": "भारतीय EEZ",
   "layer.protected_areas": "संरक्षित क्षेत्र",
   "layer.geofences": "जियोफेंस",
   "layer.route": "मार्ग",
-  "layer.pfz": "PFZ संदर्भ",
+  "layer.pfz": "INCOIS PFZ संदर्भ",
+  "layer.pfz.noGeometry": "इस स्थान के लिए आधिकारिक INCOIS संदर्भ मानचित्र पर उपलब्ध नहीं है।",
+  "layer.pfz.zoneCount": "आधिकारिक INCOIS संदर्भ — {count} क्षेत्र",
   "layer.sst": "समुद्र सतह तापमान",
   "layer.chlorophyll": "क्लोरोफिल-a",
-  "sst.unavailable":
-    "उपग्रह SST / क्लोरोफिल अभी एकीकृत नहीं हैं। कोई मान नहीं दिखाया गया।",
+  "layer.sst.available":
+    "Open-Meteo Marine मान — Environmental सैंपल-पॉइंट मार्कर पर दिखाया गया (कोई ग्रिड ओवरले नहीं)।",
+  "layer.sst.unavailable":
+    "इस क्वेरी के लिए SST अनुपलब्ध — कोई मान्य Open-Meteo Marine मान नहीं।",
+  "layer.chlorophyll.available":
+    "NOAA CoastWatch (VIIRS) मान — Environmental सैंपल-पॉइंट मार्कर पर दिखाया गया (कोई ग्रिड ओवरले नहीं)।",
+  "layer.chlorophyll.unavailable":
+    "क्लोरोफिल-a अनुपलब्ध — संभवतः उपग्रह बादल / डेटा कवरेज या वैधता सीमाओं के कारण। कोई मान नहीं दिखाया गया।",
+  "env.interp": "उत्पादकता व्याख्या",
+  "env.interp.limited": "सीमित",
+  "env.interp.limitedNote":
+    "क्लोरोफिल-a अनुपलब्ध; पर्यावरणीय उत्पादकता क्षमता का आकलन नहीं किया जा सकता।",
+  "env.ev.qualityNote":
+    "क्या अंतर्निहित SST / क्लोरोफिल-a अवलोकन मान्य, स्रोतित और समयांकित हैं — यह इससे अलग है कि उत्पादकता की व्याख्या हो सकी या नहीं।",
+  "voice.mic.start": "अपना प्रश्न बोलें",
+  "voice.mic.stop": "सुनना बंद करें",
+  "voice.mic.unsupported": "इस ब्राउज़र में वाक् इनपुट समर्थित नहीं है",
+  "voice.mic.error": "माइक्रोफ़ोन अनुपलब्ध — आप फिर भी प्रश्न टाइप कर सकते हैं",
+  "voice.listening": "सुन रहा है…",
+  "voice.tts.play": "ज़ोर से पढ़ें",
+  "voice.tts.stop": "पढ़ना बंद करें",
+  "voice.tts.unsupported": "इस ब्राउज़र में ज़ोर से पढ़ना समर्थित नहीं है",
+  "voice.speaking": "बोल रहा है…",
   "common.expand": "विस्तृत करें",
   "common.collapse": "संक्षिप्त करें",
   "common.print": "प्रिंट / निर्यात",
@@ -709,6 +857,23 @@ const kn: Table = {
   "risk.notComputed": "ಈ ಪ್ರಶ್ನೆಗೆ ಅಪಾಯ ಲೆಕ್ಕಹಾಕಲಾಗಿಲ್ಲ.",
   "suitability.derived": "ORCA-ಪಡೆದ — ಸುರಕ್ಷತೆಯಿಂದ ಪ್ರತ್ಯೇಕ",
   "suitability.pfzNote": "PFZ ಉಲ್ಲೇಖ",
+  "panel.advisory": "ಅಧಿಕೃತ ಸಮುದ್ರ ಸಲಹೆ",
+  "advisory.distinctNote":
+    "ಲೈವ್ ಅಧಿಕೃತ IMD ಸಲಹೆ — ಕೆಳಗಿನ ORCA ಲೆಕ್ಕಾಚಾರದ ಅಪಾಯದ ಮೌಲ್ಯಮಾಪನದಿಂದ ಪ್ರತ್ಯೇಕವಾಗಿದೆ.",
+  "advisory.area": "ಸಮುದ್ರ ಪ್ರದೇಶ",
+  "advisory.status.no_warning": "ಎಚ್ಚರಿಕೆ ಇಲ್ಲ",
+  "advisory.status.caution": "ಎಚ್ಚರಿಕೆ",
+  "advisory.status.do_not_venture": "ಮೀನುಗಾರರು ಸಮುದ್ರಕ್ಕೆ ಹೋಗದಂತೆ ಸಲಹೆ",
+  "advisory.availability.unavailable": "ಸಲಹೆ ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
+  "advisory.availability.expired": "ಸಲಹೆ ಅವಧಿ ಮುಗಿದಿದೆ",
+  "advisory.availability.not_yet_valid": "ಸಲಹೆ ಇನ್ನೂ ಜಾರಿಯಲ್ಲಿಲ್ಲ",
+  "advisory.availability.no_location_match": "ಈ ಸ್ಥಳಕ್ಕೆ ಯಾವುದೇ ಅಧಿಕೃತ ಸಲಹೆ ಪ್ರದೇಶವಿಲ್ಲ",
+  "advisory.valid": "ಮಾನ್ಯ",
+  "advisory.validFrom": "ಈ ಸಮಯದಿಂದ ಮಾನ್ಯ",
+  "advisory.retrieved": "ಪಡೆಯಲಾಗಿದೆ",
+  "advisory.retrievedLive": "ಲೈವ್",
+  "advisory.source": "ಮೂಲ",
+  "advisory.notApplicable": "ವಿನಂತಿಸಿದ ಸಮಯಕ್ಕೆ ಅನ್ವಯಿಸುವುದಿಲ್ಲ",
   "panel.environmental": "ಪರಿಸರ ಸಂದರ್ಭ",
   "env.productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ",
   "env.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
@@ -738,7 +903,7 @@ const kn: Table = {
   "env.cmp.unavailable": "ತಾತ್ಕಾಲಿಕ ಹೋಲಿಕೆ ಮಾಡಲಾಗಲಿಲ್ಲ.",
   "env.cmp.note": "ಉಲ್ಲೇಖವು ಇತ್ತೀಚಿನ ಹಿಂದಿನ ಅವಧಿಯ ORCA-ಗಣಿತ ಮೌಲ್ಯ, ಹವಾಮಾನ ಸಾಮಾನ್ಯವಲ್ಲ. ಒಂದು ವ್ಯತ್ಯಾಸ ಪ್ರವೃತ್ತಿಯಲ್ಲ.",
   "env.ev.title": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ಪುನರುತ್ಪಾದನೀಯತೆ",
-  "env.ev.status": "ದತ್ತಾಂಶ ಪುನರುತ್ಪಾದನೀಯತೆ",
+  "env.ev.status": "ಸಾಕ್ಷ್ಯ ಗುಣಮಟ್ಟ",
   "env.ev.summary": "ಸಾರಾಂಶ",
   "env.ev.current": "ಪ್ರಸ್ತುತ",
   "env.ev.historical": "ಐತಿಹಾಸಿಕ / ಉಲ್ಲೇಖ",
@@ -845,6 +1010,7 @@ const kn: Table = {
   "verdict.fullExplanation": "ಪೂರ್ಣ ವಿವರಣೆ",
   "verdict.envContext": "ಪರಿಸರ ಮತ್ತು ಸಂಶೋಧನಾ ಸಂದರ್ಭ",
   "verdict.operationalDetail": "ಕಾರ್ಯಾಚರಣೆ ವಿವರ",
+  "verdict.whatIf": "ಊಹಾತ್ಮಕ ಸನ್ನಿವೇಶ ಸಿಮ್ಯುಲೇಶನ್",
   "evidence.reviewed": "ಸಾಕ್ಷ್ಯ ದಾಖಲೆಗಳು ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
   "map.layers": "ದತ್ತಾಂಶ ಪದರಗಳು",
   "map.legend": "ದತ್ತಾಂಶ ಮೂಲ",
@@ -858,17 +1024,50 @@ const kn: Table = {
   "map.noRoute": "ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಇಲ್ಲ",
   "map.origin": "ಆರಂಭ",
   "map.destination": "ಗಮ್ಯ",
+  "layer.group.marineBase": "ಸಮುದ್ರ ಆಧಾರ",
+  "layer.group.orcaAnalysis": "ORCA ವಿಶ್ಲೇಷಣೆ",
+  "layer.group.fishingEnvironment": "ಮೀನುಗಾರಿಕೆ ಮತ್ತು ಪರಿಸರ",
+  "layer.badge.orca": "ORCA",
+  "layer.badge.incois": "INCOIS",
+  "layer.badge.live": "ಲೈವ್",
+  "layer.source.reference": "ಅಧಿಕೃತ ಉಲ್ಲೇಖ ಪದರ",
+  "layer.source.orca": "ORCA ಲೆಕ್ಕಹಾಕಿದ",
+  "layer.source.incois": "INCOIS ಅಧಿಕೃತ ಉಲ್ಲೇಖ",
+  "layer.source.live": "ಲೈವ್ ಅವಲೋಕನ",
   "layer.risk": "ಅಪಾಯ",
   "layer.coastline": "ಕರಾವಳಿ",
   "layer.eez": "ಭಾರತೀಯ EEZ",
   "layer.protected_areas": "ಸಂರಕ್ಷಿತ ಪ್ರದೇಶಗಳು",
   "layer.geofences": "ಜಿಯೋಫೆನ್ಸ್",
   "layer.route": "ಮಾರ್ಗ",
-  "layer.pfz": "PFZ ಉಲ್ಲೇಖ",
+  "layer.pfz": "INCOIS PFZ ಉಲ್ಲೇಖ",
+  "layer.pfz.noGeometry": "ಈ ಸ್ಥಳಕ್ಕೆ ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ ನಕ್ಷೆಯಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ.",
+  "layer.pfz.zoneCount": "ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ — {count} ವಲಯ(ಗಳು)",
   "layer.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
   "layer.chlorophyll": "ಕ್ಲೋರೊಫಿಲ್-a",
-  "sst.unavailable":
-    "ಉಪಗ್ರಹ SST / ಕ್ಲೋರೊಫಿಲ್ ಇನ್ನೂ ಸಂಯೋಜಿಸಲಾಗಿಲ್ಲ. ಯಾವುದೇ ಮೌಲ್ಯ ತೋರಿಸಲಾಗಿಲ್ಲ.",
+  "layer.sst.available":
+    "Open-Meteo Marine ಮೌಲ್ಯ — Environmental ಮಾದರಿ-ಬಿಂದು ಗುರುತಿನ ಮೇಲೆ ತೋರಿಸಲಾಗಿದೆ (ಗ್ರಿಡ್ ಓವರ್‌ಲೇ ಇಲ್ಲ).",
+  "layer.sst.unavailable":
+    "ಈ ಪ್ರಶ್ನೆಗೆ SST ಲಭ್ಯವಿಲ್ಲ — ಮಾನ್ಯ Open-Meteo Marine ಮೌಲ್ಯ ಇಲ್ಲ.",
+  "layer.chlorophyll.available":
+    "NOAA CoastWatch (VIIRS) ಮೌಲ್ಯ — Environmental ಮಾದರಿ-ಬಿಂದು ಗುರುತಿನ ಮೇಲೆ ತೋರಿಸಲಾಗಿದೆ (ಗ್ರಿಡ್ ಓವರ್‌ಲೇ ಇಲ್ಲ).",
+  "layer.chlorophyll.unavailable":
+    "ಕ್ಲೋರೊಫಿಲ್-a ಲಭ್ಯವಿಲ್ಲ — ಬಹುಶಃ ಉಪಗ್ರಹ ಮೋಡ / ದತ್ತಾಂಶ ವ್ಯಾಪ್ತಿ ಅಥವಾ ಮಾನ್ಯತೆ ಮಿತಿಗಳ ಕಾರಣ. ಯಾವುದೇ ಮೌಲ್ಯ ತೋರಿಸಲಾಗಿಲ್ಲ.",
+  "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
+  "env.interp.limited": "ಸೀಮಿತ",
+  "env.interp.limitedNote":
+    "ಕ್ಲೋರೊಫಿಲ್-a ಲಭ್ಯವಿಲ್ಲ; ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯವನ್ನು ಅಂದಾಜಿಸಲಾಗದು.",
+  "env.ev.qualityNote":
+    "ಆಧಾರವಾಗಿರುವ SST / ಕ್ಲೋರೊಫಿಲ್-a ಅವಲೋಕನಗಳು ಮಾನ್ಯ, ಮೂಲಸಹಿತ ಮತ್ತು ಸಮಯಮುದ್ರಿತವೇ ಎಂಬುದು — ಉತ್ಪಾದಕತೆಯನ್ನು ವ್ಯಾಖ್ಯಾನಿಸಬಹುದೇ ಎಂಬುದರಿಂದ ಬೇರೆ.",
+  "voice.mic.start": "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಮಾತನಾಡಿ",
+  "voice.mic.stop": "ಆಲಿಸುವುದನ್ನು ನಿಲ್ಲಿಸಿ",
+  "voice.mic.unsupported": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬೆಂಬಲಿತವಲ್ಲ",
+  "voice.mic.error": "ಮೈಕ್ರೊಫೋನ್ ಲಭ್ಯವಿಲ್ಲ — ನೀವು ಇನ್ನೂ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಬಹುದು",
+  "voice.listening": "ಆಲಿಸುತ್ತಿದೆ…",
+  "voice.tts.play": "ಗಟ್ಟಿಯಾಗಿ ಓದಿ",
+  "voice.tts.stop": "ಓದುವುದನ್ನು ನಿಲ್ಲಿಸಿ",
+  "voice.tts.unsupported": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಗಟ್ಟಿಯಾಗಿ ಓದುವುದು ಬೆಂಬಲಿತವಲ್ಲ",
+  "voice.speaking": "ಮಾತನಾಡುತ್ತಿದೆ…",
   "common.expand": "ವಿಸ್ತರಿಸಿ",
   "common.collapse": "ಸಂಕುಚಿಸಿ",
   "common.print": "ಮುದ್ರಿಸಿ / ರಫ್ತು",

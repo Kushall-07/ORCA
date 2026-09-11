@@ -132,3 +132,42 @@ async def test_session_context_is_merged() -> None:
 async def test_empty_message_asks_for_clarification() -> None:
     u = await _rules().understand("   ")
     assert u.needs_clarification is True
+
+
+# ---- location resolution: gazetteer coverage --------------------------
+async def test_fishing_safety_near_kanyakumari_resolves_and_proceeds() -> None:
+    u = await _rules().understand("safe fishing near kanyakumari")
+    assert u.intent is QueryIntent.FISHING_SAFETY
+    assert u.origin is not None and u.origin.coordinate is not None
+    assert u.needs_clarification is False
+
+
+async def test_kanyakumari_is_case_insensitive() -> None:
+    u = await _rules().understand("safe fishing near KANYAKUMARI")
+    assert u.intent is QueryIntent.FISHING_SAFETY
+    assert u.origin is not None and u.origin.coordinate is not None
+    assert u.needs_clarification is False
+
+
+async def test_existing_location_mangalore_still_resolves() -> None:
+    u = await _rules().understand("safe fishing near Mangalore")
+    assert u.intent is QueryIntent.FISHING_SAFETY
+    assert u.origin is not None and u.origin.coordinate is not None
+    assert u.needs_clarification is False
+
+
+async def test_fishing_without_a_location_still_asks_for_clarification() -> None:
+    u = await _rules().understand("safe fishing")
+    assert u.intent is QueryIntent.FISHING_SAFETY
+    assert u.needs_clarification is True
+    assert u.clarification_question
+
+
+async def test_kanyakumari_native_script_resolves() -> None:
+    hi = await _rules().understand("क्या कन्याकुमारी से मछली पकड़ना सुरक्षित है?")
+    assert hi.language is Language.HI
+    assert hi.intent is QueryIntent.FISHING_SAFETY
+    assert hi.origin is not None and hi.origin.coordinate is not None
+    kn = await _rules().understand("ಕನ್ಯಾಕುಮಾರಿ ಬಳಿ ಮೀನುಗಾರಿಕೆ ಸುರಕ್ಷಿತವೇ?")
+    assert kn.language is Language.KN
+    assert kn.origin is not None and kn.origin.coordinate is not None

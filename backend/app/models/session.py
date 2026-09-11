@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.query import GeoRef, Language, QueryIntent, QueryUnderstanding
+from app.risk.engine import RiskEngineInput
 
 
 class SessionTurn(BaseModel):
@@ -20,6 +21,17 @@ class SessionTurn(BaseModel):
     understanding: QueryUnderstanding
     decision_status: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # ---- what-if / scenario-sensitivity baseline (additive, read-only) ----
+    # The realised deterministic Risk Engine input for this turn. A follow-up
+    # ``POST /whatif`` perturbs a COPY of it and re-runs the same Risk -> Safety
+    # -> Decision chain. Present only when the turn actually ran that chain.
+    # ``app.whatif`` never mutates this; the live pipeline never reads it back.
+    risk_input: RiskEngineInput | None = None
+    # Whether the Safety Guard saw the required critical-evidence set as present
+    # on this turn (it did not only when an unresolved safety-critical conflict
+    # was surfaced). Re-used verbatim when re-scoring so the what-if is faithful.
+    required_evidence_present: bool | None = None
 
 
 class SessionContext(BaseModel):
@@ -70,4 +82,14 @@ class SessionContext(BaseModel):
         for turn in reversed(self.turns):
             if turn.decision_status is not None:
                 return turn.decision_status
+        return None
+
+    @property
+    def last_whatif_baseline(self) -> SessionTurn | None:
+        """The most recent turn that carries a realised Risk Engine input - the
+        baseline a follow-up what-if perturbs. ``None`` when no turn ran the
+        deterministic risk/decision chain yet."""
+        for turn in reversed(self.turns):
+            if turn.risk_input is not None:
+                return turn
         return None

@@ -35,6 +35,8 @@ class ProvNodeKind(str, Enum):
     ENVIRONMENTAL_EVIDENCE = "environmental_evidence"  # Phase 9 Step 5: evidence / reproducibility assessment
     ENVIRONMENTAL_STABILITY = "environmental_stability"  # Phase 9 Step 6: bounded-window dispersion & coverage
     ENVIRONMENTAL_NEIGHBOURHOOD = "environmental_neighbourhood"  # Phase 9 Step 7: chlorophyll-a pixel-neighbourhood representativeness
+    ADVISORY = "advisory"          # official IMD marine advisory: matching / temporal validation / applicability
+    PFZ_REFERENCE = "pfz_reference"  # official INCOIS PFZ reference: retrieval / spatial match - never safety
     EXPLANATION = "explanation"
 
 

@@ -168,6 +168,7 @@ function EvidenceBlock({
         </span>
         <span className="env-ev__caption">{t("env.ev.status")}</span>
       </div>
+      <p className="env-ev__note">{t("env.ev.qualityNote")}</p>
       {evidence.summary && <p className="env-ev__summary">{evidence.summary}</p>}
 
       <ul className="env-ev__list">
@@ -431,19 +432,34 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
   if (!env) return null;
 
   const na = t("env.unavailable");
+  // A. Interpretation availability — can productivity be read at all? This is a
+  // separate question from B. evidence quality (handled in EvidenceBlock). When
+  // chlorophyll-a is missing the productivity potential simply cannot be
+  // assessed, so the hero says LIMITED rather than a bare UNKNOWN that reads
+  // like a computed verdict. The raw backend fields stay visible in the grid.
+  const chlMissing = env.chlorophyll_a?.value == null;
 
   return (
     <Panel title={t("panel.environmental")}>
       <div className="env">
         <div className="env__row">
           <span
-            className={`env__level env__level--${env.productivity_potential}`}
+            className={`env__level env__level--${
+              chlMissing ? "unknown" : env.productivity_potential
+            }`}
             data-neutral="true"
           >
-            {productivityLabel(env.productivity_potential)}
+            {chlMissing
+              ? t("env.interp.limited")
+              : productivityLabel(env.productivity_potential)}
           </span>
-          <span className="env__caption">{t("env.productivity")}</span>
+          <span className="env__caption">
+            {chlMissing ? t("env.interp") : t("env.productivity")}
+          </span>
         </div>
+        {chlMissing && (
+          <p className="env__derived">{t("env.interp.limitedNote")}</p>
+        )}
 
         <dl className="env__grid">
           <KeyValue k={t("env.sst")}>{fmtObs(env.sst, na)}</KeyValue>
@@ -453,6 +469,9 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
               {chlClassLabel(env.chlorophyll_class)}
             </KeyValue>
           )}
+          <KeyValue k={t("env.productivity")}>
+            {productivityLabel(env.productivity_potential)}
+          </KeyValue>
           <KeyValue k={t("env.confidence")}>
             {String(env.confidence).toUpperCase()}
           </KeyValue>

@@ -83,6 +83,64 @@ async def test_llm_hallucinated_number_falls_back_to_template() -> None:
     assert "4.9" not in e.text and "7.3" not in e.text
 
 
+async def test_clarification_understanding_does_not_call_the_llm() -> None:
+    """A clarification-needed turn has no decision to explain. Even with an LLM
+    configured, the explanation must be the deterministic clarify template, not
+    an LLM refusal ("the decision, risk score ... were not included ...")."""
+    refusal = (
+        "I'm sorry, but the decision, risk score, safety status, suitability "
+        "score, and route details were not included in the information you "
+        "provided, so I can't explain them."
+    )
+    stub = StubLlmClient(text_response=[refusal, refusal])
+    u = QueryUnderstanding(
+        language=Language.EN,
+        intent=QueryIntent.CLARIFICATION_NEEDED,
+        needs_clarification=True,
+        clarification_question="Which port or coastal area should I assess?",
+    )
+    e = await ExplanationAgent(stub).explain(
+        language=Language.EN, understanding=u, decision=None, risk=None,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None,
+        provenance=None,
+    )
+    assert stub.calls == []                      # the LLM was never invoked
+    assert e.generated_via == "template"
+    assert "were not included" not in e.text.lower()
+    assert "Which port or coastal area should I assess?" in e.text
+
+
+async def test_failed_understanding_does_not_call_the_llm() -> None:
+    stub = StubLlmClient(text_response=["whatever"])
+    u = QueryUnderstanding(language=Language.EN, failed=True)
+    e = await ExplanationAgent(stub).explain(
+        language=Language.EN, understanding=u, decision=None, risk=None,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None,
+        provenance=None,
+    )
+    assert stub.calls == []
+    assert e.generated_via == "template"
+    assert "could not reliably understand" in e.text.lower()
+
+
+async def test_valid_location_decision_state_reaches_the_explanation() -> None:
+    """When understanding is complete, the real decision / risk / suitability /
+    route state is passed through and explained (not treated as missing)."""
+    decision, risk = _decision(wave_height_m=1.2, wind_speed_ms=5.0)
+    u = QueryUnderstanding(language=Language.EN, intent=QueryIntent.FISHING_SAFETY)
+    e = await ExplanationAgent(None).explain(
+        language=Language.EN, understanding=u, decision=decision, risk=risk,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None,
+        provenance=None,
+    )
+    assert e.generated_via == "template"
+    assert e.grounded is True
+    assert "were not included" not in e.text.lower()
+    # the deterministic decision sentence is present
+    assert "orca" in e.text.lower()
+    assert e.reasoning_summary and e.reasoning_summary != "no decision"
+
+
 async def test_explanation_never_changes_the_decision_object() -> None:
     decision, risk = _decision(wave_height_m=6.0, wind_speed_ms=25.0, thunderstorm_proxy=True,
                                min_pressure_hpa=940.0, max_gust_ms=45.0, advisory_level=1.0)

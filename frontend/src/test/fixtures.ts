@@ -1,4 +1,4 @@
-import type { QueryResponse } from "../types/api";
+import type { QueryResponse, WhatIfResponse } from "../types/api";
 
 export function makeResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
   return {
@@ -548,6 +548,86 @@ export function makeNeighbourhoodResponse(
     },
     ...overrides,
   });
+}
+
+// POST /whatif - a deterministic scenario-sensitivity result. `label` is stamped
+// by the backend and repeated on the payload so it can never be dropped.
+export function makeWhatIfResponse(
+  overrides: Partial<WhatIfResponse> = {},
+): WhatIfResponse {
+  return {
+    session_id: "web-test",
+    label: "SIMULATION - NOT LIVE DATA",
+    baseline_message: "Is it safe to go fishing from Mangalore now?",
+    baseline_age_minutes: 0.4,
+    error: null,
+    data: {
+      label: "SIMULATION - NOT LIVE DATA",
+      perturbation: { wave_height_delta_m: 3, wind_speed_delta_ms: null },
+      perturbed_inputs: [
+        {
+          variable: "wave_height_m",
+          unit: "m",
+          baseline: 1.1,
+          scenario: 4.1,
+          delta_requested: 3,
+          floored: false,
+        },
+      ],
+      baseline: {
+        risk: {
+          level: "low",
+          score: 9,
+          overall_score: 8.6,
+          risk_level: "low",
+          data_sufficiency: "sufficient",
+          limiting_factors: [],
+          missing_critical_factors: [],
+          warnings: [],
+        },
+        safety: { status: "ALLOWED", reasons: [] },
+        decision: {
+          status: "PROCEED",
+          safety_status: "ALLOWED",
+          routing_allowed: true,
+          reasons: ["risk level LOW"],
+          warnings: [],
+        },
+      },
+      scenario: {
+        risk: {
+          level: "high",
+          score: 63,
+          overall_score: 62.9,
+          risk_level: "high",
+          data_sufficiency: "sufficient",
+          limiting_factors: ["wave_height"],
+          missing_critical_factors: [],
+          warnings: [],
+        },
+        safety: { status: "CAUTION", reasons: ["risk level HIGH"] },
+        decision: {
+          status: "PROCEED_WITH_CAUTION",
+          safety_status: "CAUTION",
+          routing_allowed: true,
+          reasons: ["risk level HIGH (score 62.9)"],
+          warnings: [],
+        },
+      },
+      risk_score_delta: 54.3,
+      decision_changed: true,
+      safety_status_changed: true,
+      explanation:
+        "SIMULATION - NOT LIVE DATA. With wave height m from 1.1 to 4.1 m " +
+        "(a user-supplied assumption, not a forecast), deterministic marine risk " +
+        "moves from 9/100 (LOW) to 63/100 (HIGH) and the recommendation changes " +
+        "from PROCEED to PROCEED_WITH_CAUTION.",
+      notes: [],
+      provenance: { kind: "scenario_simulation" },
+      whatif_version: "whatif-1.0.0",
+    },
+    ...overrides,
+  };
 }
 
 export function makeNoRouteResponse(): QueryResponse {

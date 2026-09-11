@@ -333,6 +333,64 @@ class EnvironmentalInfo(BaseModel):
     neighbourhood: EnvironmentalNeighbourhoodInfo | None = None
 
 
+class AdvisoryInfo(BaseModel):
+    """Official IMD marine advisory (A9). Kept visually and structurally
+    separate from ``risk`` / ``decision`` - this is the LIVE OFFICIAL ADVISORY,
+    not ORCA's computed risk. ``severity``/``warning_text`` are ``None`` when
+    unavailable; the frontend must show that honestly, never substitute
+    another source."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str = "IMD"
+    availability: str = "unavailable"   # available | unavailable | expired | not_yet_valid | no_location_match
+    area: str | None = None
+    severity: str | None = None         # no_warning | caution | do_not_venture
+    warning_text: str | None = None
+    issued_at: str | None = None
+    valid_from: str | None = None
+    valid_until: str | None = None
+    retrieved_at: str | None = None
+    source_url: str | None = None
+    applicable: bool = False
+
+
+class PfzLandingCentreInfo(BaseModel):
+    name: str
+    district: str = ""
+    sector: str = ""
+    latitude: float
+    longitude: float
+    distance_km: float
+    direction: str = ""
+    bearing_deg: float | None = None
+    distance_from_nm: float | None = None
+    distance_to_nm: float | None = None
+    depth_from_m: float | None = None
+    depth_to_m: float | None = None
+    forecast_date: str | None = None
+    valid_until: str | None = None
+
+
+class PfzReferenceInfo(BaseModel):
+    """Official INCOIS PFZ reference summary (B9). A fishing-potential
+    reference only - never a safety zone, never ORCA risk, never a
+    recommendation to enter the sea. Full map geometry is fetched separately
+    via ``GET /gis/layers/pfz`` using the same query coordinate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str = "INCOIS"
+    availability: str = "unavailable"   # available | unavailable | no_location_match
+    area_matched: str | None = None
+    zone_count: int = 0
+    nearest_landing_centre: PfzLandingCentreInfo | None = None
+    issued_at: str | None = None
+    retrieved_at: str | None = None
+    source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    disclaimer: str = ""
+
+
 class DataQualityInfo(BaseModel):
     weather_tier: str | None = None
     ocean_tier: str | None = None
@@ -382,6 +440,12 @@ class QueryResponse(BaseModel):
     route: RouteInfo | None = None
     gis: GisSummary | None = None
     reference: list[ReferenceInfo] = Field(default_factory=list)
+    # Live official marine advisory (A) - distinct from `risk`/`decision`,
+    # which are ORCA's own computed assessment.
+    advisory: AdvisoryInfo | None = None
+    # Official INCOIS PFZ reference (B) - fishing-potential reference only,
+    # never safety. Null when no coordinate was resolved.
+    pfz_reference: PfzReferenceInfo | None = None
 
     alerts: list[AlertItem] = Field(default_factory=list)
     conflicts: list[ConflictItem] = Field(default_factory=list)

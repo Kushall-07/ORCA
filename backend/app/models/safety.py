@@ -10,6 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.advisory import AdvisoryAvailability, AdvisorySeverity
 from app.models.geo import GeofenceResult
 from app.models.risk import DataSufficiency, RiskLevel, RiskResult
 
@@ -32,6 +33,16 @@ class SafetyGuardInput(BaseModel):
     # The caller asserts whether the critical evidence set was actually present.
     required_evidence_present: bool = True
     extra_reasons: tuple[str, ...] = ()
+    # Official IMD marine advisory (A5/A7). Deterministic-only input: the guard
+    # never interprets warning text itself, only the already-classified
+    # severity + availability + whether it is temporally/spatially applicable
+    # to this query. A DO_NOT_VENTURE advisory that IS applicable forces
+    # BLOCKED (Rule 2, below); anything else only reaches safety through the
+    # Risk Engine's weighted ``advisory`` factor, same as every other signal.
+    advisory_severity: AdvisorySeverity | None = None
+    advisory_availability: AdvisoryAvailability | None = None
+    advisory_applicable: bool = False
+    advisory_area: str | None = None
 
 
 class SafetyGuardResult(BaseModel):

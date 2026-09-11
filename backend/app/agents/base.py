@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.advisory import MarineAdvisory
 from app.models.common import Coordinate, SignalKind, SourceTier
 from app.models.fabric import DataTier, SourceStatus
 from app.models.observations import MarineObservation
@@ -56,6 +57,11 @@ class AgentResult(BaseModel):
     observations: tuple[MarineObservation, ...] = ()
     source_status: SourceStatus
     errors: tuple[str, ...] = ()
+    # Only the marine-advisory agent sets this: the full official advisory
+    # record (text, area, validity, severity) alongside the numeric
+    # ``advisory_level`` observation that actually feeds the Risk Engine.
+    # Every other agent leaves it ``None``.
+    advisory: MarineAdvisory | None = None
 
     @property
     def has_data(self) -> bool:

@@ -88,6 +88,7 @@ def build_fabric(
     ocean: AgentResult | None = None,
     gis: GisQueryResult | None = None,
     environment: AgentResult | None = None,
+    advisory: AgentResult | None = None,
     references: tuple[ReferenceArtifact, ...] = (),
     temporal_config: TemporalConfig | None = None,
     now: datetime | None = None,
@@ -103,6 +104,7 @@ def build_fabric(
         ("weather", weather),
         ("ocean", ocean),
         ("environment", environment),
+        ("advisory", advisory),
     ):
         if result is None:
             continue
