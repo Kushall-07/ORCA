@@ -207,6 +207,34 @@ export async function fetchPfzLayer(
   }
 }
 
+/**
+ * ORCA Environmental Suitability - a bounded, deterministic chlorophyll-a
+ * spatial grid around (lat, lon). Environmental context only - see the
+ * `orca_meta.disclaimer` carried on the response. Like `fetchPfzLayer`, this
+ * is query-location-scoped (not a static file) and the backend caches the
+ * underlying ERDDAP box fetch, so repeated layer toggles for the same
+ * location never re-hit NOAA CoastWatch. Returns `null` (not a throw) when
+ * the source is genuinely unavailable (404) - the caller must show that
+ * honestly, never fabricate a surface.
+ */
+export async function fetchEnvironmentalSuitabilityLayer(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal,
+): Promise<GeoJsonFeatureCollection | null> {
+  try {
+    return await request<GeoJsonFeatureCollection>(
+      `/gis/layers/environmental-suitability?lat=${lat}&lon=${lon}`,
+      { signal },
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.kind === "http" && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 export function pfzSnapshotUrl(): string {
   return `${API_BASE_URL}/reference/pfz`;
 }

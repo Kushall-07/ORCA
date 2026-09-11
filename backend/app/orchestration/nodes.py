@@ -99,14 +99,22 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
     if origin is None and session is not None and session.last_origin is not None:
         origin = session.last_origin.coordinate or gazetteer.lookup(session.last_origin.name)
 
-    destination = None
-    if u.destination is not None:
+    destination_override = state.get("destination_override")
+    destination = destination_override
+    if destination is None and u.destination is not None:
         destination = u.destination.coordinate or gazetteer.lookup(u.destination.name)
 
     date_hint = state.get("date_hint_override") or u.date_hint
     decision_time = _resolve_decision_time(_now(state), date_hint, u.time_window)
 
+    # An explicit destination override (e.g. a selected INCOIS PFZ reference
+    # point) always implies a route request, deterministically - never relies
+    # on the LLM having parsed "route" intent from free text.
+    if destination_override is not None and not u.requests_route:
+        u = u.model_copy(update={"requests_route": True})
+
     updates: dict = {
+        "understanding": u,
         "resolved_origin": origin,
         "resolved_destination": destination,
         "decision_time": decision_time,

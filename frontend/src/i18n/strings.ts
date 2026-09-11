@@ -240,6 +240,27 @@ export type StringKey =
   | "layer.sst.unavailable"
   | "layer.chlorophyll.available"
   | "layer.chlorophyll.unavailable"
+  | "layer.environmentalSuitability"
+  | "layer.environmentalSuitability.noLocation"
+  | "env.suitability.title"
+  | "env.suitability.disclaimer"
+  | "env.suitability.insufficientData"
+  | "env.suitability.legend.low"
+  | "env.suitability.legend.moderate"
+  | "env.suitability.legend.high"
+  | "gps.use"
+  | "gps.requesting"
+  | "gps.granted"
+  | "gps.denied"
+  | "gps.unavailable"
+  | "gps.markerLabel"
+  | "pfz.selectedTitle"
+  | "pfz.selectedMarkerLabel"
+  | "pfz.navigate"
+  | "pfz.notSafetyNote"
+  | "pfz.clearSelection"
+  | "pfz.cannotRoute"
+  | "route.myLocationToPfz"
   | "env.interp"
   | "env.interp.limited"
   | "env.interp.limitedNote"
@@ -511,6 +532,27 @@ const en: Table = {
     "NOAA CoastWatch (VIIRS) value — shown on the Environmental sample point marker (no gridded overlay).",
   "layer.chlorophyll.unavailable":
     "Chlorophyll-a unavailable — likely satellite cloud / data coverage or validity constraints. No value is shown.",
+  "layer.environmentalSuitability": "ORCA Environmental Suitability",
+  "layer.environmentalSuitability.noLocation": "Ask ORCA about a location first to load this layer.",
+  "env.suitability.title": "ORCA Environmental Suitability",
+  "env.suitability.disclaimer": "Environmental context only — not a fish-presence or safety prediction.",
+  "env.suitability.insufficientData": "Insufficient environmental data for a suitability visualization here.",
+  "env.suitability.legend.low": "Low",
+  "env.suitability.legend.moderate": "Moderate",
+  "env.suitability.legend.high": "Higher",
+  "gps.use": "Use my current location",
+  "gps.requesting": "Requesting location…",
+  "gps.granted": "Using your current location",
+  "gps.denied": "Location permission denied",
+  "gps.unavailable": "Current location unavailable",
+  "gps.markerLabel": "My current location",
+  "pfz.selectedTitle": "INCOIS PFZ Reference selected",
+  "pfz.selectedMarkerLabel": "Selected PFZ reference",
+  "pfz.navigate": "Navigate to this PFZ",
+  "pfz.notSafetyNote": "PFZ reference is not a safety recommendation.",
+  "pfz.clearSelection": "Clear selection",
+  "pfz.cannotRoute": "Selected PFZ reference cannot be safely routed to.",
+  "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
   "env.interp.limitedNote":
@@ -782,6 +824,27 @@ const hi: Table = {
     "NOAA CoastWatch (VIIRS) मान — Environmental सैंपल-पॉइंट मार्कर पर दिखाया गया (कोई ग्रिड ओवरले नहीं)।",
   "layer.chlorophyll.unavailable":
     "क्लोरोफिल-a अनुपलब्ध — संभवतः उपग्रह बादल / डेटा कवरेज या वैधता सीमाओं के कारण। कोई मान नहीं दिखाया गया।",
+  "layer.environmentalSuitability": "ORCA पर्यावरणीय उपयुक्तता",
+  "layer.environmentalSuitability.noLocation": "इस लेयर को लोड करने के लिए पहले ORCA से किसी स्थान के बारे में पूछें।",
+  "env.suitability.title": "ORCA पर्यावरणीय उपयुक्तता",
+  "env.suitability.disclaimer": "केवल पर्यावरणीय संदर्भ — यह मछली-उपस्थिति या सुरक्षा भविष्यवाणी नहीं है।",
+  "env.suitability.insufficientData": "यहाँ उपयुक्तता विज़ुअलाइज़ेशन के लिए पर्याप्त पर्यावरणीय डेटा उपलब्ध नहीं है।",
+  "env.suitability.legend.low": "कम",
+  "env.suitability.legend.moderate": "मध्यम",
+  "env.suitability.legend.high": "अधिक",
+  "gps.use": "मेरा वर्तमान स्थान उपयोग करें",
+  "gps.requesting": "स्थान का अनुरोध किया जा रहा है…",
+  "gps.granted": "आपके वर्तमान स्थान का उपयोग किया जा रहा है",
+  "gps.denied": "स्थान की अनुमति अस्वीकृत",
+  "gps.unavailable": "वर्तमान स्थान उपलब्ध नहीं है",
+  "gps.markerLabel": "मेरा वर्तमान स्थान",
+  "pfz.selectedTitle": "INCOIS PFZ संदर्भ चयनित",
+  "pfz.selectedMarkerLabel": "चयनित PFZ संदर्भ",
+  "pfz.navigate": "इस PFZ की ओर मार्ग बनाएं",
+  "pfz.notSafetyNote": "PFZ संदर्भ कोई सुरक्षा सिफारिश नहीं है।",
+  "pfz.clearSelection": "चयन साफ़ करें",
+  "pfz.cannotRoute": "चयनित PFZ संदर्भ तक सुरक्षित रूप से मार्ग नहीं बनाया जा सकता।",
+  "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
   "env.interp.limitedNote":
@@ -1053,6 +1116,27 @@ const kn: Table = {
     "NOAA CoastWatch (VIIRS) ಮೌಲ್ಯ — Environmental ಮಾದರಿ-ಬಿಂದು ಗುರುತಿನ ಮೇಲೆ ತೋರಿಸಲಾಗಿದೆ (ಗ್ರಿಡ್ ಓವರ್‌ಲೇ ಇಲ್ಲ).",
   "layer.chlorophyll.unavailable":
     "ಕ್ಲೋರೊಫಿಲ್-a ಲಭ್ಯವಿಲ್ಲ — ಬಹುಶಃ ಉಪಗ್ರಹ ಮೋಡ / ದತ್ತಾಂಶ ವ್ಯಾಪ್ತಿ ಅಥವಾ ಮಾನ್ಯತೆ ಮಿತಿಗಳ ಕಾರಣ. ಯಾವುದೇ ಮೌಲ್ಯ ತೋರಿಸಲಾಗಿಲ್ಲ.",
+  "layer.environmentalSuitability": "ORCA ಪರಿಸರ ಸೂಕ್ತತೆ",
+  "layer.environmentalSuitability.noLocation": "ಈ ಲೇಯರ್ ಲೋಡ್ ಮಾಡಲು ಮೊದಲು ORCA ಗೆ ಒಂದು ಸ್ಥಳದ ಬಗ್ಗೆ ಕೇಳಿ.",
+  "env.suitability.title": "ORCA ಪರಿಸರ ಸೂಕ್ತತೆ",
+  "env.suitability.disclaimer": "ಕೇವಲ ಪರಿಸರ ಸಂದರ್ಭ — ಇದು ಮೀನು-ಇರುವಿಕೆ ಅಥವಾ ಸುರಕ್ಷತಾ ಮುನ್ಸೂಚನೆ ಅಲ್ಲ.",
+  "env.suitability.insufficientData": "ಇಲ್ಲಿ ಸೂಕ್ತತೆ ದೃಶ್ಯೀಕರಣಕ್ಕೆ ಸಾಕಷ್ಟು ಪರಿಸರ ದತ್ತಾಂಶ ಇಲ್ಲ.",
+  "env.suitability.legend.low": "ಕಡಿಮೆ",
+  "env.suitability.legend.moderate": "ಮಧ್ಯಮ",
+  "env.suitability.legend.high": "ಹೆಚ್ಚು",
+  "gps.use": "ನನ್ನ ಪ್ರಸ್ತುತ ಸ್ಥಳವನ್ನು ಬಳಸಿ",
+  "gps.requesting": "ಸ್ಥಳವನ್ನು ವಿನಂತಿಸಲಾಗುತ್ತಿದೆ…",
+  "gps.granted": "ನಿಮ್ಮ ಪ್ರಸ್ತುತ ಸ್ಥಳವನ್ನು ಬಳಸಲಾಗುತ್ತಿದೆ",
+  "gps.denied": "ಸ್ಥಳದ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ",
+  "gps.unavailable": "ಪ್ರಸ್ತುತ ಸ್ಥಳ ಲಭ್ಯವಿಲ್ಲ",
+  "gps.markerLabel": "ನನ್ನ ಪ್ರಸ್ತುತ ಸ್ಥಳ",
+  "pfz.selectedTitle": "INCOIS PFZ ಉಲ್ಲೇಖ ಆಯ್ಕೆಯಾಗಿದೆ",
+  "pfz.selectedMarkerLabel": "ಆಯ್ಕೆಮಾಡಿದ PFZ ಉಲ್ಲೇಖ",
+  "pfz.navigate": "ಈ PFZ ಗೆ ಮಾರ್ಗ ನಿರ್ದೇಶನ",
+  "pfz.notSafetyNote": "PFZ ಉಲ್ಲೇಖವು ಸುರಕ್ಷತಾ ಶಿಫಾರಸು ಅಲ್ಲ.",
+  "pfz.clearSelection": "ಆಯ್ಕೆ ತೆರವುಗೊಳಿಸಿ",
+  "pfz.cannotRoute": "ಆಯ್ಕೆಮಾಡಿದ PFZ ಉಲ್ಲೇಖಕ್ಕೆ ಸುರಕ್ಷಿತವಾಗಿ ಮಾರ್ಗ ನಿರ್ದೇಶನ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
+  "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
   "env.interp.limitedNote":

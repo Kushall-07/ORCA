@@ -14,6 +14,14 @@ class QueryRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     latitude: float | None = None
     longitude: float | None = None
+    # Explicit destination coordinate (additive). When both are given, this
+    # overrides any destination the message text would otherwise resolve to -
+    # used for "current location -> selected INCOIS PFZ reference" routing, so
+    # destination resolution is deterministic, never LLM-dependent. PFZ
+    # geometry itself never reaches the backend; only a plain coordinate does,
+    # indistinguishable from a manually supplied destination.
+    destination_latitude: float | None = None
+    destination_longitude: float | None = None
     date_hint: str | None = None
     # UX context only - echoed back, never changes reasoning.
     stakeholder: str | None = None

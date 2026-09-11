@@ -55,6 +55,14 @@ class OrcaGraphState(TypedDict, total=False):
     message: str
     now: datetime
     coordinate_override: Coordinate | None
+    # Explicit destination coordinate (e.g. a client-derived point on a
+    # selected INCOIS PFZ reference geometry, or a browser-GPS-based manual
+    # pin). When present, `normalize` uses it verbatim instead of resolving
+    # `understanding.destination` via the LLM / gazetteer, and forces
+    # `requests_route = True` - so PFZ-to-route navigation stays fully
+    # deterministic (no LLM in the loop) and reuses the existing Risk / Safety
+    # / Decision / RouteAgent chain unchanged.
+    destination_override: Coordinate | None
     date_hint_override: str | None
     stakeholder: str | None
     language_hint: str | None

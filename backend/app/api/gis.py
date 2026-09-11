@@ -9,6 +9,7 @@ browser cannot read directly. All geometry is EPSG:4326 and carries its
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -18,7 +19,8 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.gis.validation import CoordinateError, validate_latitude, validate_longitude
 from app.models.common import Coordinate
-from app.services.cache import InMemoryCache, JsonCache
+from app.models.environmental import EnvironmentalSuitabilityGridResult
+from app.services.cache import InMemoryCache, JsonCache, suitability_grid_cache_key
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["gis"])
@@ -29,6 +31,11 @@ router = APIRouter(tags=["gis"])
 # day-bucketed and a few hundred KB. Swap for a Redis-backed JsonCache the same
 # way the rest of the data agents would be wired for multi-process deployment.
 _pfz_cache = JsonCache(InMemoryCache())
+
+# Same rationale as `_pfz_cache`: one bounded ERDDAP box fetch per (location,
+# day), shared across requests, so toggling the "ORCA Environmental
+# Suitability" layer repeatedly never re-hits NOAA CoastWatch.
+_suitability_cache = JsonCache(InMemoryCache())
 
 # layer id -> (filename, human name)
 _LAYERS: dict[str, tuple[str, str]] = {
@@ -114,6 +121,132 @@ async def pfz_layer(
     if not fc.get("features"):
         raise HTTPException(status_code=404, detail="no PFZ reference geometry matched this location")
     return JSONResponse(fc, headers={"Cache-Control": "public, max-age=1800"})
+
+
+@router.get("/gis/layers/environmental-suitability")
+async def environmental_suitability_layer(
+    lat: float = Query(..., description="Query latitude"),
+    lon: float = Query(..., description="Query longitude"),
+) -> JSONResponse:
+    """ORCA Environmental Suitability - a bounded, deterministic spatial
+    visualization of chlorophyll-a productivity magnitude around (lat, lon).
+
+    Reuses the SAME single bounded ERDDAP box request the researcher
+    pixel-neighbourhood feature already issues
+    (``app.services.oceancolor.fetch_chlorophyll_neighbourhood``) and the SAME
+    chlorophyll-class thresholds the single-point Environmental Productivity
+    Engine uses. Environmental context only - never fish abundance, catch,
+    presence or a safety recommendation, and never enters ``RiskEngineInput``
+    / ``SafetyGuardInput`` / the Policy & Safety Guard / the Decision Engine.
+
+    Returns ``200`` with ``data_sufficiency: "insufficient"`` and no features
+    (never a fabricated surface) when coverage is too thin. ``404`` only on a
+    genuine source failure - mirrors ``/gis/layers/pfz``.
+    """
+    try:
+        latitude = validate_latitude(lat)
+        longitude = validate_longitude(lon)
+    except CoordinateError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+    key = suitability_grid_cache_key(latitude, longitude, now)
+    cached = await _suitability_cache.get_json(key)
+    if cached is not None and isinstance(cached.get("fc"), dict):
+        return JSONResponse(cached["fc"], headers={"Cache-Control": "public, max-age=1800"})
+
+    from app.environmental.suitability_grid import EnvironmentalSuitabilityGridEngine
+    from app.services.oceancolor import OceanColorError, fetch_chlorophyll_neighbourhood
+
+    try:
+        neighbourhood = await fetch_chlorophyll_neighbourhood(
+            latitude,
+            longitude,
+            now,
+            half_width_deg=settings.suitability_grid_half_width_deg,
+            settings=settings,
+        )
+    except OceanColorError as exc:
+        logger.warning(
+            "environmental suitability layer unavailable", extra={"source": "oceancolor"}
+        )
+        raise HTTPException(
+            status_code=404,
+            detail=f"ORCA Environmental Suitability unavailable: {exc}",
+        ) from exc
+
+    engine = EnvironmentalSuitabilityGridEngine()
+    result = engine.assess(
+        neighbourhood,
+        center_latitude=latitude,
+        center_longitude=longitude,
+        min_coverage=settings.suitability_grid_min_coverage,
+        max_cells=settings.suitability_grid_max_cells,
+        cell_size_deg=settings.suitability_grid_cell_size_deg,
+    )
+    fc = _suitability_result_to_geojson(result)
+    await _suitability_cache.set_json(
+        key, {"fc": fc}, settings.suitability_grid_cache_ttl_seconds
+    )
+    return JSONResponse(fc, headers={"Cache-Control": "public, max-age=1800"})
+
+
+def _suitability_result_to_geojson(result: EnvironmentalSuitabilityGridResult) -> dict:
+    """Project the deterministic grid result onto a GeoJSON FeatureCollection
+    the frontend's existing GeoJSON layer machinery already knows how to
+    render (same ``orca_meta`` convention as the other ``/gis/layers/*``
+    endpoints)."""
+    half = result.cell_size_deg / 2.0
+    features = []
+    for cell in result.cells:
+        lat, lon = cell.latitude, cell.longitude
+        ring = [
+            [lon - half, lat - half],
+            [lon + half, lat - half],
+            [lon + half, lat + half],
+            [lon - half, lat + half],
+            [lon - half, lat - half],
+        ]
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Polygon", "coordinates": [ring]},
+                "properties": {
+                    "suitability_index": cell.suitability_index,
+                    "productivity_potential": cell.productivity_potential.value,
+                    "chlorophyll_class": cell.chlorophyll_class.value,
+                    "chlorophyll_value_mg_m3": cell.chlorophyll_value,
+                    "distance_km": cell.distance_km,
+                },
+            }
+        )
+    return {
+        "type": "FeatureCollection",
+        "orca_meta": {
+            "source": (
+                "ORCA Environmental Suitability (deterministic; chlorophyll-a "
+                "from NOAA CoastWatch ERDDAP)"
+            ),
+            "layer_kind": "DERIVED",
+            "authority": "ORCA",
+            "disclaimer": result.disclaimer,
+            "formula": result.formula,
+            "data_sufficiency": result.data_sufficiency.value,
+            "coverage_ratio": result.coverage_ratio,
+            "cells_total": result.cells_total,
+            "cells_valid": result.cells_valid,
+            "composite_date": result.composite_date,
+            "dataset": result.dataset,
+            "half_width_deg": result.half_width_deg,
+            "cell_size_deg": result.cell_size_deg,
+            "center": [result.center_latitude, result.center_longitude],
+            "limitations": list(result.limitations),
+            "engine_version": result.engine_version,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "features": features,
+    }
 
 
 @router.get("/gis/layers/{layer_id}")

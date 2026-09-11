@@ -525,3 +525,96 @@ class EnvironmentalNeighbourhoodResult(BaseModel):
     @property
     def has_profile(self) -> bool:
         return self.median is not None
+
+
+# ==========================================================================
+# ORCA Environmental Suitability Spatial Grid (bounded spatial visualization)
+# ==========================================================================
+# A deterministic, LLM-free, I/O-free per-pixel classification of the SAME
+# native chlorophyll-a pixels a single bounded ERDDAP box request already
+# returns (app.services.oceancolor.fetch_chlorophyll_neighbourhood). Each pixel
+# is classified with the EXACT SAME EnvironmentalConfig thresholds the
+# single-point Environmental Productivity Engine already uses
+# (app.environmental.engine, environmental_config.yaml) - no new ecological
+# threshold is invented. This answers only "what chlorophyll-a productivity
+# magnitude class is near this pixel?" - never fish abundance, catch, presence
+# or a biological model.
+#
+# SST is NOT part of this grid: Open-Meteo Marine has no bounded/batch
+# endpoint, so gridding SST would require one HTTP request per cell. SST stays
+# a single reference point (unchanged, existing feature) - see the feasibility
+# audit note in app.environmental.suitability_grid.
+#
+# This module (and app.environmental.suitability_grid) imports nothing from
+# app.policy / app.risk / app.decision / app.routing, and its output NEVER
+# enters RiskEngineInput, SafetyGuardInput, the Policy & Safety Guard or the
+# Decision Engine.
+
+ENVIRONMENTAL_SUITABILITY_GRID_ENGINE_VERSION = "environmental-suitability-grid-0.1.0"
+
+ENVIRONMENTAL_SUITABILITY_DISCLAIMER = (
+    "ORCA Environmental Suitability is a deterministic chlorophyll-a "
+    "productivity-magnitude visualization. It is environmental context only - "
+    "not a fish-presence, abundance, catch or safety prediction, and not a "
+    "recommendation to fish at any location."
+)
+
+ENVIRONMENTAL_SUITABILITY_FORMULA = (
+    "For each real (never interpolated) chlorophyll-a pixel returned by the "
+    "bounded ERDDAP box request: chlorophyll_class = the SAME oligotrophic / "
+    "low / moderate / elevated / high boundaries as environmental_config.yaml; "
+    "productivity_potential = the SAME class->potential mapping the "
+    "single-point Environmental Productivity Engine uses; "
+    "suitability_index = 0.33 if productivity_potential == 'low', "
+    "0.67 if 'moderate', 1.0 if 'elevated'. Bounded to [0, 1]. A cell with no "
+    "valid pixel is omitted, never zero-filled or interpolated."
+)
+
+
+class EnvironmentalSuitabilityCell(BaseModel):
+    """One classified native chlorophyll-a pixel inside the suitability grid
+    box. Never fabricated or interpolated - copied from a real ERDDAP pixel
+    already validated by :func:`fetch_chlorophyll_neighbourhood`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    latitude: float
+    longitude: float
+    chlorophyll_value: float             # mg m-3, strictly > 0
+    chlorophyll_class: ChlorophyllClass
+    productivity_potential: ProductivityPotential
+    suitability_index: float = Field(ge=0.0, le=1.0)
+    distance_km: float
+
+
+class EnvironmentalSuitabilityGridResult(BaseModel):
+    """Deterministic output of the Environmental Suitability Grid Engine.
+
+    Purely a spatial re-classification of real pixels already fetched in ONE
+    bounded ERDDAP box request. It NEVER enters RiskEngineInput or
+    SafetyGuardInput and never affects the Policy & Safety Guard or the
+    Decision Engine. ``data_sufficiency`` is INSUFFICIENT (empty ``cells``)
+    when no valid pixel exists or coverage is too thin - the grid is never
+    fabricated to look complete."""
+
+    model_config = ConfigDict(frozen=True)
+
+    data_sufficiency: DataSufficiency = DataSufficiency.INSUFFICIENT
+    center_latitude: float = 0.0
+    center_longitude: float = 0.0
+    half_width_deg: float = 0.0
+    cell_size_deg: float = 0.0
+    composite_date: str | None = None
+    dataset: str = ""
+    cells_total: int = 0
+    cells_valid: int = 0
+    coverage_ratio: float | None = None
+    cells: tuple[EnvironmentalSuitabilityCell, ...] = ()
+    formula: str = ENVIRONMENTAL_SUITABILITY_FORMULA
+    limitations: tuple[str, ...] = ()
+    disclaimer: str = ENVIRONMENTAL_SUITABILITY_DISCLAIMER
+    engine_version: str = ENVIRONMENTAL_SUITABILITY_GRID_ENGINE_VERSION
+
+    @property
+    def has_data(self) -> bool:
+        return self.data_sufficiency == DataSufficiency.SUFFICIENT and len(self.cells) > 0

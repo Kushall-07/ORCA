@@ -63,12 +63,32 @@ async def query(request: QueryRequest, http_request: Request) -> QueryResponse:
                 errors=["invalid coordinate"],
             )
 
+    destination = None
+    if request.destination_latitude is not None and request.destination_longitude is not None:
+        try:
+            destination = Coordinate(
+                latitude=request.destination_latitude,
+                longitude=request.destination_longitude,
+            )
+        except ValueError:
+            return QueryResponse(
+                session_id=request.session_id or "sess-unknown",
+                request_id=request_id,
+                turn=0,
+                status="ERROR",
+                language="en",
+                intent="general",
+                answer="The supplied destination coordinates are invalid.",
+                errors=["invalid destination coordinate"],
+            )
+
     try:
         return await get_pipeline().run(
             message=request.message,
             session_id=request.session_id,
             request_id=request_id,
             coordinate=coordinate,
+            destination=destination,
             date_hint=request.date_hint,
             stakeholder=request.stakeholder,
             language=request.language,

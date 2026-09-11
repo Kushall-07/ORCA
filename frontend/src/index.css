@@ -114,6 +114,38 @@ button { font-family: inherit; }
   font-size: 0.8rem;
 }
 
+.workspace__map-overlay > .gps-control,
+.workspace__map-overlay > .pfz-selection-card { flex: none; width: 100%; }
+
+.gps-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: rgba(11, 18, 32, 0.94);
+  border: 1px solid var(--orca-border);
+  color: inherit;
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.gps-control.is-active { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
+
+.pfz-selection-card {
+  background: rgba(11, 18, 32, 0.94);
+  border: 1px solid var(--orca-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.78rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.pfz-selection-card__head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+.pfz-selection-card__meta { opacity: 0.75; margin: 0; }
+.pfz-selection-card__note { opacity: 0.75; margin: 0; font-size: 0.72rem; }
+
 .workspace__rail {
   border-left: 1px solid var(--orca-border);
   background: var(--orca-panel-2);

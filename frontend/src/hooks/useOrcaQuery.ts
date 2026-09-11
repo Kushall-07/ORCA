@@ -16,12 +16,19 @@ export interface ChatMessage {
 let counter = 0;
 const nextId = () => `m${Date.now()}-${counter++}`;
 
+export interface QueryCoordinateOverride {
+  latitude?: number;
+  longitude?: number;
+  destinationLatitude?: number;
+  destinationLongitude?: number;
+}
+
 export interface UseOrcaQuery {
   messages: ChatMessage[];
   latest: QueryResponse | null;
   loading: boolean;
   error: string | null;
-  send: (text: string) => Promise<void>;
+  send: (text: string, coords?: QueryCoordinateOverride) => Promise<void>;
   retry: () => Promise<void>;
   clear: () => void;
   sessionId: string;
@@ -43,9 +50,12 @@ export function useOrcaQuery(opts: {
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
+  const lastCoords = useRef<QueryCoordinateOverride | undefined>(undefined);
+
   const run = useCallback(
-    async (text: string) => {
+    async (text: string, coords?: QueryCoordinateOverride) => {
       lastQuery.current = text;
+      lastCoords.current = coords;
       setError(null);
       setLoading(true);
       abortRef.current?.abort();
@@ -58,6 +68,10 @@ export function useOrcaQuery(opts: {
             message: text,
             stakeholder: optsRef.current.stakeholder,
             language: optsRef.current.language,
+            latitude: coords?.latitude,
+            longitude: coords?.longitude,
+            destination_latitude: coords?.destinationLatitude,
+            destination_longitude: coords?.destinationLongitude,
           },
           controller.signal,
         );
@@ -93,14 +107,14 @@ export function useOrcaQuery(opts: {
   );
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, coords?: QueryCoordinateOverride) => {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
       setMessages((prev) => [
         ...prev,
         { id: nextId(), role: "user", text: trimmed, ts: Date.now() },
       ]);
-      await run(trimmed);
+      await run(trimmed, coords);
     },
     [loading, run],
   );
@@ -113,7 +127,7 @@ export function useOrcaQuery(opts: {
         if (copy.length && copy[copy.length - 1].error) copy.pop();
         return copy;
       });
-      await run(lastQuery.current);
+      await run(lastQuery.current, lastCoords.current);
     }
   }, [loading, run]);
 

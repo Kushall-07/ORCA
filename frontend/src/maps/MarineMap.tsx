@@ -26,7 +26,8 @@ export type LayerId =
   | "pfz"
   | "sst"
   | "chlorophyll"
-  | "environmental";
+  | "environmental"
+  | "environmental_suitability";
 
 // Phase 9 Step 3 - NEUTRAL greyscale-blue ramp for the descriptive chlorophyll-a
 // trophic band. Deliberately NOT a red/green "good vs bad fishing" palette:
@@ -57,6 +58,18 @@ const LAYER_STYLE: Record<string, PathOptions> = {
   pfz: { color: "#0ca678", weight: 2, dashArray: "3 3", fillOpacity: 0 },
 };
 
+// "ORCA Environmental Suitability" grid cells - a restrained, neutral-blue
+// ramp that reuses the SAME family as CHL_CLASS_COLOR (never the RISK_COLOR
+// red/orange/green family, so it can never read as a safety heatmap).
+// suitability_index: 0.33 (low) / 0.67 (moderate) / 1.0 (elevated).
+function suitabilityFillColor(index: number): string {
+  if (index >= 0.85) return "#2c6e91";
+  if (index >= 0.5) return "#7fb3d5";
+  return "#dce8f0";
+}
+
+const SUITABILITY_CELL_STYLE: PathOptions = { weight: 0.5, color: "#ffffff", fillOpacity: 0.55 };
+
 function FitController({ resp }: { resp: QueryResponse | null }) {
   const map = useMap();
   useEffect(() => {
@@ -78,15 +91,22 @@ function StaticLayer({
   id,
   fc,
   kind,
+  onSelectPfz,
 }: {
   id: string;
   fc: GeoJsonFeatureCollection;
   kind: "HARD" | "SOFT" | "REFERENCE";
+  /** Fired when a PFZ feature is clicked (id === "pfz" only). */
+  onSelectPfz?: (feature: Feature<Geometry, Record<string, unknown>>, clickLatLng: [number, number]) => void;
 }) {
   const styleFn = (feature?: Feature<Geometry, Record<string, unknown>>): PathOptions => {
     if (id === "coastline") return LAYER_STYLE.coastline;
     if (id === "eez") return LAYER_STYLE.eez;
     if (id === "pfz") return LAYER_STYLE.pfz;
+    if (id === "environmental_suitability") {
+      const index = Number(feature?.properties?.suitability_index ?? 0);
+      return { ...SUITABILITY_CELL_STYLE, fillColor: suitabilityFillColor(index) };
+    }
     const fk = String(feature?.properties?.layer_kind ?? kind).toUpperCase();
     return fk === "HARD" ? LAYER_STYLE.protected_hard : LAYER_STYLE.protected_soft;
   };
@@ -97,6 +117,20 @@ function StaticLayer({
       const day = String(p.Julian_day ?? "");
       layer.bindTooltip(
         `INCOIS PFZ Reference${state ? ` — ${state}` : ""}${day ? ` (day ${day})` : ""}`,
+        { sticky: true },
+      );
+      if (onSelectPfz) {
+        layer.on("click", (e: { latlng: { lat: number; lng: number } }) => {
+          onSelectPfz(feature, [e.latlng.lat, e.latlng.lng]);
+        });
+      }
+      return;
+    }
+    if (id === "environmental_suitability") {
+      const idx = Number(p.suitability_index ?? 0);
+      const cls = String(p.chlorophyll_class ?? "");
+      layer.bindTooltip(
+        `ORCA Environmental Suitability: ${idx.toFixed(2)} (${cls})`,
         { sticky: true },
       );
       return;
@@ -117,16 +151,31 @@ export interface MarineMapProps {
   resp: QueryResponse | null;
   activeLayers: Set<LayerId>;
   layerData: Record<string, GeoJsonFeatureCollection>;
+  /** Browser-geolocation origin (Phase B), shown as a distinct pin from the
+   * query's resolved origin - null when GPS was never requested / granted. */
+  gpsLocation?: [number, number] | null;
+  /** A PFZ reference destination the user selected by clicking the layer
+   * (Phase C) but has not yet (or has already) routed to. */
+  selectedPfz?: [number, number] | null;
+  /** Fired when a PFZ feature is clicked. */
+  onSelectPfz?: (feature: Feature<Geometry, Record<string, unknown>>, clickLatLng: [number, number]) => void;
 }
 
-export default function MarineMap({ resp, activeLayers, layerData }: MarineMapProps) {
+export default function MarineMap({
+  resp,
+  activeLayers,
+  layerData,
+  gpsLocation = null,
+  selectedPfz = null,
+  onSelectPfz,
+}: MarineMapProps) {
   const { t } = useI18n();
 
   const origin = useMemo<[number, number] | null>(() => {
     if (resp?.route?.origin) return resp.route.origin;
     if (resp?.location) return [resp.location.latitude, resp.location.longitude];
-    return null;
-  }, [resp]);
+    return gpsLocation;
+  }, [resp, gpsLocation]);
   const destination = useMemo<[number, number] | null>(() => {
     if (resp?.route?.destination) return resp.route.destination;
     if (resp?.destination) return [resp.destination.latitude, resp.destination.longitude];
@@ -160,7 +209,15 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
       )}
 
       {activeLayers.has("pfz") && layerData.pfz && (
-        <StaticLayer id="pfz" fc={layerData.pfz} kind="REFERENCE" />
+        <StaticLayer id="pfz" fc={layerData.pfz} kind="REFERENCE" onSelectPfz={onSelectPfz} />
+      )}
+
+      {activeLayers.has("environmental_suitability") && layerData.environmental_suitability && (
+        <StaticLayer
+          id="environmental_suitability"
+          fc={layerData.environmental_suitability}
+          kind="REFERENCE"
+        />
       )}
 
       {activeLayers.has("route") && route.length >= 2 && (
@@ -198,6 +255,30 @@ export default function MarineMap({ resp, activeLayers, layerData }: MarineMapPr
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("map.destination")}
             {resp?.destination?.name ? ` — ${resp.destination.name}` : ""}
+          </Tooltip>
+        </CircleMarker>
+      )}
+
+      {gpsLocation && !resp && (
+        <CircleMarker
+          center={gpsLocation}
+          radius={7}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#1971c2", fillOpacity: 1 }}
+        >
+          <Tooltip permanent direction="top" offset={[0, -8]}>
+            {t("gps.markerLabel")}
+          </Tooltip>
+        </CircleMarker>
+      )}
+
+      {selectedPfz && (
+        <CircleMarker
+          center={selectedPfz}
+          radius={8}
+          pathOptions={{ color: "#0ca678", weight: 3, fillColor: "#ffffff", fillOpacity: 0.9 }}
+        >
+          <Tooltip permanent direction="top" offset={[0, -8]}>
+            {t("pfz.selectedMarkerLabel")}
           </Tooltip>
         </CircleMarker>
       )}

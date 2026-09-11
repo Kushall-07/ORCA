@@ -160,3 +160,15 @@ def oceancolor_cache_key(
     never labelled LIVE.
     """
     return f"oceancolor:{_round(lat, decimals)}:{_round(lon, decimals)}:{time_bucket(day, 'day')}"
+
+
+def suitability_grid_cache_key(
+    lat: float, lon: float, day: datetime, *, decimals: int = 2
+) -> str:
+    """Day-bucketed key for the ORCA Environmental Suitability grid layer.
+
+    Same bucketing rationale as :func:`oceancolor_cache_key` (a daily
+    composite): repeated map-layer toggles for the same location on the same
+    day are served from cache, never re-hitting ERDDAP per toggle.
+    """
+    return f"suitability-grid:{_round(lat, decimals)}:{_round(lon, decimals)}:{time_bucket(day, 'day')}"

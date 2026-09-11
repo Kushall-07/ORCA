@@ -166,6 +166,22 @@ class Settings(BaseSettings):
     imd_cache_ttl_seconds: int = Field(default=3600, gt=0)       # 1 h
     imd_cache_max_age_seconds: int = Field(default=43200, gt=0)  # 12 h
 
+    # ---- ORCA Environmental Suitability spatial grid (bounded, CHL-driven) ----
+    # SST has no bounded/batch endpoint (Open-Meteo Marine is single-point
+    # only), so the spatial grid is driven by chlorophyll-a alone via ONE
+    # existing bounded ERDDAP box request (see
+    # app.services.oceancolor.fetch_chlorophyll_neighbourhood and
+    # app.environmental.suitability_grid). At ~4 km native VIIRS resolution,
+    # half_width_deg=0.20 (~22 km each direction) yields roughly 11x11=121
+    # cells - comfortably inside max_cells.
+    suitability_grid_half_width_deg: float = Field(default=0.20, gt=0.0, le=1.0)
+    suitability_grid_max_cells: int = Field(default=200, ge=1, le=2000)
+    suitability_grid_min_coverage: float = Field(default=0.10, ge=0.0, le=1.0)
+    # Rendering-only constant (not a claimed sensor footprint): the square side
+    # used to draw each pixel on the map, close to the ~4 km native pixel.
+    suitability_grid_cell_size_deg: float = Field(default=0.045, gt=0.0, le=1.0)
+    suitability_grid_cache_ttl_seconds: int = Field(default=32400, gt=0)  # 9 h
+
     # ---- Official INCOIS PFZ reference geometry (public, no auth) ----
     incois_pfz_wfs_base_url: str = Field(default="https://www.incois.gov.in/geoserver")
     incois_pfz_timeout_seconds: float = Field(default=15.0, gt=0)

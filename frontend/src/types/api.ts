@@ -549,6 +549,12 @@ export interface QueryRequestBody {
   message: string;
   latitude?: number;
   longitude?: number;
+  // Explicit destination coordinate (additive) - used for "current location ->
+  // selected INCOIS PFZ reference" routing. Overrides any destination the
+  // message text would otherwise resolve to; the deterministic RouteAgent /
+  // hard-geofence / Safety Guard chain is unchanged either way.
+  destination_latitude?: number;
+  destination_longitude?: number;
   date_hint?: string;
   stakeholder?: string;
   language?: LanguageCode;

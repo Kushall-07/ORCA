@@ -647,3 +647,27 @@ export function makeNoRouteResponse(): QueryResponse {
     },
   });
 }
+
+/** Current-location -> selected INCOIS PFZ reference route, found (task D). */
+export function makeRouteFoundResponse(): QueryResponse {
+  return makeResponse({
+    intent: "ROUTE",
+    route: {
+      status: "ROUTE_FOUND",
+      waypoint_count: 4,
+      total_distance_m: 8200,
+      grid_path_cost: 5.6,
+      validation_passed: true,
+      reasons: [],
+      waypoints: [
+        [12.87, 74.84],
+        [12.9, 74.87],
+        [12.93, 74.89],
+        [12.95, 74.9],
+      ],
+      origin: [12.87, 74.84],
+      destination: [12.95, 74.9],
+      hard_geofence_violations: 0,
+    },
+  });
+}

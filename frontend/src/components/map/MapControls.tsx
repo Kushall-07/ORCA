@@ -49,6 +49,7 @@ export function buildLayerToggles(
   const sstValue = resp?.environmental?.sst?.value != null;
   const chlValue = resp?.environmental?.chlorophyll_a?.value != null;
   const envReady = sstValue || chlValue;
+  const suitabilityReady = !!resp?.location;
 
   return [
     // ---- Marine base ----
@@ -113,6 +114,20 @@ export function buildLayerToggles(
       sourceTitleKey: "layer.source.orca",
     },
     // ---- Fishing & environment ----
+    {
+      id: "environmental_suitability",
+      labelKey: "layer.environmentalSuitability",
+      group: "fishing_environment",
+      // Query-location-scoped, like PFZ: only meaningful once a coordinate is
+      // resolved. The endpoint itself may still report "insufficient
+      // environmental data" (WorkspacePage shows that honestly) - `available`
+      // here just means "there is a location to request the grid for".
+      available: suitabilityReady,
+      provenance: "derived",
+      badgeKey: "layer.badge.orca",
+      sourceTitleKey: "layer.source.orca",
+      noteKey: suitabilityReady ? undefined : "layer.environmentalSuitability.noLocation",
+    },
     {
       id: "pfz",
       labelKey: "layer.pfz",
@@ -232,6 +247,15 @@ function LayerIcon({ id }: { id: LayerId }) {
       return (
         <svg {...common} aria-hidden="true">
           <path d="M8 2c2.4 3.1 4.3 5.7 4.3 8A4.3 4.3 0 0 1 3.7 10C3.7 7.7 5.6 5.1 8 2z" />
+        </svg>
+      );
+    case "environmental_suitability":
+      return (
+        <svg {...common} aria-hidden="true">
+          <rect x="1.5" y="1.5" width="4.5" height="4.5" />
+          <rect x="6.7" y="1.5" width="4.5" height="4.5" />
+          <rect x="1.5" y="6.7" width="4.5" height="4.5" />
+          <rect x="6.7" y="6.7" width="4.5" height="4.5" fill="currentColor" stroke="none" />
         </svg>
       );
     default:
