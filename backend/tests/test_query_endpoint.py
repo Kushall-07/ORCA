@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -371,3 +373,76 @@ def test_route_query_returns_waypoint_geometry(client) -> None:
             [body["route"]["origin"][0], body["route"]["origin"][1]], abs=0.5
         )
         assert body["route"]["hard_geofence_violations"] == 0
+
+
+# ---- audit blocker 1 regression -----------------------------------------
+# Explicit destination coordinates must take precedence over natural-language
+# destination resolution. This uses the REAL LLM-backed control-flow seam
+# (QueryUnderstandingAgent with an `llm` configured, so `_understand_with_llm`
+# / the graph's STATUS_CLARIFY short-circuit actually execute) via
+# StubLlmClient - not the `llm=None` deterministic-rules path, which never
+# exercises the bug (`_SHORT_CIRCUIT` short-circuiting `normalize()` before
+# `destination_override` is consulted).
+_AMBIGUOUS_LLM_JSON = json.dumps({
+    "language": "en", "intent": "clarification_needed", "origin_name": None,
+    "destination_name": None, "activity": None, "date_hint": None,
+    "time_window": None, "requests_route": False, "requests_risk": False,
+    "requests_pfz": False, "needs_clarification": True,
+    "clarification_question": "Which location would you like me to check?",
+    "confidence": 0.35,
+})
+
+
+def test_explicit_destination_reaches_routing_despite_llm_clarification(client) -> None:
+    from app.services.llm import StubLlmClient
+
+    stub = StubLlmClient(json_response=_AMBIGUOUS_LLM_JSON)
+    query_api.set_pipeline(make_pipeline(qu_llm=stub))
+
+    # origin = the fixture's Mangalore point (matches the fake weather/ocean
+    # observations' coordinate, so the safety chain has usable evidence and
+    # can actually reach a decision) - which also happens to be real land per
+    # the bathymetry dataset (audit blocker 2), so the route correctly comes
+    # back ORIGIN_BLOCKED rather than a fabricated route. What matters here is
+    # that the request reaches RouteAgent/A*/land-validation at all instead of
+    # getting stuck at CLARIFICATION_NEEDED.
+    body = client.post("/query", json={
+        "session_id": "api-explicit-dest",
+        "message": "check this for me",
+        "latitude": 12.87, "longitude": 74.84,
+        "destination_latitude": 9.97, "destination_longitude": 76.24,
+    }).json()
+
+    # the real LLM-backed control-flow path ran (not the rule-based fallback)
+    assert stub.calls
+    # the LLM's own inability to resolve a place name from the ambiguous
+    # message text must NOT block the explicit destination coordinate
+    assert body["status"] != "CLARIFICATION_NEEDED"
+    assert body["decision"]["routing_allowed"] is True
+    assert body["route"] is not None
+    assert body["route"]["status"] in (
+        "ROUTE_FOUND", "NO_ROUTE", "ORIGIN_BLOCKED",
+        "DESTINATION_BLOCKED", "ROUTE_VALIDATION_FAILED",
+    )
+    assert body["route"]["reasons"]  # the real planner evaluated it, not a stub
+    assert body["destination"]["latitude"] == pytest.approx(9.97)
+    assert body["destination"]["longitude"] == pytest.approx(76.24)
+
+
+def test_llm_clarification_without_explicit_destination_is_unaffected(client) -> None:
+    """Preserve normal LLM behaviour when no explicit coordinates are supplied:
+    a genuinely ambiguous message with no destination override still stops
+    for clarification."""
+    from app.services.llm import StubLlmClient
+
+    stub = StubLlmClient(json_response=_AMBIGUOUS_LLM_JSON)
+    query_api.set_pipeline(make_pipeline(qu_llm=stub))
+
+    body = client.post("/query", json={
+        "session_id": "api-no-override",
+        "message": "check this for me",
+    }).json()
+
+    assert stub.calls
+    assert body["status"] == "CLARIFICATION_NEEDED"
+    assert body["route"] is None

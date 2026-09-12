@@ -59,6 +59,38 @@ def _now(state: OrcaGraphState) -> datetime:
 
 
 # ---------------------------------------------------------------------------
+def _apply_explicit_destination_override(u, state: OrcaGraphState):  # type: ignore[no-untyped-def]
+    """An explicit destination coordinate supplied by the application (e.g. a
+    map-selected point, or a client-derived PFZ pin) describes *where*, not
+    *what the user meant*. The Query Understanding LLM only ever sees the raw
+    message text - it has no visibility into ``destination_override`` - so it
+    can legitimately ask for clarification on a destination it cannot resolve
+    from natural language even though the application already supplied one.
+
+    When that is the ONLY reason understanding is asking for clarification,
+    the explicit coordinate takes precedence: understanding proceeds so
+    ``normalize`` can consult ``destination_override`` and the request reaches
+    routing/A*/geofencing/SafetyGuard normally. This never touches safety,
+    risk, geofence or routing validation - it only stops a destination the
+    application already resolved from being discarded before ``normalize``
+    ever runs. When no destination override is supplied, behaviour is
+    unchanged."""
+    if u.failed or not u.needs_clarification:
+        return u
+    if state.get("destination_override") is None:
+        return u
+    return u.model_copy(
+        update={
+            "needs_clarification": False,
+            "clarification_question": None,
+            "notes": u.notes + (
+                "explicit destination coordinates supplied by the application; "
+                "proceeding without natural-language destination resolution",
+            ),
+        }
+    )
+
+
 async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     session = deps.session_store.get(state["session_id"])
     try:
@@ -73,6 +105,7 @@ async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
             intent=QueryIntent.CLARIFICATION_NEEDED, failed=True, understood_via="rules",
             notes=("query understanding node raised an exception",),
         )
+    u = _apply_explicit_destination_override(u, state)
     if u.failed:
         status = STATUS_QU_FAILED
     elif u.needs_clarification:

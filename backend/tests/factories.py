@@ -102,3 +102,35 @@ def grid_with_blocks(blocked_cells: set[tuple[int, int]], n_rows: int = 5, n_col
     for r, c in blocked_cells:
         mask[r, c] = True
     return Grid.from_spec(spec, mask)
+
+
+class FakeLandBackend:
+    """Deterministic land/water stand-in for routing tests - no bathymetry
+    file, no shapely. Any coordinate inside the given lon/lat box is "land"
+    (depth_m = +10); everything else is "water" (depth_m = -50). ``lat_min`` /
+    ``lat_max`` default to the whole globe, so a caller that only cares about a
+    longitude band (a coast-to-coast strip) can omit them. Matches the
+    ``depth_m(coordinate) -> float | None`` contract
+    ``app.routing.land_mask.rasterize_land`` and ``plan_route``'s
+    ``land_backend`` parameter expect."""
+
+    def __init__(
+        self,
+        land_lon_min: float,
+        land_lon_max: float,
+        *,
+        land_lat_min: float = -90.0,
+        land_lat_max: float = 90.0,
+    ) -> None:
+        self.land_lon_min = land_lon_min
+        self.land_lon_max = land_lon_max
+        self.land_lat_min = land_lat_min
+        self.land_lat_max = land_lat_max
+
+    def depth_m(self, coordinate: Coordinate) -> float | None:
+        if (
+            self.land_lon_min <= coordinate.longitude <= self.land_lon_max
+            and self.land_lat_min <= coordinate.latitude <= self.land_lat_max
+        ):
+            return 10.0
+        return -50.0

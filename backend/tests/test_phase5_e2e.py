@@ -81,11 +81,20 @@ async def test_6_geofence_violation_blocks() -> None:
 
 
 async def test_7_route_around_a_hard_geofence() -> None:
+    from app.models.common import Coordinate
     from tests.orchestration_fakes import hard_zone
 
+    # Explicit water-to-water coordinates (not the "Mangalore"/"Kochi" gazetteer
+    # points, whose harbour-centre coordinates the real bathymetry dataset
+    # classifies as land - see the routing land/water constraint) straddling
+    # the wall's longitude band.
     wall = hard_zone("wall", "POLYGON((75.3 8.0, 75.45 8.0, 75.45 14.0, 75.3 14.0, 75.3 8.0))")
     pipe = make_pipeline(hard_geofences=[wall])
-    r = await pipe.run(message="route from Mangalore to Kochi", session_id="e7", now=NOW)
+    r = await pipe.run(
+        message="conditions here", session_id="e7", now=NOW,
+        coordinate=Coordinate(latitude=9.5, longitude=74.5),
+        destination=Coordinate(latitude=9.5, longitude=76.2),
+    )
     assert r.route is not None
     if r.route.status == RouteStatus.ROUTE_FOUND.value:
         assert r.route.validation_passed is True

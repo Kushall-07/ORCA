@@ -13,9 +13,17 @@ from app.models.routing import RouteStatus
 from app.models.safety import SafetyGuardInput
 from app.policy.safety_guard import evaluate_safety
 from app.risk.engine import RiskEngine, RiskEngineInput
+from tests.factories import FakeLandBackend
 from tests.orchestration_fakes import hard_zone
 
-MANGALORE = Coordinate(latitude=12.87, longitude=74.84)
+# NOTE: (12.87, 74.84) - the harbour/river-mouth point historically used here
+# as "Mangalore" - is classified ON LAND by the real bathymetry dataset (audit
+# blocker 2's exact repro coordinate; see MANGALORE_LAND / test_route_planner
+# below). Routing tests that need a legitimate *water* start point near
+# Mangalore use MANGALORE just offshore instead, so this suite keeps testing
+# route-finding / geofence logic rather than accidentally re-encoding the bug.
+MANGALORE = Coordinate(latitude=12.85, longitude=74.60)
+MANGALORE_LAND = Coordinate(latitude=12.87, longitude=74.84)
 KOCHI = Coordinate(latitude=9.97, longitude=76.24)
 INSIDE_ZONE = Coordinate(latitude=12.7, longitude=74.6)  # inside hard_zone()
 
@@ -93,3 +101,63 @@ def test_route_recheck_runs_the_safety_guard() -> None:
     res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
                             origin=MANGALORE, destination=KOCHI, risk=r)
     assert res.safety_after_route is not None       # guard re-run with route evidence
+
+
+# ---- land/water constraint (audit blocker 2) --------------------------
+# `RouteAgent()` with no explicit `land_backend` always builds a real
+# offline spatial backend from the git-tracked bathymetry dataset, so these
+# tests exercise the actual production land constraint end to end - not a
+# fake/injected one.
+
+def test_mangalore_land_crossing_pair_does_not_return_a_route() -> None:
+    """Exact audit repro: 12.87,74.84 -> 12.95,74.90. Both points are
+    classified on_land=True by the existing bathymetry dataset (depth_m > 0),
+    the same dataset the GIS agent already uses for `on_land`. The route must
+    NOT be found while that remains true."""
+    d, r = _ok_decision()
+    res = RouteAgent().plan(
+        understanding=_route_understanding(), decision=d,
+        origin=MANGALORE_LAND, destination=Coordinate(latitude=12.95, longitude=74.90),
+        risk=r,
+    )
+    assert res.route.status is not RouteStatus.ROUTE_FOUND
+    assert res.route.validation is None or res.route.validation.valid is not True
+
+
+def test_land_origin_is_blocked_through_the_route_agent() -> None:
+    d, r = _ok_decision()
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
+                            origin=MANGALORE_LAND, destination=KOCHI, risk=r)
+    assert res.route.status is RouteStatus.ORIGIN_BLOCKED
+    assert "land" in " ".join(res.route.reasons).lower()
+
+
+def test_land_destination_is_blocked_through_the_route_agent() -> None:
+    d, r = _ok_decision()
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
+                            origin=MANGALORE, destination=MANGALORE_LAND, risk=r)
+    assert res.route.status is RouteStatus.DESTINATION_BLOCKED
+    assert "land" in " ".join(res.route.reasons).lower()
+
+
+def test_water_route_between_real_ports_is_still_found() -> None:
+    """Both MANGALORE (offshore water) and KOCHI are real navigable water per
+    the same bathymetry dataset - the land constraint must not block a
+    legitimate route."""
+    d, r = _ok_decision()
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
+                            origin=MANGALORE, destination=KOCHI, risk=r)
+    assert res.route.status is RouteStatus.ROUTE_FOUND
+    assert res.route.validation is not None and res.route.validation.valid is True
+
+
+def test_injected_land_backend_is_used_instead_of_the_real_one() -> None:
+    # A fake land backend can be injected (e.g. for a deterministic unit test)
+    # and takes priority over the real bathymetry-backed default.
+    land = FakeLandBackend(74.0, 78.0)  # blocks the whole MANGALORE..KOCHI corridor
+    d, r = _ok_decision()
+    res = RouteAgent(land_backend=land).plan(
+        understanding=_route_understanding(), decision=d,
+        origin=MANGALORE, destination=KOCHI, risk=r,
+    )
+    assert res.route.status is RouteStatus.ORIGIN_BLOCKED

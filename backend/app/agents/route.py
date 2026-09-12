@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 from app.core.config import Settings, get_settings
 from app.core.logging import get_logger
 from app.gis.geofencing import check_geofences
+from app.gis.spatial_backend import SpatialBackend, build_spatial_backend
 from app.models.common import Coordinate
 from app.models.decision import DecisionResult
 from app.models.geo import Geofence, GeofenceHit, GeofenceResult
@@ -42,8 +43,21 @@ class RouteAgentResult(BaseModel):
 
 
 class RouteAgent:
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        land_backend: SpatialBackend | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
+        # Deterministic land/water constraint (Phase 3 defence-in-depth):
+        # reuses the SAME bathymetry-derived classification the GIS agent uses
+        # for `on_land`, via `depth_m()`. `build_spatial_backend` with no
+        # `engine` always resolves to the offline backend, so this never
+        # silently reaches a real database.
+        self.land_backend = (
+            land_backend if land_backend is not None else build_spatial_backend(self.settings)
+        )
 
     def plan(
         self,
@@ -73,7 +87,7 @@ class RouteAgent:
         #      coords -> grid bounds -> point-in-hard-geofence -> cell free -> A*.
         grid = _grid_for(origin, destination, self.settings)
         request = RouteRequest(origin=origin, destination=destination, grid=grid)
-        route = plan_route(request, list(hard_geofences))
+        route = plan_route(request, list(hard_geofences), self.land_backend)
 
         route_geofence: GeofenceResult | None = None
         safety_after: SafetyGuardResult | None = None

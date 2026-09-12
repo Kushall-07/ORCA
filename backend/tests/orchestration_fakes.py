@@ -36,9 +36,9 @@ _UNSET = object()  # make_pipeline: default -> a real deterministic productivity
 
 
 def obs(variable: str, value: float, unit: str, source: str, *, when: datetime = NOW,
-        tier: SourceTier = SourceTier.MODEL) -> MarineObservation:
+        tier: SourceTier = SourceTier.MODEL, coordinate: Coordinate = MANGALORE) -> MarineObservation:
     return MarineObservation(
-        variable=variable, value=value, unit=unit, coordinate=MANGALORE,
+        variable=variable, value=value, unit=unit, coordinate=coordinate,
         valid_from=when - timedelta(minutes=20), valid_until=when + timedelta(minutes=40),
         retrieved_at=when - timedelta(minutes=5), source=source,
         source_tier=tier, signal_kind=SignalKind.MODEL_DERIVED,
@@ -58,10 +58,13 @@ class FakeWeatherAgent:
                 source_status=SourceStatus(tier=DataTier.MISSING, source="none"),
                 errors=("live weather unavailable",),
             )
+        # Tagged at the ACTUAL queried coordinate (not a hardcoded point) so a
+        # test that queries somewhere other than the demo Mangalore point does
+        # not spuriously trip the Marine Data Fabric's spatial-alignment gate.
         default = (
-            obs("wind_speed", 5.0, "m/s", "open-meteo-forecast", when=when),
-            obs("weather_code", 3.0, "wmo", "open-meteo-forecast", when=when),
-            obs("mean_sea_level_pressure", 1009.0, "hPa", "open-meteo-forecast", when=when),
+            obs("wind_speed", 5.0, "m/s", "open-meteo-forecast", when=when, coordinate=coordinate),
+            obs("weather_code", 3.0, "wmo", "open-meteo-forecast", when=when, coordinate=coordinate),
+            obs("mean_sea_level_pressure", 1009.0, "hPa", "open-meteo-forecast", when=when, coordinate=coordinate),
         )
         return AgentResult(
             kind="weather", coordinate=coordinate, query_time=when,
@@ -83,7 +86,7 @@ class FakeOceanAgent:
                 source_status=SourceStatus(tier=DataTier.MISSING, source="none"),
                 errors=("live marine unavailable",),
             )
-        default = (obs("wave_height", 1.1, "m", "open-meteo-marine", when=when),)
+        default = (obs("wave_height", 1.1, "m", "open-meteo-marine", when=when, coordinate=coordinate),)
         return AgentResult(
             kind="oceanographic", coordinate=coordinate, query_time=when,
             observations=tuple(self._obs) if self._obs is not None else default,

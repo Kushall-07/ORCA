@@ -79,7 +79,14 @@ SCENARIOS: tuple[Scenario, ...] = (
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
-                route_status_in=("ROUTE_FOUND", "NO_ROUTE"),
+                # The gazetteer's "Mangalore" reference point is the harbour
+                # centroid, which the git-tracked bathymetry dataset (the same
+                # one the GIS agent's `on_land` and the routing land/water
+                # constraint both use) classifies as on_land - so this
+                # deterministically comes back ORIGIN_BLOCKED, not a
+                # fabricated route. ROUTE_FOUND / NO_ROUTE are kept as
+                # possibilities in case the underlying dataset changes.
+                route_status_in=("ORIGIN_BLOCKED", "ROUTE_FOUND", "NO_ROUTE"),
                 provenance_has_kinds=("route",),
                 provenance_complete=True,
             ),
@@ -97,7 +104,12 @@ SCENARIOS: tuple[Scenario, ...] = (
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
-                route_status_in=("DESTINATION_BLOCKED", "NO_ROUTE"),
+                # As in 04_maritime_route: the "Mangalore" origin is on land
+                # per the real bathymetry dataset, so it is rejected before
+                # the destination hard-geofence check ever runs.
+                # DESTINATION_BLOCKED / NO_ROUTE are kept as possibilities in
+                # case the underlying dataset changes.
+                route_status_in=("ORIGIN_BLOCKED", "DESTINATION_BLOCKED", "NO_ROUTE"),
                 route_waypoints_min=0,
                 answer_contains_any=("restrict", "geofence", "no ", "cannot", "blocked"),
             ),
@@ -106,7 +118,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         scenario_id="06_route_around_geofence",
-        title="Route around a hard geofence -> valid geometry, zero violations",
+        title="Origin on land is rejected before a hard-geofence detour is even attempted",
         stakeholder="marine_operator",
         fixture="route_around",
         turns=("Give a safe sea route from Mangalore to Kochi.",),
@@ -115,16 +127,24 @@ SCENARIOS: tuple[Scenario, ...] = (
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
-                route_status_in=("ROUTE_FOUND",),
-                route_waypoints_min=3,
-                route_validation_passed=True,
-                hard_geofence_violations_max=0,
+                # The gazetteer's "Mangalore" point is on land per the real
+                # bathymetry dataset (see 04_maritime_route), so this scenario
+                # now demonstrates the land constraint rather than a
+                # geofence detour. Dedicated, non-gazetteer-coordinate unit
+                # coverage of "A* finds a real detour around a hard geofence"
+                # lives in tests/test_route_planner.py
+                # (test_route_avoids_hard_geofence /
+                # test_route_crossing_land_is_rejected_in_favour_of_going_around)
+                # and tests/test_route_agent.py.
+                route_status_in=("ORIGIN_BLOCKED",),
                 provenance_has_kinds=("route",),
             ),
         ),
         tags=("demo", "route", "safety"),
-        notes="A real detour: ROUTE_FOUND, independent validation passes, "
-              "zero hard-geofence violations.",
+        notes="The demo's 'Mangalore' coordinate is real land per the "
+              "bathymetry dataset, so the route is correctly rejected "
+              "(ORIGIN_BLOCKED) rather than fabricated - not a detour demo "
+              "any more; see test_route_planner.py for detour coverage.",
     ),
     Scenario(
         scenario_id="07_route_no_safe_path",
@@ -137,7 +157,11 @@ SCENARIOS: tuple[Scenario, ...] = (
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
-                route_status_in=("NO_ROUTE", "DESTINATION_BLOCKED"),
+                # As in 04_maritime_route: the "Mangalore" origin is on land
+                # per the real bathymetry dataset. NO_ROUTE /
+                # DESTINATION_BLOCKED are kept as possibilities in case the
+                # underlying dataset changes.
+                route_status_in=("ORIGIN_BLOCKED", "NO_ROUTE", "DESTINATION_BLOCKED"),
                 route_waypoints_min=0,
                 answer_contains_any=("no ", "cannot", "could not", "unable", "restrict"),
             ),

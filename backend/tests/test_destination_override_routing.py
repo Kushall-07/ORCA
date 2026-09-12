@@ -19,7 +19,15 @@ from tests.orchestration_fakes import (
 )
 
 ORIGIN = Coordinate(latitude=12.87, longitude=74.84)        # near Mangalore
-DESTINATION = Coordinate(latitude=12.95, longitude=74.90)   # a nearby open-water point
+# NOTE: (12.87, 74.84) -> (12.95, 74.90) is the audit's exact land-crossing
+# repro pair: the real bathymetry dataset classifies BOTH points as on_land
+# (see the routing land/water constraint). Tests that need an actual
+# navigable-water route use WATER_ORIGIN / WATER_DESTINATION instead; ORIGIN /
+# DESTINATION stay defined for the tests that specifically exercise
+# destination-override plumbing without depending on the route succeeding.
+DESTINATION = Coordinate(latitude=12.95, longitude=74.90)
+WATER_ORIGIN = Coordinate(latitude=12.85, longitude=74.60)       # confirmed navigable water
+WATER_DESTINATION = Coordinate(latitude=12.85, longitude=74.70)  # confirmed navigable water
 
 
 # ---- 15/16. destination override deterministically drives routing ----------
@@ -54,8 +62,8 @@ async def test_route_found_uses_the_existing_astar_engine() -> None:
     r = await pipe.run(
         message="conditions here",
         session_id="s-dest-2",
-        coordinate=ORIGIN,
-        destination=DESTINATION,
+        coordinate=WATER_ORIGIN,
+        destination=WATER_DESTINATION,
         now=NOW,
     )
     assert r.route is not None
@@ -70,7 +78,7 @@ async def test_destination_inside_hard_geofence_is_blocked_not_routed() -> None:
     r = await pipe.run(
         message="conditions here",
         session_id="s-dest-3",
-        coordinate=ORIGIN,
+        coordinate=WATER_ORIGIN,
         destination=Coordinate(latitude=12.95, longitude=74.95),  # inside the fence
         now=NOW,
     )
@@ -92,6 +100,23 @@ async def test_missing_weather_still_blocks_routing_even_with_destination_overri
     )
     assert "route" not in r.agent_trace or (r.route is None)
     assert r.decision.status == "NO_SAFE_RECOMMENDATION"
+
+
+# ---- audit blocker 2 regression: land is now a routing constraint ---------
+async def test_land_crossing_pair_via_destination_override_is_not_routed() -> None:
+    """The exact previously-failing pair: 12.87,74.84 -> 12.95,74.90. Both are
+    on_land per the real bathymetry dataset, so a destination override must
+    not be able to fabricate a route across them either."""
+    pipe = make_pipeline()
+    r = await pipe.run(
+        message="conditions here",
+        session_id="s-dest-land",
+        coordinate=ORIGIN,
+        destination=DESTINATION,
+        now=NOW,
+    )
+    assert r.route is not None
+    assert r.route.status != "ROUTE_FOUND"
 
 
 # ---- destination override never contaminates the safety/risk chain --------
