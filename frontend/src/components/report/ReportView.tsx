@@ -17,7 +17,7 @@ export function ReportView({
   const now = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
   return (
-    <div className="report-overlay" role="dialog" aria-modal="true">
+    <div className="report-page">
       <div className="report">
         <div className="report__toolbar">
           <button type="button" className="btn btn--primary btn--small" onClick={() => window.print()}>

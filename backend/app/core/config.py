@@ -184,6 +184,11 @@ class Settings(BaseSettings):
 
     # ---- Official INCOIS PFZ reference geometry (public, no auth) ----
     incois_pfz_wfs_base_url: str = Field(default="https://www.incois.gov.in/geoserver")
+    # Official INCOIS PFZ Text Data service - the fallback dissemination
+    # channel used only when the GeoServer WFS above denies access (see
+    # app.services.incois_pfz module docstring). Same authority (INCOIS),
+    # different official delivery mechanism - never a third-party source.
+    incois_pfz_textdata_base_url: str = Field(default="https://incois.gov.in/MarineFisheries")
     incois_pfz_timeout_seconds: float = Field(default=15.0, gt=0)
     incois_pfz_cache_ttl_seconds: int = Field(default=21600, gt=0)      # 6 h
     incois_pfz_cache_max_age_seconds: int = Field(default=86400, gt=0)  # 24 h

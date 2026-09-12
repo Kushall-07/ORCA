@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   makeComparisonResponse,
@@ -9,6 +9,7 @@ import {
   makeNoRouteResponse,
   makeNoSafeResponse,
   makeResponse,
+  makeRouteFoundResponse,
   makeStabilityResponse,
 } from "./fixtures";
 
@@ -83,10 +84,42 @@ async function sendQuery(text = "Can I go fishing tomorrow?") {
   await userEvent.keyboard("{Enter}");
 }
 
+// The advisory, suitability, environmental, route and operational-detail
+// sections live on the Details tab, one click away from the concise Decision
+// verdict (see WorkspacePage.tsx).
+async function openDetails() {
+  await userEvent.click(screen.getByRole("button", { name: /^details$/i }));
+}
+
+// A query response never navigates by itself - the user stays on Workspace
+// and must click a section (Decision, Details, ...) to enter Assessment mode.
+// This opens Decision explicitly wherever a test needs to see decision content.
+async function openDecision() {
+  await userEvent.click(screen.getByRole("button", { name: /^decision$/i }));
+}
+
+// Waits for a response to have arrived without navigating anywhere - the
+// Decision nav item (present in both Workspace's top nav and Assessment's
+// sidebar) is disabled until `latest` exists, so its enabled state is a
+// mode-agnostic signal that the response has landed.
+async function waitForResponse() {
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /^decision$/i })).not.toBeDisabled(),
+  );
+}
+
+// Assessment mode's sidebar brand doubles as "return to Workspace"; this is
+// the only manual navigation that leaves Assessment mode.
+async function returnToWorkspace() {
+  await userEvent.click(
+    screen.getByRole("button", { name: /return to workspace/i }),
+  );
+}
+
 describe("ORCA workspace", () => {
   it("loads the shell with the ORCA brand and chat input", async () => {
     render(<App />);
-    expect(screen.getByText("ORCA")).toBeInTheDocument();
+    expect(screen.getAllByText("ORCA").length).toBeGreaterThan(0);
     expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
     await waitFor(() => expect(fetchHealth).toHaveBeenCalled());
   });
@@ -96,21 +129,25 @@ describe("ORCA workspace", () => {
     render(<App />);
     await sendQuery();
 
-    await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(1));
-    // chat bubble (also appears in the explanation panel + status chip)
-    expect(
-      (await screen.findAllByText(/Proceed with caution/i)).length,
-    ).toBeGreaterThan(0);
+    expect(postQuery).toHaveBeenCalledTimes(1);
+    // the response never navigates by itself - open Decision manually
+    await waitForResponse();
+    await openDecision();
     // decision card headline
     expect(
       screen.getByText("CAUTION", { selector: ".decision__headline" }),
     ).toBeInTheDocument();
-    // risk panel factor sourced from the provenance risk_factor node
+    expect(
+      screen.getByText(/Wave height near advisory threshold/i),
+    ).toBeInTheDocument();
+    // risk panel factor sourced from the provenance risk_factor node — on the
+    // Details tab, one click away from the concise decision verdict
+    await openDetails();
     expect(
       screen.getByText("wave height", { selector: ".risk-factor__name" }),
     ).toBeInTheDocument();
     // evidence tab
-    await userEvent.click(screen.getByRole("tab", { name: /evidence/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^evidence$/i }));
     expect(screen.getByText("Open-Meteo Marine")).toBeInTheDocument();
   });
 
@@ -127,18 +164,24 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeNoSafeResponse());
     render(<App />);
     await sendQuery();
+    await waitForResponse();
+    await openDecision();
     expect(
-      await screen.findByText("NO SAFE RECOMMENDATION", { selector: ".decision__nsr strong" }),
+      screen.getByText("NO SAFE RECOMMENDATION", { selector: ".decision__nsr strong" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Risk was not computed/i)).toBeInTheDocument();
-    // missing safety-critical factors surfaced (underscores rendered as spaces)
+    // missing safety-critical factors surfaced on the decision hero itself
+    // (underscores rendered as spaces)
     expect(screen.getAllByText(/wave height/i).length).toBeGreaterThan(0);
+    // the full risk breakdown ("risk not computed") lives on the Details tab
+    await openDetails();
+    expect(screen.getByText(/Risk was not computed/i)).toBeInTheDocument();
   });
 
   it("shows a structured reason when no safe route exists and draws no fake route", async () => {
     postQuery.mockResolvedValue(makeNoRouteResponse());
     render(<App />);
     await sendQuery("Route from Mangalore to a blocked area");
+    await openDetails();
     expect(await screen.findByText("NO SAFE ROUTE")).toBeInTheDocument();
     expect(
       screen.getByText(/Destination lies inside a hard-restricted area/i),
@@ -149,8 +192,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /provenance/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^provenance$/i }));
     expect(screen.getByText("Decision Engine")).toBeInTheDocument();
     expect(screen.getByText("deterministic risk")).toBeInTheDocument();
   });
@@ -159,8 +202,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /evidence/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^evidence$/i }));
     expect(screen.getByText(/Evidence conflict detected/i)).toBeInTheDocument();
     expect(screen.getByText(/Resolution: preserved/i)).toBeInTheDocument();
   });
@@ -169,8 +212,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /alerts/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^alerts$/i }));
     expect(screen.getByText(/Thunderstorm proxy signal/i)).toBeInTheDocument();
     expect(screen.getByText(/model-derived proxies/i)).toBeInTheDocument();
   });
@@ -179,8 +222,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /activity/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
     const routeStep = screen.getByText("Route agent (A*)").closest(".activity-step");
     expect(routeStep?.className).toContain("activity-step--skipped");
   });
@@ -189,8 +232,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /activity/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
     // real duration_ms rendered next to a completed stage
     const fabricStep = screen.getByText("Spatial-temporal fabric").closest(".activity-step");
     expect(fabricStep?.textContent).toMatch(/2\.4 ms/);
@@ -204,8 +247,8 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse({ node_trace: undefined }));
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
-    await userEvent.click(screen.getByRole("tab", { name: /activity/i }));
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
     expect(screen.getByText(/no per-stage timing in this response/i)).toBeInTheDocument();
     // agent_trace still drives status
     const routeStep = screen.getByText("Route agent (A*)").closest(".activity-step");
@@ -233,22 +276,24 @@ describe("ORCA workspace", () => {
       await screen.findByText(/ORCA is analyzing marine conditions/i),
     ).toBeInTheDocument();
     resolve(makeResponse());
-    await screen.findByText("CAUTION");
+    await waitForResponse();
   });
 
   it("switches UI language without touching backend response content", async () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    await waitForResponse();
+    await openDetails();
     const selects = screen.getAllByRole("combobox");
     // second select is language
     await userEvent.selectOptions(selects[1], "hi");
     expect(screen.getByText("समुद्री जोखिम")).toBeInTheDocument();
-    // backend answer text stays in the language the backend returned
+    // backend-authored text stays in the language the backend returned,
+    // regardless of the UI chrome language
     expect(
-      screen.getAllByText(/Proceed with caution/i).length,
-    ).toBeGreaterThan(0);
+      screen.getByText(/Not a guarantee of fish presence/i),
+    ).toBeInTheDocument();
   });
 
   it("switches stakeholder context and updates suggested questions", async () => {
@@ -264,7 +309,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse({ suitability: null }));
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    await waitForResponse();
     expect(screen.queryByText("Fishing Suitability")).not.toBeInTheDocument();
   });
 
@@ -286,7 +331,9 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    // a query submission stays on Workspace; the layer toggle is already
+    // visible in the map overlay, no navigation needed
+    await waitForResponse();
 
     const pfz = screen.getByLabelText(/PFZ reference/i) as HTMLInputElement;
     expect(pfz.disabled).toBe(true);
@@ -303,6 +350,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse());
     render(<App />);
     await sendQuery();
+    await openDetails();
     expect(
       await screen.findByText(/An INCOIS PFZ advisory snapshot is available/i),
     ).toBeInTheDocument();
@@ -326,7 +374,9 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    // a query submission stays on Workspace; the layer toggle is already
+    // visible in the map overlay, no navigation needed
+    await waitForResponse();
 
     const pfz = screen.getByLabelText(/PFZ reference/i) as HTMLInputElement;
     expect(pfz.disabled).toBe(false);
@@ -354,7 +404,8 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    await waitForResponse();
+    await openDetails();
 
     expect(screen.getByText("Official Marine Advisory")).toBeInTheDocument();
     expect(screen.getByText("Karnataka Coast")).toBeInTheDocument();
@@ -384,7 +435,8 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    await waitForResponse();
+    await openDetails();
 
     expect(screen.getByText("Advisory data unavailable")).toBeInTheDocument();
   });
@@ -394,6 +446,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
     render(<App />);
     await sendQuery("chlorophyll and sea surface temperature near Mangalore");
+    await openDetails();
     expect(await screen.findByText("Environmental Context")).toBeInTheDocument();
     expect(screen.getByText("Sea-surface temperature")).toBeInTheDocument();
     expect(screen.getAllByText(/Chlorophyll-a/).length).toBeGreaterThan(0);
@@ -408,6 +461,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
     render(<App />);
     await sendQuery("environmental productivity near Mangalore");
+    await openDetails();
     const panel = (await screen.findByText("Environmental Context")).closest(
       ".panel",
     ) as HTMLElement;
@@ -430,7 +484,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeResponse()); // no `environmental`
     render(<App />);
     await sendQuery();
-    await screen.findByText("CAUTION");
+    await waitForResponse();
     expect(screen.queryByText("Environmental Context")).not.toBeInTheDocument();
   });
 
@@ -464,6 +518,7 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(screen.getAllByText(/UNKNOWN/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/satellite cloud cover or data gap/i)).toBeInTheDocument();
@@ -496,7 +551,10 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
     render(<App />);
     await sendQuery("sst and chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
+    // the layer-toggle notes live in the Workspace map overlay, not Assessment
+    await returnToWorkspace();
     expect(screen.queryByText(/not yet integrated/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/No values are shown/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Open-Meteo Marine value/i)).toBeInTheDocument();
@@ -509,7 +567,10 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
+    // the layer-toggle note lives in the Workspace map overlay, not Assessment
+    await returnToWorkspace();
     expect(
       screen.getByText(/cloud . data coverage or validity constraints/i),
     ).toBeInTheDocument();
@@ -523,6 +584,7 @@ describe("ORCA workspace", () => {
     );
     render(<App />);
     await sendQuery("environmental productivity near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(screen.getByText("Productivity interpretation")).toBeInTheDocument();
     expect(
@@ -534,6 +596,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEvidenceResponse());
     render(<App />);
     await sendQuery("how reproducible is the chlorophyll data near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(screen.getByText("Evidence quality")).toBeInTheDocument();
     expect(
@@ -545,6 +608,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     const selects = screen.getAllByRole("combobox");
     await userEvent.selectOptions(selects[1], "hi");
@@ -558,6 +622,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeComparisonResponse());
     render(<App />);
     await sendQuery("compare chlorophyll near Mangalore with last month");
+    await openDetails();
     expect(
       await screen.findByText("Compared with an earlier observation"),
     ).toBeInTheDocument();
@@ -577,6 +642,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeComparisonResponse());
     render(<App />);
     await sendQuery("compare chlorophyll near Mangalore with last month");
+    await openDetails();
     const panel = (
       await screen.findByText("Compared with an earlier observation")
     ).closest(".panel") as HTMLElement;
@@ -593,6 +659,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeComparisonResponse());
     render(<App />);
     await sendQuery("compare chlorophyll near Mangalore with last month");
+    await openDetails();
     const panel = (
       await screen.findByText("Compared with an earlier observation")
     ).closest(".panel") as HTMLElement;
@@ -610,6 +677,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no comparison
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(
       screen.queryByText("Compared with an earlier observation"),
@@ -620,6 +688,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeComparisonResponse());
     render(<App />);
     await sendQuery("compare chlorophyll near Mangalore with last month");
+    await openDetails();
     await screen.findByText("Compared with an earlier observation");
     const selects = screen.getAllByRole("combobox");
     await userEvent.selectOptions(selects[1], "kn");
@@ -637,6 +706,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEvidenceResponse());
     render(<App />);
     await sendQuery("how reproducible is the chlorophyll data near Mangalore");
+    await openDetails();
     expect(await screen.findByText("Evidence & reproducibility")).toBeInTheDocument();
     const panel = screen
       .getByText("Evidence & reproducibility")
@@ -657,6 +727,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEvidenceResponse());
     render(<App />);
     await sendQuery("environmental evidence near Mangalore");
+    await openDetails();
     const panel = (
       await screen.findByText("Evidence & reproducibility")
     ).closest(".panel") as HTMLElement;
@@ -677,6 +748,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEvidenceResponse());
     render(<App />);
     await sendQuery("reproducibility of the chlorophyll data near Mangalore");
+    await openDetails();
     await screen.findByText("Evidence & reproducibility");
     await userEvent.click(screen.getByText("Reproducibility bundle"));
     await userEvent.click(screen.getByRole("button", { name: /copy as json/i }));
@@ -690,6 +762,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no evidence
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(
       screen.queryByText("Evidence & reproducibility"),
@@ -700,6 +773,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEvidenceResponse());
     render(<App />);
     await sendQuery("reproducibility of the chlorophyll data near Mangalore");
+    await openDetails();
     await screen.findByText("Evidence & reproducibility");
     const selects = screen.getAllByRole("combobox");
     await userEvent.selectOptions(selects[1], "hi");
@@ -718,6 +792,7 @@ describe("ORCA workspace", () => {
     await sendQuery(
       "dispersion and coverage of the chlorophyll near Mangalore over the last 30 days",
     );
+    await openDetails();
     expect(await screen.findByText("Dispersion & coverage")).toBeInTheDocument();
     const panel = screen
       .getByText("Dispersion & coverage")
@@ -751,6 +826,7 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no stability
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(screen.queryByText("Dispersion & coverage")).not.toBeInTheDocument();
   });
@@ -762,6 +838,7 @@ describe("ORCA workspace", () => {
     await sendQuery(
       "is the chlorophyll pixel near Mangalore representative of the nearby pixels",
     );
+    await openDetails();
     expect(await screen.findByText("Local representativeness")).toBeInTheDocument();
     const panel = screen
       .getByText("Local representativeness")
@@ -792,9 +869,334 @@ describe("ORCA workspace", () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse()); // no neighbourhood
     render(<App />);
     await sendQuery("chlorophyll near Mangalore");
+    await openDetails();
     await screen.findByText("Environmental Context");
     expect(
       screen.queryByText("Local representativeness"),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ---- Sidebar navigation: each section is its own dedicated page ----
+const FULL_ADVISORY = {
+  source: "IMD",
+  availability: "available" as const,
+  area: "Karnataka Coast",
+  severity: "no_warning" as const,
+  warning_text: "NIL",
+  issued_at: "2026-09-11T06:00:00Z",
+  valid_from: "2026-09-11T06:00:00Z",
+  valid_until: "2026-09-12T06:00:00Z",
+  retrieved_at: "2026-09-11T12:00:00Z",
+  source_url: "https://api.imd.gov.in/api/v1/seabulletin",
+  applicable: true,
+};
+
+describe("ORCA sidebar navigation", () => {
+  it("renders all seven navigation items, enabled but not auto-selected, after a response", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+
+    // still Workspace: the top nav, not the Assessment sidebar
+    const nav = screen.getByRole("navigation");
+    for (const name of [
+      "Decision",
+      "Details",
+      "Evidence",
+      "Provenance",
+      "Alerts",
+      "Activity",
+      "Report",
+    ]) {
+      const item = within(nav).getByRole("button", { name });
+      expect(item).toBeInTheDocument();
+      expect(item).toBeEnabled();
+      // arrival of a response must not auto-select any section
+      expect(item).not.toHaveAttribute("aria-current", "page");
+    }
+    // "Ask ORCA" (Workspace itself) stays the active context
+    expect(within(nav).getByText("Ask ORCA")).toHaveAttribute("aria-current", "page");
+
+    // manually opening Decision now marks it active in the Assessment sidebar
+    await openDecision();
+    expect(
+      screen.getByRole("button", { name: "Decision" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("clicking Details displays the Marine Details page", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDetails();
+    expect(screen.getByText("Marine Details")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Details" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("clicking Evidence displays the Evidence page", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^evidence$/i }));
+    expect(screen.getByText("Open-Meteo Marine")).toBeInTheDocument();
+  });
+
+  it("clicking Provenance displays the Provenance page", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^provenance$/i }));
+    expect(screen.getByText("Decision Engine")).toBeInTheDocument();
+  });
+
+  it("clicking Alerts displays the Alerts page", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^alerts$/i }));
+    expect(screen.getByText(/Thunderstorm proxy signal/i)).toBeInTheDocument();
+  });
+
+  it("clicking Activity displays the Activity page", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
+    expect(screen.getByText("Route agent (A*)")).toBeInTheDocument();
+  });
+
+  it("clicking Report displays the Report page in place, without opening a new tab", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^report$/i }));
+    expect(screen.getByText("ORCA Marine Assessment")).toBeInTheDocument();
+  });
+
+  it("Decision page does not contain a View Marine Details button", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+    expect(
+      screen.queryByRole("button", { name: /view marine details/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Decision page does not render the five detailed sections", async () => {
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({
+        advisory: FULL_ADVISORY,
+        route: makeRouteFoundResponse().route,
+      }),
+    );
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+
+    expect(screen.queryByText("Official Marine Advisory")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fishing Suitability")).not.toBeInTheDocument();
+    expect(screen.queryByText("Environmental Context")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Route", { selector: ".panel__title" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/operational detail/i)).not.toBeInTheDocument();
+  });
+
+  it("Marine Details page renders the advisory, suitability, environmental and operational-detail sections", async () => {
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({
+        advisory: FULL_ADVISORY,
+        route: makeRouteFoundResponse().route,
+      }),
+    );
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDetails();
+
+    expect(screen.getByText("Official Marine Advisory")).toBeInTheDocument();
+    expect(screen.getByText("Fishing Suitability")).toBeInTheDocument();
+    expect(screen.getByText("Environmental Context")).toBeInTheDocument();
+    expect(screen.getByText("ROUTE FOUND")).toBeInTheDocument();
+    expect(screen.getByText(/operational detail/i)).toBeInTheDocument();
+  });
+
+  it("does not fabricate a Route section on Marine Details when no route was requested", async () => {
+    postQuery.mockResolvedValue(makeResponse()); // route: null by default
+    render(<App />);
+    await sendQuery();
+    await openDetails();
+    expect(
+      screen.queryByText("Route", { selector: ".panel__title" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("still renders NO_SAFE_RECOMMENDATION prominently on the concise Decision page", async () => {
+    postQuery.mockResolvedValue(makeNoSafeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+    expect(
+      screen.getByText("NO SAFE RECOMMENDATION", {
+        selector: ".decision__nsr strong",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps Hindi and Kannada sidebar labels and Details content valid", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+
+    const selects = screen.getAllByRole("combobox");
+    await userEvent.selectOptions(selects[1], "hi");
+    expect(screen.getByRole("button", { name: "विवरण" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "विवरण" }));
+    expect(screen.getByText("मछली पकड़ने की उपयुक्तता")).toBeInTheDocument();
+
+    await userEvent.selectOptions(selects[1], "kn");
+    expect(screen.getByRole("button", { name: "ವಿವರಗಳು" })).toBeInTheDocument();
+    expect(screen.getByText("ಮೀನುಗಾರಿಕೆ ಸೂಕ್ತತೆ")).toBeInTheDocument();
+  });
+});
+
+// ---- Two distinct application modes: Workspace (map + Ask ORCA, horizontal
+// nav) before a query, Assessment (vertical sidebar, one section at a time)
+// after a response arrives ---------------------------------------------
+describe("Workspace / Assessment mode", () => {
+  it("starts in Workspace mode: horizontal navigation, map/chat, no result cards", () => {
+    const { container } = render(<App />);
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    // section entry points exist but are disabled until a response exists
+    expect(screen.getByRole("button", { name: /^decision$/i })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /return to workspace/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("CAUTION", { selector: ".decision__headline" }),
+    ).not.toBeInTheDocument();
+    // map and chat sit side-by-side under the top nav
+    const content = container.querySelector(".workspace__content");
+    expect(content?.querySelector(".workspace__map")).not.toBeNull();
+    expect(content?.querySelector(".workspace__chat")).not.toBeNull();
+  });
+
+  it("stays on Workspace after a response arrives: map, chat and the answer are all visible", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    const { container } = render(<App />);
+    await sendQuery();
+    await waitForResponse();
+
+    // still Workspace - the query input and map are still on screen, no
+    // Assessment sidebar / DecisionCard appeared on its own
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /return to workspace/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("CAUTION", { selector: ".decision__headline" }),
+    ).not.toBeInTheDocument();
+    const content = container.querySelector(".workspace__content");
+    expect(content?.querySelector(".workspace__map")).not.toBeNull();
+    expect(content?.querySelector(".workspace__chat")).not.toBeNull();
+    // the ORCA reply itself is rendered in the existing chat area
+    expect(
+      within(content!.querySelector(".workspace__chat") as HTMLElement).getByText(
+        /Conditions near Mangalore are moderate\. Proceed with caution\./i,
+      ),
+    ).toBeInTheDocument();
+    // "Ask ORCA" stays the active nav context; nothing was auto-selected
+    expect(
+      within(screen.getByRole("navigation")).getByText("Ask ORCA"),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("only enters Assessment / Decision once the user manually clicks Decision", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+    expect(
+      screen.getByText("CAUTION", { selector: ".decision__headline" }),
+    ).toBeInTheDocument();
+    // Workspace's map/chat are gone; the vertical sidebar takes over
+    expect(screen.queryByPlaceholderText(/marine question/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^decision$/i }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("returns to Workspace with the map, chat and query input available again", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+    await returnToWorkspace();
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /use my current location/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("preserves the previous ORCA response in chat after returning to Workspace", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await openDecision();
+    await returnToWorkspace();
+    expect(
+      screen.getByText(/Conditions near Mangalore are moderate\. Proceed with caution\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("jumps straight into Assessment at the chosen section from Workspace", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    await sendQuery();
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^evidence$/i }));
+    expect(screen.getByText("Open-Meteo Marine")).toBeInTheDocument();
+  });
+
+  it("does not navigate away from Workspace on a second (or third) query", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+
+    await sendQuery("Can I fish tomorrow near Kanyakumari?");
+    await waitForResponse();
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+
+    await sendQuery("What are the sea conditions?");
+    await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(2));
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("CAUTION", { selector: ".decision__headline" }),
+    ).not.toBeInTheDocument();
+
+    await sendQuery("Is there an INCOIS PFZ advisory?");
+    await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(3));
+    expect(screen.getByPlaceholderText(/marine question/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("CAUTION", { selector: ".decision__headline" }),
     ).not.toBeInTheDocument();
   });
 });

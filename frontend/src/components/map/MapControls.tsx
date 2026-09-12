@@ -21,7 +21,9 @@ export interface LayerToggle {
   provenance: "live" | "reference" | "derived" | "demo" | "missing";
   /** Compact trailing badge (ORCA / INCOIS / LIVE); omitted for base reference layers. */
   badgeKey?: StringKey;
-  /** Tooltip explaining the row's source when available. */
+  /** One-line "what is this" tooltip, shown on the row when the layer is available. */
+  descKey?: StringKey;
+  /** Tooltip explaining the row's source when available (used when descKey is absent). */
   sourceTitleKey?: StringKey;
   /** Overrides the generic disabled-row tooltip with a specific explanation. */
   noteKey?: StringKey;
@@ -59,6 +61,7 @@ export function buildLayerToggles(
       group: "marine_base",
       available: has("coastline"),
       provenance: "reference",
+      descKey: "layer.desc.coastline",
       sourceTitleKey: "layer.source.reference",
     },
     {
@@ -67,6 +70,7 @@ export function buildLayerToggles(
       group: "marine_base",
       available: has("eez"),
       provenance: "reference",
+      descKey: "layer.desc.eez",
       sourceTitleKey: "layer.source.reference",
     },
     {
@@ -75,6 +79,7 @@ export function buildLayerToggles(
       group: "marine_base",
       available: has("protected_areas"),
       provenance: protectedMeta?.layer_kind === "REFERENCE" ? "reference" : "demo",
+      descKey: "layer.desc.protected_areas",
       sourceTitleKey: "layer.source.reference",
     },
     {
@@ -83,6 +88,7 @@ export function buildLayerToggles(
       group: "marine_base",
       available: geofenceReady,
       provenance: "reference",
+      descKey: "layer.desc.geofences",
       sourceTitleKey: "layer.source.reference",
     },
     // ---- ORCA analysis ----
@@ -93,6 +99,7 @@ export function buildLayerToggles(
       available: riskReady,
       provenance: "derived",
       badgeKey: "layer.badge.orca",
+      descKey: "layer.desc.risk",
       sourceTitleKey: "layer.source.orca",
     },
     {
@@ -102,6 +109,7 @@ export function buildLayerToggles(
       available: routeReady,
       provenance: "derived",
       badgeKey: "layer.badge.orca",
+      descKey: "layer.desc.route",
       sourceTitleKey: "layer.source.orca",
     },
     {
@@ -111,6 +119,7 @@ export function buildLayerToggles(
       available: envReady,
       provenance: "derived",
       badgeKey: "layer.badge.orca",
+      descKey: "layer.desc.environmental",
       sourceTitleKey: "layer.source.orca",
     },
     // ---- Fishing & environment ----
@@ -125,6 +134,7 @@ export function buildLayerToggles(
       available: suitabilityReady,
       provenance: "derived",
       badgeKey: "layer.badge.orca",
+      descKey: "layer.desc.environmentalSuitability",
       sourceTitleKey: "layer.source.orca",
       noteKey: suitabilityReady ? undefined : "layer.environmentalSuitability.noLocation",
     },
@@ -140,6 +150,7 @@ export function buildLayerToggles(
       available: pfzGeometryAvailable,
       provenance: pfzGeometryAvailable ? "reference" : pfzSnapshotReady ? "reference" : "missing",
       badgeKey: "layer.badge.incois",
+      descKey: "layer.desc.pfz",
       sourceTitleKey: "layer.source.incois",
       noteKey: pfzGeometryAvailable ? undefined : "layer.pfz.noGeometry",
       zoneCount: pfzRef?.zone_count,
@@ -169,93 +180,160 @@ export function buildLayerToggles(
   ];
 }
 
+// Every icon below is colored to match what the layer actually looks like on
+// the map (see LAYER_STYLE / RISK_COLOR / suitabilityFillColor in MarineMap),
+// not a generic per-tier square — so the legend answers "what am I looking at"
+// rather than just "what tier is this data".
 function LayerIcon({ id }: { id: LayerId }) {
-  const common = {
-    width: 13,
-    height: 13,
-    viewBox: "0 0 16 16",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.4,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
+  const box = { width: 16, height: 14, viewBox: "0 0 16 16", "aria-hidden": "true" as const };
   switch (id) {
     case "coastline":
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M1 9c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0" />
+        <svg {...box}>
+          <path
+            d="M1 9c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0"
+            fill="none"
+            stroke="#5c7cfa"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "eez":
       return (
-        <svg {...common} aria-hidden="true">
-          <rect x="2" y="3" width="12" height="10" rx="1.5" strokeDasharray="2.2 2" />
+        <svg {...box}>
+          <rect
+            x="2"
+            y="3"
+            width="12"
+            height="10"
+            rx="1.5"
+            fill="none"
+            stroke="#4dabf7"
+            strokeWidth="1.4"
+            strokeDasharray="2.4 2"
+          />
         </svg>
       );
     case "protected_areas":
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M8 1.4l5.3 1.9v4.3c0 3.6-2.4 5.7-5.3 6.6-2.9-.9-5.3-3-5.3-6.6V3.3z" />
+        <svg {...box}>
+          <path
+            d="M8 1.4l5.3 1.9v4.3c0 3.6-2.4 5.7-5.3 6.6-2.9-.9-5.3-3-5.3-6.6V3.3z"
+            fill="none"
+            stroke="#f59f00"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "geofences":
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M8 1.2l5.8 3.4v6.8L8 14.8l-5.8-3.4V4.6z" strokeDasharray="2.2 1.6" />
+        <svg {...box}>
+          <path
+            d="M8 1.2l5.8 3.4v6.8L8 14.8l-5.8-3.4V4.6z"
+            fill="none"
+            stroke="#e03131"
+            strokeWidth="1.4"
+            strokeDasharray="2.2 1.6"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "risk":
+      // Low -> severe swatch strip, using the exact colors the risk marker
+      // uses on the map (RISK_COLOR), so the legend reads as a scale.
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M8 2 14.5 13.5h-13z" />
-          <path d="M8 6.3v3.2" />
-          <circle cx="8" cy="11.6" r="0.55" fill="currentColor" stroke="none" />
+        <svg width="16" height="14" viewBox="0 0 16 10" aria-hidden="true">
+          <rect x="0" y="2" width="3.2" height="6" rx="1" fill="#2f9e44" />
+          <rect x="4.3" y="2" width="3.2" height="6" rx="1" fill="#f08c00" />
+          <rect x="8.6" y="2" width="3.2" height="6" rx="1" fill="#e8590c" />
+          <rect x="12.9" y="2" width="3.1" height="6" rx="1" fill="#c92a2a" />
         </svg>
       );
     case "route":
+      // Solid line (the route on the map is solid, not dashed) with a small
+      // arrowhead, blue origin dot and green destination dot — matching the
+      // marker colors used for origin/destination on the map.
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M2 13c3-6 5-8 12-10" strokeDasharray="2 2" />
-          <circle cx="2" cy="13" r="1.3" fill="currentColor" stroke="none" />
-          <circle cx="14" cy="3" r="1.3" fill="currentColor" stroke="none" />
+        <svg {...box}>
+          <path
+            d="M2 13c3-6 5-8 9-9.6"
+            fill="none"
+            stroke="#1971c2"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+          <path
+            d="M9.4 2.2l2.6.9-.6 2.7"
+            fill="none"
+            stroke="#1971c2"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="2" cy="13" r="1.3" fill="#1971c2" />
+          <circle cx="12" cy="3.3" r="1.3" fill="#2f9e44" />
         </svg>
       );
     case "environmental":
+      // A white-ringed sample point, matching the CircleMarker used on the map.
       return (
-        <svg {...common} aria-hidden="true">
-          <circle cx="8" cy="8" r="5.2" />
-          <circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none" />
+        <svg {...box}>
+          <circle cx="8" cy="8" r="5" fill="#6fa8c7" stroke="#e2e8f0" strokeWidth="1.4" />
         </svg>
       );
     case "pfz":
+      // Dashed teal boundary + point, matching the official PFZ line style
+      // (LAYER_STYLE.pfz) — deliberately not fish-shaped or ORCA-colored.
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M2 8c3-3.6 7.6-3.6 10.3-.8-1 3-1 2.6 0 5.6-2.7 2.8-7.3 2.8-10.3-.8-.9-1-.9-3 0-4z" />
-          <path d="M12.3 7.4 14.6 5v6l-2.3-2.4" />
-          <circle cx="4.4" cy="7.4" r="0.5" fill="currentColor" stroke="none" />
+        <svg {...box}>
+          <path
+            d="M2.4 9.2c0-3.4 2.6-6.2 5.6-6.2s5.6 2.8 5.6 6.2-2.6 5-5.6 5-5.6-1.6-5.6-5z"
+            fill="none"
+            stroke="#0ca678"
+            strokeWidth="1.4"
+            strokeDasharray="2.2 1.8"
+          />
+          <circle cx="8" cy="9.2" r="1.1" fill="#0ca678" />
         </svg>
       );
     case "sst":
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M8 2.2a1.4 1.4 0 0 0-1.4 1.4v5.9a2.9 2.9 0 1 0 2.8 0V3.6A1.4 1.4 0 0 0 8 2.2z" />
-          <path d="M8 5v4.4" />
+        <svg {...box}>
+          <path
+            d="M8 2.2a1.4 1.4 0 0 0-1.4 1.4v5.9a2.9 2.9 0 1 0 2.8 0V3.6A1.4 1.4 0 0 0 8 2.2z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M8 5v4.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       );
     case "chlorophyll":
+      // Neutral blue-grey, matching CHL_CLASS_COLOR — deliberately not green,
+      // since chlorophyll-a is not a "good fishing" signal.
       return (
-        <svg {...common} aria-hidden="true">
-          <path d="M8 2c2.4 3.1 4.3 5.7 4.3 8A4.3 4.3 0 0 1 3.7 10C3.7 7.7 5.6 5.1 8 2z" />
+        <svg {...box}>
+          <path
+            d="M8 2c2.4 3.1 4.3 5.7 4.3 8A4.3 4.3 0 0 1 3.7 10C3.7 7.7 5.6 5.1 8 2z"
+            fill="none"
+            stroke="#6fa8c7"
+            strokeWidth="1.4"
+          />
         </svg>
       );
     case "environmental_suitability":
+      // Low -> elevated suitability swatch strip using the exact colors the
+      // suitability grid cells use on the map (suitabilityFillColor).
       return (
-        <svg {...common} aria-hidden="true">
-          <rect x="1.5" y="1.5" width="4.5" height="4.5" />
-          <rect x="6.7" y="1.5" width="4.5" height="4.5" />
-          <rect x="1.5" y="6.7" width="4.5" height="4.5" />
-          <rect x="6.7" y="6.7" width="4.5" height="4.5" fill="currentColor" stroke="none" />
+        <svg width="16" height="14" viewBox="0 0 16 10" aria-hidden="true">
+          <rect x="0" y="1" width="4.6" height="8" rx="1" fill="#dce8f0" />
+          <rect x="5.4" y="1" width="4.6" height="8" rx="1" fill="#7fb3d5" />
+          <rect x="10.8" y="1" width="4.6" height="8" rx="1" fill="#2c6e91" />
         </svg>
       );
     default:
@@ -277,7 +355,8 @@ function LayerRow({
   // also stays as visible text (kept short via i18n copy) so users never have
   // to hover to learn *why* — matching the "why can't I click this" demo goal.
   const noteText = t(tg.noteKey ?? "map.noGeometry");
-  const title = tg.available ? (tg.sourceTitleKey ? t(tg.sourceTitleKey) : undefined) : noteText;
+  const availableTitle = tg.descKey ? t(tg.descKey) : tg.sourceTitleKey ? t(tg.sourceTitleKey) : undefined;
+  const title = tg.available ? availableTitle : noteText;
 
   return (
     <li className="layer-control__item">
@@ -291,7 +370,6 @@ function LayerRow({
           disabled={!tg.available}
           onChange={() => onToggle(tg.id)}
         />
-        <span className={`layer-toggle__swatch layer-toggle__swatch--${tg.provenance}`} />
         <span className="layer-toggle__icon">
           <LayerIcon id={tg.id} />
         </span>
@@ -322,25 +400,63 @@ export function LayerControl({
   onToggle: (id: LayerId) => void;
 }) {
   const { t } = useI18n();
+  const [expanded, setExpanded] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<LayerGroup, boolean>>({
+    marine_base: false,
+    orca_analysis: false,
+    fishing_environment: false,
+  });
+
   const groups = GROUP_ORDER.map((g) => ({
     group: g,
     rows: toggles.filter((tg) => tg.group === g),
   })).filter((g) => g.rows.length > 0);
 
+  const activeCount = toggles.filter((tg) => tg.available && active.has(tg.id)).length;
+
   return (
-    <div className="layer-control">
-      <p className="layer-control__title">{t("map.layers")}</p>
-      <div className="layer-control__body">
-        {groups.map(({ group, rows }) => (
-          <div className="layer-control__group" key={group}>
-            <p className="layer-control__group-title">{t(GROUP_TITLE_KEY[group])}</p>
-            <ul className="layer-control__list">
-              {rows.map((tg) => (
-                <LayerRow key={tg.id} tg={tg} active={active.has(tg.id)} onToggle={onToggle} />
-              ))}
-            </ul>
-          </div>
-        ))}
+    <div className={`layer-control ${expanded ? "is-open" : ""}`}>
+      <button
+        type="button"
+        className="layer-control__header"
+        aria-expanded={expanded}
+        title={t(expanded ? "map.layers.collapse" : "map.layers.expand")}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="layer-control__header-title">{t("map.layers")}</span>
+        {activeCount > 0 && (
+          <span className="layer-control__count">{t("map.layers.active", { count: activeCount })}</span>
+        )}
+        <span className={`layer-control__chevron ${expanded ? "is-open" : ""}`} aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      <div className="layer-control__body" hidden={!expanded}>
+        {groups.map(({ group, rows }) => {
+          const open = openGroups[group];
+          return (
+            <div className="layer-control__group" key={group}>
+              <button
+                type="button"
+                className="layer-control__group-header"
+                aria-expanded={open}
+                onClick={() =>
+                  setOpenGroups((g) => ({ ...g, [group]: !g[group] }))
+                }
+              >
+                <span className="layer-control__group-title">{t(GROUP_TITLE_KEY[group])}</span>
+                <span className={`layer-control__chevron ${open ? "is-open" : ""}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              <ul className="layer-control__list" hidden={!open}>
+                {rows.map((tg) => (
+                  <LayerRow key={tg.id} tg={tg} active={active.has(tg.id)} onToggle={onToggle} />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

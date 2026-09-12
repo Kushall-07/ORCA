@@ -126,6 +126,39 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+// A query response never navigates away from Workspace by itself; the map
+// and its GPS/PFZ controls stay put. This helper is only needed for tests
+// that explicitly enter Assessment mode first and then return.
+async function returnToWorkspace() {
+  await userEvent.click(
+    screen.getByRole("button", { name: /return to workspace/i }),
+  );
+}
+
+// The Decision nav item is disabled until a response exists (`latest`), in
+// both Workspace's top nav and Assessment's sidebar - a mode-agnostic signal
+// that a response has landed, without navigating anywhere.
+async function waitForResponse() {
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /^decision$/i })).not.toBeDisabled(),
+  );
+}
+
+// The Map Layers panel is collapsed by default (and its groups are separately
+// collapsible), so tests that need to click a layer checkbox must open the
+// panel first — the checkbox stays in the DOM while collapsed (`hidden`
+// attribute, not unmounted) but is excluded from the accessibility tree, so
+// getByRole("checkbox", ...) can't see it until the panel is expanded.
+async function openLayerPanel() {
+  await userEvent.click(screen.getByRole("button", { name: /map layers/i }));
+}
+
+// Groups inside the panel are collapsed by default too, so a test that needs
+// a specific row's checkbox must also open that row's group.
+async function openLayerGroup(name: RegExp) {
+  await userEvent.click(screen.getByRole("button", { name }));
+}
+
 describe("Phase B - browser location", () => {
   it("requests location only on explicit click and shows the granted state", async () => {
     render(<App />);
@@ -214,6 +247,8 @@ describe("Phase D - current location -> PFZ route", () => {
     expect(typeof body.destination_latitude).toBe("number");
     expect(typeof body.destination_longitude).toBe("number");
 
+    // Route & Navigation now lives on the Details tab.
+    await userEvent.click(screen.getByRole("button", { name: /^details$/i }));
     expect(await screen.findByText(/ROUTE FOUND/)).toBeInTheDocument();
   });
 
@@ -225,6 +260,10 @@ describe("Phase D - current location -> PFZ route", () => {
     await userEvent.type(box, "Can I go fishing tomorrow?");
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(1));
+
+    // the query submission stayed on Workspace; the map's PFZ selection +
+    // Navigate control are still right there
+    await waitForResponse();
 
     await userEvent.click(screen.getByText("simulate-pfz-click"));
     const navigateBtn = await screen.findByRole("button", { name: /navigate to this pfz/i });
@@ -250,8 +289,12 @@ describe("Phase D - current location -> PFZ route", () => {
     await userEvent.click(await screen.findByRole("button", { name: /navigate to this pfz/i }));
 
     await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(1));
+    // stays on Workspace; open Details manually to see the route status and
+    // its reason (see RoutePanel)
+    await userEvent.click(screen.getByRole("button", { name: /^details$/i }));
+    expect(await screen.findByText("NO SAFE ROUTE")).toBeInTheDocument();
     expect(
-      await screen.findByText(/Selected PFZ reference cannot be safely routed to/i),
+      screen.getByText(/Destination lies inside a hard-restricted area/i),
     ).toBeInTheDocument();
   });
 });
@@ -277,6 +320,12 @@ describe("ORCA Environmental Suitability layer", () => {
     await userEvent.type(box, "Can I go fishing tomorrow?");
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(1));
+
+    // the query submission stayed on Workspace; the layer toggle is already
+    // right there in the map overlay
+    await waitForResponse();
+    await openLayerPanel();
+    await openLayerGroup(/fishing & environment/i);
 
     const suitabilityCheckbox = screen.getByRole("checkbox", {
       name: /ORCA Environmental Suitability/i,
@@ -308,6 +357,12 @@ describe("ORCA Environmental Suitability layer", () => {
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(postQuery).toHaveBeenCalledTimes(1));
 
+    // the query submission stayed on Workspace; the layer toggle is already
+    // right there in the map overlay
+    await waitForResponse();
+    await openLayerPanel();
+    await openLayerGroup(/fishing & environment/i);
+
     const suitabilityCheckbox = screen.getByRole("checkbox", {
       name: /ORCA Environmental Suitability/i,
     });
@@ -334,5 +389,48 @@ describe("EN/HI/KN strings for the new location controls", () => {
     await userEvent.selectOptions(selects[1], "kn");
     expect(screen.getByRole("button", { name: /ನನ್ನ ಪ್ರಸ್ತುತ ಸ್ಥಳವನ್ನು ಬಳಸಿ/ })).toBeInTheDocument();
     expect(screen.getByText(/INCOIS PFZ ಉಲ್ಲೇಖ ಆಯ್ಕೆಯಾಗಿದೆ/)).toBeInTheDocument();
+  });
+});
+
+// ---- Map preservation: the map is a Workspace feature, not removed from the
+// app - it simply does not belong to Assessment mode (see WorkspacePage.tsx).
+describe("Workspace preserves the map; Assessment mode does not", () => {
+  it("keeps the map and GPS control available in Workspace", () => {
+    render(<App />);
+    expect(screen.getByTestId("fake-map")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /use my current location/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the map visible after a query response - no automatic hand-off to Assessment", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    const box = screen.getByPlaceholderText(/marine question/i);
+    await userEvent.type(box, "Can I go fishing tomorrow?");
+    await userEvent.keyboard("{Enter}");
+    await waitForResponse();
+    expect(screen.getByTestId("fake-map")).toBeInTheDocument();
+    expect(
+      screen.queryByText("CAUTION", { selector: ".decision__headline" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("removes the map only once the user manually opens Decision, and it comes back on return", async () => {
+    postQuery.mockResolvedValue(makeResponse());
+    render(<App />);
+    const box = screen.getByPlaceholderText(/marine question/i);
+    await userEvent.type(box, "Can I go fishing tomorrow?");
+    await userEvent.keyboard("{Enter}");
+    await waitForResponse();
+    await userEvent.click(screen.getByRole("button", { name: /^decision$/i }));
+    await screen.findByText("CAUTION", { selector: ".decision__headline" });
+    expect(screen.queryByTestId("fake-map")).not.toBeInTheDocument();
+
+    await returnToWorkspace();
+    expect(screen.getByTestId("fake-map")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /use my current location/i }),
+    ).toBeInTheDocument();
   });
 });

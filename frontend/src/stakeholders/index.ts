@@ -13,6 +13,7 @@ export type StakeholderId =
 
 export type EmphasisTab =
   | "decision"
+  | "details"
   | "evidence"
   | "provenance"
   | "alerts"

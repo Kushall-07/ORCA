@@ -57,19 +57,138 @@ button { font-family: inherit; }
 /* ---------- layout ---------- */
 .workspace { display: flex; flex-direction: column; height: 100%; }
 
-.workspace__body {
+/* Workspace mode: horizontal nav on top, map/chat content below. */
+.workspace__shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Assessment mode: vertical sidebar + large content area. Mutually exclusive
+   with .workspace__shell - only one of the two mode shells is ever mounted. */
+.assessment__shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ---------- horizontal top navigation (Workspace mode) ---------- */
+.top-nav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.55rem 1rem;
+  background: var(--orca-panel);
+  border-bottom: 1px solid var(--orca-border);
+  overflow-x: auto;
+}
+.top-nav__brand { display: flex; align-items: center; gap: 0.4rem; flex: none; }
+.top-nav__mark { color: var(--orca-accent-2); font-size: 1.1rem; }
+.top-nav__name { font-weight: 700; letter-spacing: 0.08em; font-size: 0.85rem; }
+.top-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+}
+.top-nav__item {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--orca-muted);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.top-nav__item:hover:not(:disabled) { color: var(--orca-text); background: var(--orca-panel-2); }
+.top-nav__item.is-active { color: #fff; background: var(--orca-accent-2); border-color: var(--orca-accent-2); cursor: default; }
+.top-nav__item:disabled { opacity: 0.4; cursor: not-allowed; }
+.top-nav__item:focus-visible { outline: 2px solid var(--orca-accent-2); outline-offset: 2px; }
+
+/* ---------- sidebar navigation (Assessment mode) ---------- */
+.sidebar {
+  flex: none;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--orca-panel);
+  border-right: 1px solid var(--orca-border);
+}
+.sidebar__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--orca-border);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.sidebar__brand:hover { background: var(--orca-panel-2); }
+.sidebar__brand:focus-visible { outline: 2px solid var(--orca-accent-2); outline-offset: 2px; }
+.sidebar__mark { color: var(--orca-accent-2); font-size: 1.2rem; line-height: 1.1; }
+.sidebar__name { font-weight: 700; letter-spacing: 0.08em; font-size: 0.92rem; }
+.sidebar__sub { color: var(--orca-muted); font-size: 0.72rem; margin-top: 0.15rem; }
+
+.sidebar__nav {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+.sidebar__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--orca-muted);
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.sidebar__item:hover:not(:disabled) {
+  color: var(--orca-text);
+  background: var(--orca-panel-2);
+}
+.sidebar__item.is-active {
+  color: #fff;
+  background: var(--orca-accent-2);
+  border-color: var(--orca-accent-2);
+}
+.sidebar__item:disabled { opacity: 0.4; cursor: not-allowed; }
+.sidebar__item:focus-visible { outline: 2px solid var(--orca-accent-2); outline-offset: 2px; }
+
+/* Map/chat side-by-side, map getting the majority of the width (~62/38). */
+.workspace__content {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 380px minmax(0, 1fr) 440px;
-  /* Pin the single row to the viewport height so the inner scroll containers
-     (chat + right rail) actually engage instead of the row growing to fit its
-     content and pushing cards past the fold / into each other. */
+  grid-template-columns: minmax(0, 5fr) minmax(360px, 3fr);
+  /* Pin the single row to the viewport height so the inner scroll container
+     (chat) actually engages instead of the row growing to fit its content. */
   grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace__chat {
-  border-right: 1px solid var(--orca-border);
+  border-left: 1px solid var(--orca-border);
   min-height: 0;
   display: flex;
 }
@@ -98,7 +217,7 @@ button { font-family: inherit; }
   max-height: calc(100% - 1.5rem);
   overflow: hidden;
 }
-.workspace__map-overlay > .layer-control { flex: 1 1 auto; min-height: 0; }
+.workspace__map-overlay > .layer-control { flex: 0 1 auto; min-height: 0; }
 .workspace__map-overlay > .tier-legend { flex: none; }
 
 .workspace__map-banner {
@@ -146,52 +265,27 @@ button { font-family: inherit; }
 .pfz-selection-card__meta { opacity: 0.75; margin: 0; }
 .pfz-selection-card__note { opacity: 0.75; margin: 0; font-size: 0.72rem; }
 
-.workspace__rail {
-  border-left: 1px solid var(--orca-border);
+/* Assessment content area: the selected section gets the full remaining
+   width, capped for readability instead of stretching edge-to-edge. */
+.assessment__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background: var(--orca-panel-2);
   display: flex;
-  flex-direction: column;
-  min-height: 0;
+  justify-content: center;
 }
 
-.rail__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.6rem 0.6rem 0;
-  border-bottom: 1px solid var(--orca-border);
-}
-.rail__tab {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--orca-muted);
-  padding: 0.4rem 0.7rem;
-  border-radius: 6px 6px 0 0;
-  cursor: pointer;
-  font-size: 0.82rem;
-}
-.rail__tab.is-active {
-  color: var(--orca-text);
-  background: var(--orca-panel);
-  border-color: var(--orca-border);
-  border-bottom-color: var(--orca-panel);
-}
-.rail__report-btn {
-  margin-left: auto;
-  border: 1px solid var(--orca-border);
-  background: var(--orca-panel-2);
-  color: var(--orca-text);
-  border-radius: 6px;
-  padding: 0.35rem 0.7rem;
-  cursor: pointer;
-  font-size: 0.8rem;
-  align-self: center;
+.assessment__content > .rail__content {
+  width: 100%;
+  max-width: 960px;
+  overflow-y: visible;
 }
 
 .rail__content {
   flex: 1;
   min-height: 0;
-  padding: 0.75rem;
+  padding: 1.5rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -944,59 +1038,108 @@ summary:focus-visible {
   width: 100%;
 }
 
-/* Layer control: the title is fixed, only the group list scrolls, so the
-   compact legend strip below it never gets pushed out of view on short
-   viewports (1366x768 and similar). */
+/* Layer control: collapsed to just its header by default (`.layer-control__body`
+   uses the `hidden` attribute, not conditional rendering, so existing layer
+   state/queries keep working even while collapsed). Only the group list
+   scrolls when expanded, so the compact legend strip below it never gets
+   pushed out of view on short viewports (1366x768 and similar). */
 .layer-control {
   display: flex;
   flex-direction: column;
   min-height: 0;
   max-height: 100%;
-  padding: 0.55rem 0 0.55rem 0.6rem;
+  padding: 0;
 }
-.layer-control__title {
-  margin: 0 0.6rem 0.4rem 0;
-  font-size: 0.64rem;
+.layer-control__header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--orca-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+}
+.layer-control__header-title {
+  flex: 1;
+  font-size: 0.68rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--orca-faint);
-  flex: none;
+  color: var(--orca-text);
 }
+.layer-control__count {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--orca-accent-2);
+  background: rgba(25, 113, 194, 0.14);
+  border: 1px solid var(--orca-accent-2);
+  border-radius: 999px;
+  padding: 0.06rem 0.4rem;
+}
+.layer-control__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
+.layer-control__chevron.is-open { transform: rotate(180deg); }
+.layer-control.is-open .layer-control__header { border-bottom: 1px solid var(--orca-border-soft); }
 .layer-control__body {
   overflow-y: auto;
   min-height: 0;
-  padding-right: 0.5rem;
+  max-height: min(26rem, 60vh);
+  padding: 0.5rem 0.5rem 0.55rem 0.6rem;
 }
-.layer-control__group + .layer-control__group { margin-top: 0.55rem; }
-.layer-control__group-title {
+.layer-control__body[hidden] { display: none; }
+.layer-control__group + .layer-control__group { margin-top: 0.5rem; }
+.layer-control__group-header {
   position: sticky;
   top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
   margin: 0 0 0.3rem;
-  padding: 0.1rem 0;
+  padding: 0.15rem 0;
+  border: none;
+  background: rgba(11, 18, 32, 0.97);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.layer-control__group-title {
+  flex: 1;
   font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--orca-muted);
-  background: rgba(11, 18, 32, 0.97);
 }
 .layer-control__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+/* `.layer-control__list` sets `display: flex` unconditionally, which — at
+   equal specificity — beats the browser default `[hidden]{display:none}`
+   rule (an author rule wins a specificity tie against a UA rule). Without
+   this, a collapsed group's `hidden` attribute would stop being
+   accessible/focusable but stay visually expanded. */
+.layer-control__list[hidden] { display: none; }
 .layer-control__item + .layer-control__item { margin-top: 0.05rem; }
 
-.layer-toggle { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.18rem 0; }
+.layer-toggle { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; padding: 0.2rem 0; }
 .layer-toggle.is-disabled { cursor: not-allowed; }
 /* Unavailable rows stay legible: dim the interactive parts, not the text. */
 .layer-toggle.is-disabled .layer-toggle__label { color: var(--orca-muted); }
-.layer-toggle.is-disabled .layer-toggle__icon { opacity: 0.45; }
+.layer-toggle.is-disabled .layer-toggle__icon { opacity: 0.4; }
 .layer-toggle input[type="checkbox"] { flex: none; accent-color: var(--orca-accent-2); }
-.layer-toggle__icon { display: flex; flex: none; color: var(--orca-muted); }
-.layer-toggle:not(.is-disabled) .layer-toggle__icon { color: var(--orca-text); }
-.layer-toggle__swatch { width: 0.6rem; height: 0.6rem; flex: none; border-radius: 2px; background: var(--orca-faint); }
-.layer-toggle__swatch--live { background: var(--ok); border-radius: 50%; }
-.layer-toggle__swatch--reference { background: var(--orca-accent-2); }
-.layer-toggle__swatch--derived { background: #9775fa; transform: rotate(45deg); }
-.layer-toggle__swatch--demo { background: var(--orca-faint); opacity: 0.7; }
-.layer-toggle__swatch--missing { background: transparent; border: 1px solid var(--orca-faint); }
+.layer-toggle__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.15rem;
+  height: 1rem;
+}
 .layer-toggle__label { flex: 1; }
 .layer-toggle__badge {
   flex: none;
@@ -1013,7 +1156,7 @@ summary:focus-visible {
 .layer-toggle__badge--reference { color: var(--orca-accent-2); border-color: var(--orca-accent-2); }
 .layer-toggle__badge--derived { color: #b7a2fb; border-color: #9775fa; }
 .layer-toggle__note {
-  margin: -0.05rem 0 0.15rem 1.85rem;
+  margin: -0.05rem 0 0.15rem 1.6rem;
   font-size: 0.66rem;
   color: var(--orca-faint);
 }
@@ -1047,15 +1190,9 @@ summary:focus-visible {
 .tier-legend__swatch--missing { background: transparent; border: 1px solid var(--orca-faint); }
 
 /* ---------- report ---------- */
-.report-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(4, 8, 16, 0.7);
-  z-index: 1000;
+.report-page {
   display: flex;
   justify-content: center;
-  overflow-y: auto;
-  padding: 1.5rem;
 }
 .report {
   background: #fff;
@@ -1078,10 +1215,20 @@ summary:focus-visible {
 .report__disclaimer { margin-top: 1.5rem; font-size: 0.76rem; color: #444; border-top: 1px solid #ccc; padding-top: 0.6rem; }
 
 @media print {
-  .report-overlay { position: static; background: none; padding: 0; }
+  .orca-topbar,
+  .top-nav,
+  .sidebar,
+  .workspace__chat,
+  .workspace__map,
+  .workspace__map-overlay { display: none; }
+  .workspace,
+  .workspace__shell,
+  .workspace__content,
+  .assessment__shell,
+  .assessment__content,
+  .rail__content { height: auto; overflow: visible; display: block; }
   .report { box-shadow: none; width: 100%; }
   .report__toolbar { display: none; }
-  .workspace { display: none; }
 }
 
 /* ---------- leaflet dark tweaks ---------- */
@@ -1092,17 +1239,38 @@ summary:focus-visible {
 
 /* ---------- responsive ---------- */
 @media (max-width: 1500px) {
-  .workspace__body { grid-template-columns: 340px minmax(0, 1fr) 400px; }
+  .workspace__content { grid-template-columns: minmax(0, 3fr) minmax(340px, 2fr); }
 }
 @media (max-width: 1180px) {
-  .workspace__body {
+  /* Workspace mode: map/chat stack instead of sitting side-by-side; the top
+     nav already scrolls horizontally (see .top-nav) rather than wrapping. */
+  .workspace__shell { overflow-y: auto; }
+  .workspace__content {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(320px, 40vh) minmax(300px, 45vh) auto;
+    grid-template-rows: minmax(320px, 45vh) minmax(300px, 45vh);
     overflow-y: auto;
   }
-  .workspace__chat { border-right: none; border-bottom: 1px solid var(--orca-border); }
-  .workspace__rail { border-left: none; border-top: 1px solid var(--orca-border); }
+  .workspace__chat { border-left: none; border-top: 1px solid var(--orca-border); }
   .workspace__map { min-height: 320px; }
+
+  /* Assessment mode: sidebar collapses to a horizontal scrollable bar. */
+  .assessment__shell { flex-direction: column; overflow-y: auto; }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--orca-border);
+  }
+  .sidebar__brand { flex: none; border-bottom: none; border-right: 1px solid var(--orca-border); }
+  .sidebar__nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.5rem;
+  }
+  .sidebar__item { white-space: nowrap; }
+  .assessment__content { padding: 0; }
 }
 
 /* ---------- what-if / scenario-sensitivity simulation ---------- */

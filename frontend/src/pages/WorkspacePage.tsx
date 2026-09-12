@@ -5,14 +5,16 @@ import { useHealth } from "../hooks/useHealth";
 import { useGisLayers } from "../hooks/useGisLayers";
 import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { useGeolocation } from "../hooks/useGeolocation";
-import { getStakeholder, type EmphasisTab, type StakeholderId } from "../stakeholders";
-import type { StringKey } from "../i18n/strings";
+import { getStakeholder, type StakeholderId } from "../stakeholders";
 import type { GeoJsonFeatureCollection } from "../types/api";
 import { fetchEnvironmentalSuitabilityLayer, fetchPfzLayer } from "../services/apiClient";
 import { nearestPointOnFeature } from "../maps/pfzGeometry";
 import MarineMap, { type LayerId } from "../maps/MarineMap";
 import { GpsControl, PfzSelectionCard, type SelectedPfz } from "../components/map/LocationControls";
 import { OrcaHeader } from "../components/header/OrcaHeader";
+import { OrcaSidebar } from "../components/nav/OrcaSidebar";
+import { WorkspaceNav } from "../components/nav/WorkspaceNav";
+import type { AssessmentSection } from "../components/nav/navItems";
 import { ChatPanel } from "../components/chat/ChatPanel";
 import {
   DecisionCard,
@@ -40,17 +42,9 @@ import {
   DataTierLegend,
   LayerControl,
 } from "../components/map/MapControls";
-import { Disclose, EmptyNote, Panel } from "../components/common";
+import { Disclose } from "../components/common";
 
 const STATIC_LAYER_IDS = new Set<LayerId>(["coastline", "eez", "protected_areas"]);
-
-const TABS: { id: EmphasisTab; key: StringKey }[] = [
-  { id: "decision", key: "tab.decision" },
-  { id: "evidence", key: "tab.evidence" },
-  { id: "provenance", key: "tab.provenance" },
-  { id: "alerts", key: "tab.alerts" },
-  { id: "activity", key: "tab.activity" },
-];
 
 export default function WorkspacePage() {
   const { t, lang } = useI18n();
@@ -58,11 +52,15 @@ export default function WorkspacePage() {
   const gis = useGisLayers();
 
   const [stakeholder, setStakeholder] = useState<StakeholderId>("fisherman");
-  const [tab, setTab] = useState<EmphasisTab>("decision");
+  const [page, setPage] = useState<AssessmentSection>("decision");
   const [activeLayers, setActiveLayers] = useState<Set<LayerId>>(
     () => new Set(getStakeholder("fisherman").defaultLayers as LayerId[]),
   );
-  const [reportOpen, setReportOpen] = useState(false);
+
+  // Two distinct application modes (see WorkspaceNav / OrcaSidebar): Workspace
+  // (map + Ask ORCA, horizontal nav) is the entry point; Assessment (vertical
+  // sidebar, one section at a time) takes over once a response exists.
+  const [mode, setMode] = useState<"workspace" | "assessment">("workspace");
 
   const { messages, latest, loading, send, retry, clear } = useOrcaQuery({
     stakeholder,
@@ -77,10 +75,10 @@ export default function WorkspacePage() {
     return "";
   }, [messages]);
 
-  // Switching context resets the emphasised tab + default layers (UX only).
+  // Switching context resets the emphasised page + default layers (UX only).
   useEffect(() => {
     const s = getStakeholder(stakeholder);
-    setTab(s.emphasisTab);
+    setPage(s.emphasisTab);
     setActiveLayers(new Set(s.defaultLayers as LayerId[]));
   }, [stakeholder]);
 
@@ -184,9 +182,6 @@ export default function WorkspacePage() {
     });
   };
 
-  const pfzRouteBlocked =
-    !!selectedPfz && !!latest?.route && latest.route.status !== "ROUTE_FOUND";
-
   const toggles = useMemo(
     () => buildLayerToggles(latest, gis.manifest),
     [latest, gis.manifest],
@@ -210,149 +205,145 @@ export default function WorkspacePage() {
         latest={latest}
       />
 
-      <div className="workspace__body">
-        <aside className="workspace__chat">
-          <ChatPanel
-            messages={messages}
-            loading={loading}
-            onSend={send}
-            onRetry={retry}
-            onClear={clear}
-            stakeholder={stakeholder}
+      {mode === "workspace" ? (
+        <div className="workspace__shell">
+          <WorkspaceNav
+            sectionsEnabled={!!latest}
+            onNavigate={(p) => {
+              setPage(p);
+              setMode("assessment");
+            }}
           />
-        </aside>
 
-        <main className="workspace__map">
-          <MarineMap
-            resp={latest}
-            activeLayers={activeLayers}
-            layerData={layerData}
-            gpsLocation={gpsCoordinate ? [gpsCoordinate.latitude, gpsCoordinate.longitude] : null}
-            selectedPfz={selectedPfz ? [selectedPfz.lat, selectedPfz.lon] : null}
-            onSelectPfz={onSelectPfz}
-          />
-          <div className="workspace__map-overlay">
-            <LayerControl toggles={toggles} active={activeLayers} onToggle={onToggleLayer} />
-            {suitabilityInsufficient && (
-              <p className="layer-toggle__note">{t("env.suitability.insufficientData")}</p>
-            )}
-            <DataTierLegend />
-            <GpsControl gps={gps} />
-            {selectedPfz && (
-              <PfzSelectionCard
-                selection={selectedPfz}
-                canNavigate={!!navigateOrigin}
-                onNavigate={onNavigateToPfz}
-                onClear={() => setSelectedPfz(null)}
+          <div className="workspace__content">
+            <main className="workspace__map">
+              <MarineMap
+                resp={latest}
+                activeLayers={activeLayers}
+                layerData={layerData}
+                gpsLocation={gpsCoordinate ? [gpsCoordinate.latitude, gpsCoordinate.longitude] : null}
+                selectedPfz={selectedPfz ? [selectedPfz.lat, selectedPfz.lon] : null}
+                onSelectPfz={onSelectPfz}
               />
-            )}
-          </div>
-          {health.state === "unavailable" && (
-            <div className="workspace__map-banner">{t("conn.offline")}</div>
-          )}
-          {pfzRouteBlocked && (
-            <div className="workspace__map-banner">{t("pfz.cannotRoute")}</div>
-          )}
-        </main>
+              <div className="workspace__map-overlay">
+                <LayerControl toggles={toggles} active={activeLayers} onToggle={onToggleLayer} />
+                {suitabilityInsufficient && (
+                  <p className="layer-toggle__note">{t("env.suitability.insufficientData")}</p>
+                )}
+                <DataTierLegend />
+                <GpsControl gps={gps} />
+                {selectedPfz && (
+                  <PfzSelectionCard
+                    selection={selectedPfz}
+                    canNavigate={!!navigateOrigin}
+                    onNavigate={onNavigateToPfz}
+                    onClear={() => setSelectedPfz(null)}
+                  />
+                )}
+              </div>
+              {health.state === "unavailable" && (
+                <div className="workspace__map-banner">{t("conn.offline")}</div>
+              )}
+            </main>
 
-        <section className="workspace__rail">
-          <div className="rail__tabs" role="tablist">
-            {TABS.map((tb) => (
-              <button
-                key={tb.id}
-                type="button"
-                role="tab"
-                aria-selected={tab === tb.id}
-                className={`rail__tab ${tab === tb.id ? "is-active" : ""}`}
-                onClick={() => setTab(tb.id)}
-              >
-                {t(tb.key)}
-              </button>
-            ))}
-            {latest && (
-              <button
-                type="button"
-                className="rail__report-btn"
-                onClick={() => setReportOpen(true)}
-              >
-                {t("panel.report")}
-              </button>
-            )}
+            <aside className="workspace__chat">
+              <ChatPanel
+                messages={messages}
+                loading={loading}
+                onSend={send}
+                onRetry={retry}
+                onClear={clear}
+                stakeholder={stakeholder}
+              />
+            </aside>
           </div>
+        </div>
+      ) : (
+        <div className="assessment__shell">
+          <OrcaSidebar
+            page={page}
+            onNavigate={setPage}
+            reportEnabled={!!latest}
+            onReturnToWorkspace={() => setMode("workspace")}
+          />
 
-          <div className="rail__content">
-            {!latest ? (
-              <Panel title={t("panel.decision")}>
-                <EmptyNote>{t("chat.emptyHint")}</EmptyNote>
-              </Panel>
-            ) : tab === "decision" ? (
-              <>
-                {/* PRIMARY — the operational answer, one scannable block. */}
+          <main className="assessment__content">
+            <div className="rail__content">
+              {!latest ? null : page === "decision" ? (
+                // PRIMARY — the operational answer, one scannable block. This
+                // is the whole Decision page: "Can I go?" and nothing else.
+                // Supporting detail lives one click away on Marine Details.
                 <DecisionCard resp={latest} />
+              ) : page === "details" ? (
+                <>
+                  <p className="rail__group-label">{t("panel.marineDetails")}</p>
 
-                {/* LIVE OFFICIAL ADVISORY — deliberately separate from the
-                    computed decision/risk above and below it. */}
-                {latest.advisory && <AdvisoryPanel resp={latest} />}
+                  {/* LIVE OFFICIAL ADVISORY — deliberately separate from the
+                      computed decision/risk. */}
+                  {latest.advisory && <AdvisoryPanel resp={latest} />}
 
-                {/* SECONDARY — supporting operational status. */}
-                <SuitabilityPanel resp={latest} />
-                {latest.route && <RoutePanel resp={latest} />}
+                  <SuitabilityPanel resp={latest} />
 
-                {/* TERTIARY — detail, collapsed so it never competes. */}
-                <p className="rail__group-label">
-                  {t("verdict.operationalDetail")}
-                </p>
-                <Disclose title={t("verdict.riskBreakdown")}>
-                  <RiskPanel resp={latest} />
-                </Disclose>
-                <Disclose title={t("verdict.fullExplanation")}>
-                  <ExplanationPanel resp={latest} />
-                </Disclose>
-                {latest.environmental && (
-                  <Disclose title={t("verdict.envContext")}>
-                    <EnvironmentalPanel resp={latest} />
+                  {latest.environmental && (
+                    <Disclose title={t("verdict.envContext")} defaultOpen>
+                      <EnvironmentalPanel resp={latest} />
+                    </Disclose>
+                  )}
+
+                  {latest.route && <RoutePanel resp={latest} />}
+
+                  <p className="rail__group-label">
+                    {t("verdict.operationalDetail")}
+                  </p>
+                  <Disclose title={t("verdict.riskBreakdown")}>
+                    <RiskPanel resp={latest} />
                   </Disclose>
-                )}
-                {latest.decision && latest.status === "OK" && (
-                  <Disclose title={t("verdict.whatIf")}>
-                    <WhatIfPanel resp={latest} />
+                  <Disclose title={t("verdict.fullExplanation")}>
+                    <ExplanationPanel resp={latest} />
                   </Disclose>
-                )}
-              </>
-            ) : tab === "evidence" ? (
-              <>
-                <p className="rail__group-label">
-                  {latest.evidence.length} {t("evidence.reviewed")}
-                  {latest.conflicts.length > 0
-                    ? ` · ${latest.conflicts.length} ⚠`
-                    : ""}
-                </p>
-                {latest.conflicts.some((c) => c.severity === "safety_critical") ? (
-                  <>
-                    <ConflictPanel resp={latest} />
-                    <EvidencePanel resp={latest} />
-                  </>
-                ) : (
-                  <>
-                    <EvidencePanel resp={latest} />
-                    <ConflictPanel resp={latest} />
-                  </>
-                )}
-                <ReferencePanel resp={latest} />
-              </>
-            ) : tab === "provenance" ? (
-              <ProvenanceViewer resp={latest} />
-            ) : tab === "alerts" ? (
-              <AlertsPanel resp={latest} />
-            ) : (
-              <AgentActivity resp={latest} />
-            )}
-          </div>
-        </section>
-      </div>
-
-      {reportOpen && latest && (
-        <ReportView resp={latest} query={lastUserQuery} onClose={() => setReportOpen(false)} />
+                  {latest.decision && latest.status === "OK" && (
+                    <Disclose title={t("verdict.whatIf")}>
+                      <WhatIfPanel resp={latest} />
+                    </Disclose>
+                  )}
+                </>
+              ) : page === "evidence" ? (
+                <>
+                  <p className="rail__group-label">
+                    {latest.evidence.length} {t("evidence.reviewed")}
+                    {latest.conflicts.length > 0
+                      ? ` · ${latest.conflicts.length} ⚠`
+                      : ""}
+                  </p>
+                  {latest.conflicts.some((c) => c.severity === "safety_critical") ? (
+                    <>
+                      <ConflictPanel resp={latest} />
+                      <EvidencePanel resp={latest} />
+                    </>
+                  ) : (
+                    <>
+                      <EvidencePanel resp={latest} />
+                      <ConflictPanel resp={latest} />
+                    </>
+                  )}
+                  <ReferencePanel resp={latest} />
+                </>
+              ) : page === "provenance" ? (
+                <ProvenanceViewer resp={latest} />
+              ) : page === "alerts" ? (
+                <AlertsPanel resp={latest} />
+              ) : page === "activity" ? (
+                <AgentActivity resp={latest} />
+              ) : (
+                <ReportView
+                  resp={latest}
+                  query={lastUserQuery}
+                  onClose={() => setPage("decision")}
+                />
+              )}
+            </div>
+          </main>
+        </div>
       )}
     </div>
   );

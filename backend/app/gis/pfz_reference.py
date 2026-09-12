@@ -33,6 +33,10 @@ logger = get_logger(__name__)
 
 _LINES_CACHE_KEY = "incois-pfz:lines:{bucket}"
 _LANDING_CACHE_KEY = "incois-pfz:landing:{bucket}"
+_TEXTDATA_CACHE_KEY = "incois-pfz-textdata:{state}:{bucket}"
+
+_WFS_SOURCE_URL = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+_TEXTDATA_SOURCE_URL = "https://incois.gov.in/MarineFisheries/TextDataHome?mfid=1&request="
 
 
 def _utcnow() -> datetime:
@@ -55,6 +59,67 @@ async def _cached_fetch(
     return fc
 
 
+async def _cached_textdata_feature_collections(
+    state_name: str,
+    *,
+    bucket: str,
+    cache: JsonCache,
+    settings: Settings,
+    client: httpx.AsyncClient | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Same day-bucketed caching strategy as ``_cached_fetch``, scoped to one
+    marine sector (the Text Data fallback is fetched per-sector, not as one
+    national dataset)."""
+    key = _TEXTDATA_CACHE_KEY.format(state=state_name, bucket=bucket)
+    cached = await cache.get_json(key)
+    if cached is not None and isinstance(cached.get("textdata"), dict):
+        textdata = cached["textdata"]
+    else:
+        textdata = await incois_pfz.fetch_pfz_textdata(
+            state_name=state_name, settings=settings, client=client
+        )
+        await cache.set_json(key, {"textdata": textdata}, settings.incois_pfz_cache_ttl_seconds)
+    return incois_pfz.textdata_to_feature_collections(textdata, state_name=state_name)
+
+
+async def _fetch_pfz_feature_collections(
+    area_state_name: str | None,
+    *,
+    bucket: str,
+    settings: Settings,
+    cache: JsonCache,
+    client: httpx.AsyncClient | None,
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Fetch the full lines + landing-centre FeatureCollections from the
+    primary INCOIS GeoServer WFS, falling back to the official INCOIS PFZ
+    Text Data service (same authority, different dissemination channel) only
+    when the WFS denies access. Returns ``(lines_fc, landing_fc, source_url)``.
+    Raises :class:`incois_pfz.IncoisPfzError` when both official channels are
+    unavailable - callers must treat that as an honest "unavailable", never
+    synthesise geometry."""
+    try:
+        lines_fc = await _cached_fetch(
+            cache, _LINES_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_lines,
+            settings=settings, client=client,
+        )
+        landing_fc = await _cached_fetch(
+            cache, _LANDING_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_landing_centres,
+            settings=settings, client=client,
+        )
+        return lines_fc, landing_fc, _WFS_SOURCE_URL
+    except incois_pfz.IncoisPfzError:
+        if area_state_name is None:
+            raise
+        logger.warning(
+            "INCOIS PFZ WFS unavailable, trying official Text Data fallback",
+            extra={"source": "incois_pfz", "area": area_state_name},
+        )
+        lines_fc, landing_fc = await _cached_textdata_feature_collections(
+            area_state_name, bucket=bucket, cache=cache, settings=settings, client=client,
+        )
+        return lines_fc, landing_fc, _TEXTDATA_SOURCE_URL
+
+
 async def fetch_matched_lines(
     coordinate: Coordinate,
     *,
@@ -66,21 +131,26 @@ async def fetch_matched_lines(
     (map-layer payload). Raises :class:`incois_pfz.IncoisPfzError` on failure -
     the caller (the GIS endpoint) turns that into "layer unavailable"."""
     bucket = time_bucket(_utcnow(), "day")
-    lines_fc = await _cached_fetch(
-        cache, _LINES_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_lines,
-        settings=settings, client=client,
-    )
     area = lookup_marine_area(coordinate)
+    lines_fc, _landing_fc, source_url = await _fetch_pfz_feature_collections(
+        area.state_name if area else None,
+        bucket=bucket, settings=settings, cache=cache, client=client,
+    )
     matched = incois_pfz.match_nearby_lines(
         lines_fc, coordinate,
         state_name=area.state_name if area else None,
         max_distance_km=settings.incois_pfz_match_radius_km,
         max_features=settings.incois_pfz_max_features,
     )
+    source = (
+        "INCOIS PFZ WebGIS (official GeoServer WFS)"
+        if source_url == _WFS_SOURCE_URL
+        else "INCOIS PFZ Text Data (official; GeoServer WFS unavailable)"
+    )
     return {
         "type": "FeatureCollection",
         "orca_meta": {
-            "source": "INCOIS PFZ WebGIS (official GeoServer WFS)",
+            "source": source,
             "layer_kind": "REFERENCE",
             "authority": "INCOIS",
             "disclaimer": (
@@ -110,16 +180,14 @@ async def build_pfz_reference(
 
     try:
         bucket = time_bucket(retrieved_at, "day")
-        lines_fc = await _cached_fetch(
-            cache, _LINES_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_lines,
-            settings=settings, client=client,
+        lines_fc, landing_fc, source_url = await _fetch_pfz_feature_collections(
+            area.state_name if area else None,
+            bucket=bucket, settings=settings, cache=cache, client=client,
         )
-        landing_fc = await _cached_fetch(
-            cache, _LANDING_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_landing_centres,
-            settings=settings, client=client,
+    except incois_pfz.IncoisPfzError:
+        logger.warning(
+            "INCOIS PFZ unavailable on both official channels", extra={"source": "incois_pfz"}
         )
-    except incois_pfz.IncoisPfzError as exc:
-        logger.warning("INCOIS PFZ fetch failed", extra={"source": "incois_pfz"})
         return PfzReferenceResult(
             availability=PfzAvailability.UNAVAILABLE,
             area_matched=area.state_name if area else None,
@@ -186,6 +254,7 @@ async def build_pfz_reference(
         nearest_landing_centre=nearest_ref,
         issued_at=issued_at,
         retrieved_at=retrieved_at,
+        source_url=source_url,
     )
 
 

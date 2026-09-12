@@ -38,10 +38,14 @@ export type StringKey =
   | "panel.explanation"
   | "panel.report"
   | "tab.decision"
+  | "tab.details"
   | "tab.evidence"
   | "tab.provenance"
   | "tab.alerts"
   | "tab.activity"
+  | "panel.marineDetails"
+  | "nav.sections"
+  | "nav.returnToWorkspace"
   | "decision.safetyStatus"
   | "decision.primaryFactors"
   | "decision.dataConfidence"
@@ -242,6 +246,18 @@ export type StringKey =
   | "layer.chlorophyll.unavailable"
   | "layer.environmentalSuitability"
   | "layer.environmentalSuitability.noLocation"
+  | "map.layers.expand"
+  | "map.layers.collapse"
+  | "map.layers.active"
+  | "layer.desc.coastline"
+  | "layer.desc.eez"
+  | "layer.desc.protected_areas"
+  | "layer.desc.geofences"
+  | "layer.desc.risk"
+  | "layer.desc.route"
+  | "layer.desc.environmental"
+  | "layer.desc.environmentalSuitability"
+  | "layer.desc.pfz"
   | "env.suitability.title"
   | "env.suitability.disclaimer"
   | "env.suitability.insufficientData"
@@ -316,10 +332,14 @@ const en: Table = {
   "panel.explanation": "Why this decision?",
   "panel.report": "Report",
   "tab.decision": "Decision",
+  "tab.details": "Details",
   "tab.evidence": "Evidence",
   "tab.provenance": "Provenance",
   "tab.alerts": "Alerts",
   "tab.activity": "Activity",
+  "panel.marineDetails": "Marine Details",
+  "nav.sections": "Sections",
+  "nav.returnToWorkspace": "Return to Workspace",
   "decision.safetyStatus": "Safety status",
   "decision.primaryFactors": "Primary factors",
   "decision.dataConfidence": "Data confidence",
@@ -490,7 +510,7 @@ const en: Table = {
   "verdict.operationalDetail": "Operational detail",
   "verdict.whatIf": "What-if simulation",
   "evidence.reviewed": "evidence records reviewed",
-  "map.layers": "Data layers",
+  "map.layers": "Map layers",
   "map.legend": "Data provenance",
   "map.legend.live": "Live observation / forecast",
   "map.legend.reference": "Official reference snapshot",
@@ -534,6 +554,18 @@ const en: Table = {
     "Chlorophyll-a unavailable — likely satellite cloud / data coverage or validity constraints. No value is shown.",
   "layer.environmentalSuitability": "ORCA Environmental Suitability",
   "layer.environmentalSuitability.noLocation": "Ask ORCA about a location first to load this layer.",
+  "map.layers.expand": "Show map layer controls",
+  "map.layers.collapse": "Hide map layer controls",
+  "map.layers.active": "{count} on",
+  "layer.desc.coastline": "India's coastal boundary",
+  "layer.desc.eez": "India's exclusive economic zone",
+  "layer.desc.protected_areas": "Marine/coastal protected regions",
+  "layer.desc.geofences": "Restricted hard-exclusion boundaries",
+  "layer.desc.risk": "ORCA safety risk assessment",
+  "layer.desc.route": "ORCA evaluated route — not a guaranteed safe path",
+  "layer.desc.environmental": "Environmental sample point for this query",
+  "layer.desc.environmentalSuitability": "CHL-based environmental context",
+  "layer.desc.pfz": "Official INCOIS PFZ reference — not ORCA-derived",
   "env.suitability.title": "ORCA Environmental Suitability",
   "env.suitability.disclaimer": "Environmental context only — not a fish-presence or safety prediction.",
   "env.suitability.insufficientData": "Insufficient environmental data for a suitability visualization here.",
@@ -610,10 +642,14 @@ const hi: Table = {
   "panel.explanation": "यह निर्णय क्यों?",
   "panel.report": "रिपोर्ट",
   "tab.decision": "निर्णय",
+  "tab.details": "विवरण",
   "tab.evidence": "साक्ष्य",
   "tab.provenance": "उत्पत्ति",
   "tab.alerts": "चेतावनियाँ",
   "tab.activity": "गतिविधि",
+  "panel.marineDetails": "समुद्री विवरण",
+  "nav.sections": "अनुभाग",
+  "nav.returnToWorkspace": "वर्कस्पेस पर लौटें",
   "decision.safetyStatus": "सुरक्षा स्थिति",
   "decision.primaryFactors": "मुख्य कारक",
   "decision.dataConfidence": "डेटा विश्वास",
@@ -783,7 +819,7 @@ const hi: Table = {
   "verdict.operationalDetail": "परिचालन विवरण",
   "verdict.whatIf": "काल्पनिक परिदृश्य अनुकरण",
   "evidence.reviewed": "साक्ष्य रिकॉर्ड समीक्षित",
-  "map.layers": "डेटा परतें",
+  "map.layers": "मानचित्र परतें",
   "map.legend": "डेटा उत्पत्ति",
   "map.legend.live": "लाइव अवलोकन / पूर्वानुमान",
   "map.legend.reference": "आधिकारिक संदर्भ स्नैपशॉट",
@@ -826,6 +862,18 @@ const hi: Table = {
     "क्लोरोफिल-a अनुपलब्ध — संभवतः उपग्रह बादल / डेटा कवरेज या वैधता सीमाओं के कारण। कोई मान नहीं दिखाया गया।",
   "layer.environmentalSuitability": "ORCA पर्यावरणीय उपयुक्तता",
   "layer.environmentalSuitability.noLocation": "इस लेयर को लोड करने के लिए पहले ORCA से किसी स्थान के बारे में पूछें।",
+  "map.layers.expand": "मानचित्र परत नियंत्रण दिखाएं",
+  "map.layers.collapse": "मानचित्र परत नियंत्रण छिपाएं",
+  "map.layers.active": "{count} सक्रिय",
+  "layer.desc.coastline": "भारत की तटीय सीमा",
+  "layer.desc.eez": "भारत का विशेष आर्थिक क्षेत्र",
+  "layer.desc.protected_areas": "समुद्री/तटीय संरक्षित क्षेत्र",
+  "layer.desc.geofences": "प्रतिबंधित कठोर-बहिष्करण सीमाएं",
+  "layer.desc.risk": "ORCA सुरक्षा जोखिम आकलन",
+  "layer.desc.route": "ORCA द्वारा मूल्यांकित मार्ग — सुरक्षित मार्ग की गारंटी नहीं",
+  "layer.desc.environmental": "इस प्रश्न के लिए पर्यावरणीय नमूना बिंदु",
+  "layer.desc.environmentalSuitability": "CHL-आधारित पर्यावरणीय संदर्भ",
+  "layer.desc.pfz": "आधिकारिक INCOIS PFZ संदर्भ — ORCA-व्युत्पन्न नहीं",
   "env.suitability.title": "ORCA पर्यावरणीय उपयुक्तता",
   "env.suitability.disclaimer": "केवल पर्यावरणीय संदर्भ — यह मछली-उपस्थिति या सुरक्षा भविष्यवाणी नहीं है।",
   "env.suitability.insufficientData": "यहाँ उपयुक्तता विज़ुअलाइज़ेशन के लिए पर्याप्त पर्यावरणीय डेटा उपलब्ध नहीं है।",
@@ -902,10 +950,14 @@ const kn: Table = {
   "panel.explanation": "ಈ ನಿರ್ಣಯ ಏಕೆ?",
   "panel.report": "ವರದಿ",
   "tab.decision": "ನಿರ್ಣಯ",
+  "tab.details": "ವಿವರಗಳು",
   "tab.evidence": "ಸಾಕ್ಷ್ಯ",
   "tab.provenance": "ಮೂಲ",
   "tab.alerts": "ಎಚ್ಚರಿಕೆ",
   "tab.activity": "ಚಟುವಟಿಕೆ",
+  "panel.marineDetails": "ಸಮುದ್ರ ವಿವರಗಳು",
+  "nav.sections": "ವಿಭಾಗಗಳು",
+  "nav.returnToWorkspace": "ಕಾರ್ಯಕ್ಷೇತ್ರಕ್ಕೆ ಹಿಂತಿರುಗಿ",
   "decision.safetyStatus": "ಸುರಕ್ಷತಾ ಸ್ಥಿತಿ",
   "decision.primaryFactors": "ಮುಖ್ಯ ಅಂಶಗಳು",
   "decision.dataConfidence": "ದತ್ತಾಂಶ ವಿಶ್ವಾಸ",
@@ -1075,7 +1127,7 @@ const kn: Table = {
   "verdict.operationalDetail": "ಕಾರ್ಯಾಚರಣೆ ವಿವರ",
   "verdict.whatIf": "ಊಹಾತ್ಮಕ ಸನ್ನಿವೇಶ ಸಿಮ್ಯುಲೇಶನ್",
   "evidence.reviewed": "ಸಾಕ್ಷ್ಯ ದಾಖಲೆಗಳು ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
-  "map.layers": "ದತ್ತಾಂಶ ಪದರಗಳು",
+  "map.layers": "ನಕ್ಷೆ ಪದರಗಳು",
   "map.legend": "ದತ್ತಾಂಶ ಮೂಲ",
   "map.legend.live": "ನೈಜ ಅವಲೋಕನ / ಮುನ್ಸೂಚನೆ",
   "map.legend.reference": "ಅಧಿಕೃತ ಉಲ್ಲೇಖ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್",
@@ -1118,6 +1170,18 @@ const kn: Table = {
     "ಕ್ಲೋರೊಫಿಲ್-a ಲಭ್ಯವಿಲ್ಲ — ಬಹುಶಃ ಉಪಗ್ರಹ ಮೋಡ / ದತ್ತಾಂಶ ವ್ಯಾಪ್ತಿ ಅಥವಾ ಮಾನ್ಯತೆ ಮಿತಿಗಳ ಕಾರಣ. ಯಾವುದೇ ಮೌಲ್ಯ ತೋರಿಸಲಾಗಿಲ್ಲ.",
   "layer.environmentalSuitability": "ORCA ಪರಿಸರ ಸೂಕ್ತತೆ",
   "layer.environmentalSuitability.noLocation": "ಈ ಲೇಯರ್ ಲೋಡ್ ಮಾಡಲು ಮೊದಲು ORCA ಗೆ ಒಂದು ಸ್ಥಳದ ಬಗ್ಗೆ ಕೇಳಿ.",
+  "map.layers.expand": "ನಕ್ಷೆ ಪದರ ನಿಯಂತ್ರಣಗಳನ್ನು ತೋರಿಸಿ",
+  "map.layers.collapse": "ನಕ್ಷೆ ಪದರ ನಿಯಂತ್ರಣಗಳನ್ನು ಮರೆಮಾಡಿ",
+  "map.layers.active": "{count} ಸಕ್ರಿಯ",
+  "layer.desc.coastline": "ಭಾರತದ ಕರಾವಳಿ ಗಡಿ",
+  "layer.desc.eez": "ಭಾರತದ ವಿಶೇಷ ಆರ್ಥಿಕ ವಲಯ",
+  "layer.desc.protected_areas": "ಸಮುದ್ರ/ಕರಾವಳಿ ಸಂರಕ್ಷಿತ ಪ್ರದೇಶಗಳು",
+  "layer.desc.geofences": "ನಿರ್ಬಂಧಿತ ಕಠಿಣ-ಹೊರಗಿಡುವಿಕೆ ಗಡಿಗಳು",
+  "layer.desc.risk": "ORCA ಸುರಕ್ಷತಾ ಅಪಾಯ ಮೌಲ್ಯಮಾಪನ",
+  "layer.desc.route": "ORCA ಮೌಲ್ಯಮಾಪನ ಮಾಡಿದ ಮಾರ್ಗ — ಸುರಕ್ಷಿತ ಮಾರ್ಗದ ಖಾತರಿ ಅಲ್ಲ",
+  "layer.desc.environmental": "ಈ ಪ್ರಶ್ನೆಗಾಗಿ ಪರಿಸರ ಮಾದರಿ ಬಿಂದು",
+  "layer.desc.environmentalSuitability": "CHL-ಆಧಾರಿತ ಪರಿಸರ ಸಂದರ್ಭ",
+  "layer.desc.pfz": "ಅಧಿಕೃತ INCOIS PFZ ಉಲ್ಲೇಖ — ORCA-ಪಡೆದದ್ದಲ್ಲ",
   "env.suitability.title": "ORCA ಪರಿಸರ ಸೂಕ್ತತೆ",
   "env.suitability.disclaimer": "ಕೇವಲ ಪರಿಸರ ಸಂದರ್ಭ — ಇದು ಮೀನು-ಇರುವಿಕೆ ಅಥವಾ ಸುರಕ್ಷತಾ ಮುನ್ಸೂಚನೆ ಅಲ್ಲ.",
   "env.suitability.insufficientData": "ಇಲ್ಲಿ ಸೂಕ್ತತೆ ದೃಶ್ಯೀಕರಣಕ್ಕೆ ಸಾಕಷ್ಟು ಪರಿಸರ ದತ್ತಾಂಶ ಇಲ್ಲ.",
