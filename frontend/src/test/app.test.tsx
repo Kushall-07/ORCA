@@ -457,6 +457,31 @@ describe("ORCA workspace", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("renders tide as a modelled sea-level signal, not an official tide table", async () => {
+    postQuery.mockResolvedValue(makeEnvironmentalResponse());
+    render(<App />);
+    await sendQuery("chlorophyll and sea surface temperature near Mangalore");
+    await openDetails();
+    expect(await screen.findByText("Modelled sea level")).toBeInTheDocument();
+    expect(
+      screen.getByText(/not an official tide-gauge observation/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show a tide row when the backend has no tide observation", async () => {
+    const base = makeEnvironmentalResponse();
+    postQuery.mockResolvedValue(
+      makeEnvironmentalResponse({
+        environmental: { ...base.environmental!, tide: null },
+      }),
+    );
+    render(<App />);
+    await sendQuery("chlorophyll and sea surface temperature near Mangalore");
+    await openDetails();
+    await screen.findByText("Environmental Context");
+    expect(screen.queryByText("Modelled sea level")).not.toBeInTheDocument();
+  });
+
   it("environmental panel never asserts fish presence, catch or yield", async () => {
     postQuery.mockResolvedValue(makeEnvironmentalResponse());
     render(<App />);

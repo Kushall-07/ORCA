@@ -181,3 +181,35 @@ def test_stale_chlorophyll_composite_is_flagged_stale_by_the_gate() -> None:
     )
     chl = next(r for r in fabric.records if r.variable == "chlorophyll_a")
     assert chl.validity is ValidityState.STALE
+
+
+# ---- Phase 10A: tide / sea level rides the SAME ocean AgentResult as wave ----
+def test_tide_observation_from_ocean_agent_is_folded_into_the_fabric() -> None:
+    ocean = _agent_result("oceanographic", [
+        _obs("wave_height", 1.8, "m"),
+        _obs("sea_level_height", 0.42, "m"),
+    ])
+    fabric = build_fabric(query_coordinate=COORD, query_time=T, ocean=ocean, now=T)
+    tide = fabric.for_variable("sea_level_height")[0]
+    assert tide.value == pytest.approx(0.42)
+    assert tide.observation.unit == "m"
+    assert tide.source == "open-meteo-marine"
+    assert tide.validity is ValidityState.VALID
+
+
+def test_stale_tide_forecast_is_flagged_by_the_gate_not_treated_as_no_tide() -> None:
+    ocean = _agent_result("oceanographic", [_obs("sea_level_height", 0.42, "m", valid=False)])
+    fabric = build_fabric(query_coordinate=COORD, query_time=T, ocean=ocean, now=T)
+    tide = fabric.for_variable("sea_level_height")[0]
+    assert tide.validity is not ValidityState.VALID
+    # still carries the real value - a stale/invalid verdict is not "no tide"
+    assert tide.value == pytest.approx(0.42)
+
+
+def test_missing_ocean_agent_leaves_no_tide_record_not_a_fabricated_zero() -> None:
+    missing = AgentResult(
+        kind="oceanographic", coordinate=COORD, query_time=T, observations=(),
+        source_status=SourceStatus(tier=DataTier.MISSING, source="none"),
+    )
+    fabric = build_fabric(query_coordinate=COORD, query_time=T, ocean=missing, now=T)
+    assert "sea_level_height" not in fabric.variables()

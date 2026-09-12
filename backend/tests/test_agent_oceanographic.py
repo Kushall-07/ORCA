@@ -117,3 +117,25 @@ async def test_sea_surface_temperature_is_not_invented_when_absent() -> None:
     )
     result = await _agent().fetch(COORD, WHEN)
     assert all(o.variable != "sea_surface_temperature" for o in result.observations)
+
+
+@respx.mock
+async def test_sea_level_height_is_emitted_when_present() -> None:
+    respx.get(MARINE_URL).respond(
+        json=marine_response(start=WHEN, sea_level_height_msl=0.55)
+    )
+    result = await _agent().fetch(COORD, WHEN)
+    tide = next(o for o in result.observations if o.variable == "sea_level_height")
+    assert tide.value == pytest.approx(0.55)
+    assert tide.unit == "m"
+    assert tide.source_tier.name == "MODEL"
+    assert tide.signal_kind.value == "model_derived"
+
+
+@respx.mock
+async def test_sea_level_height_is_not_invented_when_absent() -> None:
+    respx.get(MARINE_URL).respond(
+        json=marine_response(start=WHEN, sea_level_height_msl=None)
+    )
+    result = await _agent().fetch(COORD, WHEN)
+    assert all(o.variable != "sea_level_height" for o in result.observations)

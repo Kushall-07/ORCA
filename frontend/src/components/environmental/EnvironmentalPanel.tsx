@@ -478,7 +478,12 @@ export function EnvironmentalPanel({ resp }: { resp: QueryResponse }) {
           <KeyValue k={t("env.dataSufficiency")}>
             {String(env.data_sufficiency).toUpperCase()}
           </KeyValue>
+          {env.tide && (
+            <KeyValue k={t("env.tide")}>{fmtObs(env.tide, na)}</KeyValue>
+          )}
         </dl>
+
+        {env.tide && <p className="env__derived">{t("env.tide.note")}</p>}
 
         <p className="env__derived">{t("env.derived")}</p>
 

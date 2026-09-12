@@ -358,6 +358,20 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=neighbourhood.engine_version,
         )
 
+    # Phase 10A: tide / modelled sea level. Built directly from the gated Marine
+    # Data Fabric via the same generic observation helper productivity_node uses
+    # for SST/CHL (arbitration + conflict-check + timestamp fallback already
+    # handled there) - reused rather than duplicated. Deliberately NOT routed
+    # through the CHL/SST productivity engine: tide has no "productivity
+    # potential" and no comparison/stability/neighbourhood analysis in this
+    # phase. It never enters RiskEngineInput, SafetyGuardInput, the Decision
+    # Engine or route cost - see test_tide_safety_isolation.py.
+    tide_info = None
+    if fabric is not None:
+        from app.orchestration.nodes import _env_observation
+
+        tide_info = _obs_info(_env_observation(state, fabric, "sea_level_height"))
+
     environmental_info = None
     if productivity is not None:
         environmental_info = EnvironmentalInfo(
@@ -377,24 +391,28 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             evidence=evidence_info,
             stability=stability_info,
             neighbourhood=neighbourhood_info,
+            tide=tide_info,
         )
     elif (
         comparison_info is not None
         or evidence_info is not None
         or stability_info is not None
         or neighbourhood_info is not None
+        or tide_info is not None
     ):
         environmental_info = EnvironmentalInfo(
             disclaimer=(
                 comparison.disclaimer if comparison is not None
                 else evidence.disclaimer if evidence is not None
                 else stability.disclaimer if stability is not None
-                else neighbourhood.disclaimer
+                else neighbourhood.disclaimer if neighbourhood is not None
+                else ""
             ),
             comparison=comparison_info,
             evidence=evidence_info,
             stability=stability_info,
             neighbourhood=neighbourhood_info,
+            tide=tide_info,
         )
 
     route_info = None

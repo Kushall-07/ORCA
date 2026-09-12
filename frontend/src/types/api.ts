@@ -257,6 +257,10 @@ export interface EnvironmentalInfo {
   evidence?: EnvironmentalEvidenceInfo | null; // Phase 9 Step 5 - optional
   stability?: EnvironmentalStabilityInfo | null; // Phase 9 Step 6 - optional
   neighbourhood?: EnvironmentalNeighbourhoodInfo | null; // Phase 9 Step 7 - optional
+  // Phase 10A - modelled sea level (Open-Meteo Marine sea_level_height_msl).
+  // NOT an official INCOIS tide-gauge observation or navigation prediction,
+  // and never a safety/decision/route input. Null when unavailable.
+  tide?: EnvironmentalObservationInfo | null;
 }
 
 export interface RouteInfo {

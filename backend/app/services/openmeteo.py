@@ -10,6 +10,8 @@ consume:
     wave_height, wave_direction, wave_period,
     swell_wave_height, swell_wave_direction, swell_wave_period,
     sea_surface_temperature   (Phase 9: ~8 km, 6-hourly model field)
+    sea_level_height_msl      (Phase 10A: modelled sea level - NOT an official
+                               tide-gauge observation or navigation prediction)
 
 Every raw response is validated by :func:`parse_response` before anything from it
 reaches the Marine Data Fabric.
@@ -42,6 +44,9 @@ MARINE_HOURLY: Final[tuple[str, ...]] = (
     "swell_wave_direction",
     "swell_wave_period",
     "sea_surface_temperature",
+    # Phase 10A: modelled sea level (tide + inverse-barometer + steric effects).
+    # NOT an official tide-gauge observation or certified navigation prediction.
+    "sea_level_height_msl",
 )
 
 

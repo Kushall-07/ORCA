@@ -39,6 +39,12 @@ VARIABLE_MAP: dict[str, tuple[str, str]] = {
     # becomes a normal MarineObservation (source_tier MODEL, signal_kind
     # MODEL_DERIVED). It never enters the Risk Engine.
     "sea_surface_temperature": ("sea_surface_temperature", "°C"),
+    # Phase 10A: tide / sea level. Same Open-Meteo Marine path, same
+    # MODEL_DERIVED treatment as SST. A modelled sea-level signal (tide +
+    # inverse-barometer + steric effects), NOT an official INCOIS tide-gauge
+    # observation. It never enters the Risk Engine, Safety Guard, Decision
+    # Engine or route cost.
+    "sea_level_height_msl": ("sea_level_height", "m"),
 }
 
 

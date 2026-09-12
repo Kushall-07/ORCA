@@ -59,6 +59,7 @@ def marine_response(
     hours: int = 6,
     wave_height: float = 1.6,
     sea_surface_temperature: float | None = 29.4,
+    sea_level_height_msl: float | None = 0.42,
 ) -> dict:
     start = start or datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     times = _hours(start, hours)
@@ -75,6 +76,9 @@ def marine_response(
     if sea_surface_temperature is not None:
         hourly["sea_surface_temperature"] = [sea_surface_temperature] * hours
         units["sea_surface_temperature"] = "°C"
+    if sea_level_height_msl is not None:
+        hourly["sea_level_height_msl"] = [sea_level_height_msl] * hours
+        units["sea_level_height_msl"] = "m"
     return {
         "latitude": lat,
         "longitude": lon,

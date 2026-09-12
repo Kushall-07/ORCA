@@ -339,6 +339,12 @@ class EnvironmentalInfo(BaseModel):
     # observation and the isolated neighbourhood fetch succeeded. Additive -
     # existing clients are unaffected.
     neighbourhood: EnvironmentalNeighbourhoodInfo | None = None
+    # Phase 10A: modelled sea level / tide (Open-Meteo Marine
+    # sea_level_height_msl). Null when no usable observation exists. A
+    # MODELLED sea-level signal - NOT an official INCOIS tide-gauge
+    # observation or certified tide-table prediction, and never a safety,
+    # decision or routing input.
+    tide: EnvironmentalObservationInfo | None = None
 
 
 class AdvisoryInfo(BaseModel):

@@ -79,6 +79,8 @@ export type StringKey =
   | "env.productivity"
   | "env.sst"
   | "env.chlorophyll"
+  | "env.tide"
+  | "env.tide.note"
   | "env.chlClass"
   | "env.confidence"
   | "env.dataSufficiency"
@@ -375,6 +377,8 @@ const en: Table = {
   "env.productivity": "Environmental productivity potential",
   "env.sst": "Sea-surface temperature",
   "env.chlorophyll": "Chlorophyll-a",
+  "env.tide": "Modelled sea level",
+  "env.tide.note": "Modelled sea-level signal, not an official tide-gauge observation. Not for coastal navigation.",
   "env.chlClass": "Chlorophyll level",
   "env.confidence": "Confidence",
   "env.dataSufficiency": "Data sufficiency",
@@ -685,6 +689,8 @@ const hi: Table = {
   "env.productivity": "पर्यावरणीय उत्पादकता क्षमता",
   "env.sst": "समुद्री सतह तापमान",
   "env.chlorophyll": "क्लोरोफिल-a",
+  "env.tide": "मॉडल-आधारित समुद्र-स्तर",
+  "env.tide.note": "मॉडल-व्युत्पन्न समुद्र-स्तर संकेत, आधिकारिक ज्वार-गेज प्रेक्षण नहीं। तटीय नौवहन के लिए नहीं।",
   "env.chlClass": "क्लोरोफिल स्तर",
   "env.confidence": "विश्वास",
   "env.dataSufficiency": "डेटा पर्याप्तता",
@@ -993,6 +999,8 @@ const kn: Table = {
   "env.productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ",
   "env.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
   "env.chlorophyll": "ಕ್ಲೋರೊಫಿಲ್-a",
+  "env.tide": "ಮಾದರಿ ಆಧಾರಿತ ಸಮುದ್ರ ಮಟ್ಟ",
+  "env.tide.note": "ಮಾದರಿ-ಪಡೆದ ಸಮುದ್ರ ಮಟ್ಟದ ಸಂಕೇತ, ಅಧಿಕೃತ ಉಬ್ಬರವಿಳಿತ-ಗೇಜ್ ವೀಕ್ಷಣೆ ಅಲ್ಲ. ಕರಾವಳಿ ಸಂಚರಣೆಗೆ ಅಲ್ಲ.",
   "env.chlClass": "ಕ್ಲೋರೊಫಿಲ್ ಮಟ್ಟ",
   "env.confidence": "ವಿಶ್ವಾಸ",
   "env.dataSufficiency": "ದತ್ತಾಂಶ ಸಮರ್ಪಕತೆ",

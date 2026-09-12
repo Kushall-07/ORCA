@@ -256,6 +256,16 @@ export function makeEnvironmentalResponse(
         "Chlorophyll-a is an environmental productivity proxy and does not " +
         "indicate fish presence, abundance, or catch.",
       engine_version: "environmental-0.1.0",
+      tide: {
+        value: 0.55,
+        unit: "m",
+        validity: "VALID",
+        data_tier: "LIVE",
+        source: "open-meteo-marine",
+        source_tier: "3",
+        observed_at: "2026-09-07T06:00:00+00:00",
+        conflicted: false,
+      },
     },
     ...overrides,
   });
