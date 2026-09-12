@@ -274,6 +274,15 @@ export interface RouteInfo {
   origin: [number, number] | null;
   destination: [number, number] | null;
   hard_geofence_violations: number | null;
+  // Phase 10D - marine-aware route cost (soft cost only; additive). Wave/wind
+  // conditions folded into route cost, NOT a safety verdict and never a
+  // replacement for `decision`/`risk` above.
+  marine_cost_enabled?: boolean;
+  base_distance_cost?: number | null;
+  marine_penalty_cost?: number | null;
+  total_route_cost?: number | null;
+  omitted_cost_factors?: string[];
+  warnings?: string[];
 }
 
 export interface ProtectedAreaInfo {

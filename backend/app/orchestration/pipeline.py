@@ -436,6 +436,12 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             origin=[route.origin.latitude, route.origin.longitude],
             destination=[route.destination.latitude, route.destination.longitude],
             hard_geofence_violations=violations,
+            marine_cost_enabled=route.marine_cost_enabled,
+            base_distance_cost=route.base_distance_cost,
+            marine_penalty_cost=route.marine_penalty_cost,
+            total_route_cost=route.total_route_cost,
+            omitted_cost_factors=list(route.omitted_cost_factors),
+            warnings=list(route.warnings),
         )
 
     origin_coord = state.get("resolved_origin")

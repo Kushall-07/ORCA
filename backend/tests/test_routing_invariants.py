@@ -90,7 +90,7 @@ def test_4_only_route_crosses_hard_geofence_is_no_route() -> None:
 def test_5_artificial_invalid_route_is_route_validation_failed(monkeypatch) -> None:
     # Force A* to hand back a straight horizontal sweep that ploughs through the
     # hard zone. The independent validator must reject it.
-    def fake_a_star(grid, start, goal, *, allow_diagonal=True, max_expanded=None):
+    def fake_a_star(grid, start, goal, *, allow_diagonal=True, max_expanded=None, cost_field=None):
         row = start[0]
         cols = range(min(start[1], goal[1]), max(start[1], goal[1]) + 1)
         return [(row, c) for c in cols], 42

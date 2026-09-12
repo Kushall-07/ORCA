@@ -68,6 +68,18 @@ export function RoutePanel({ resp }: { resp: QueryResponse }) {
             {r.validation_passed ? `✓ ${t("route.validated")}` : "⚠ validation failed"}
           </p>
         )}
+        {r.marine_cost_enabled && (
+          <div className="route__marine">
+            <p className="route__marine-title">
+              {t("route.marineAware")} — {t("route.marineAwareNote")}
+            </p>
+            {r.marine_penalty_cost != null && r.total_route_cost != null && (
+              <KeyValue k={t("route.marinePenalty")}>
+                {r.marine_penalty_cost.toFixed(2)} ({t("route.cost")}: {r.total_route_cost.toFixed(1)})
+              </KeyValue>
+            )}
+          </div>
+        )}
       </div>
     </Panel>
   );

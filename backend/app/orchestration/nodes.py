@@ -518,6 +518,7 @@ async def route_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
         origin=state.get("resolved_origin"),
         destination=state.get("resolved_destination"),
         hard_geofences=deps.hard_geofences,
+        soft_geofences=deps.soft_geofences,
         risk=state.get("risk_result"),
         destination_geofence=state.get("dest_geofence"),
     )

@@ -111,6 +111,13 @@ class RouteInfo(BaseModel):
     origin: list[float] | None = None
     destination: list[float] | None = None
     hard_geofence_violations: int | None = None
+    # ---- Phase 10D: marine-aware route cost (soft cost only; additive) ----
+    marine_cost_enabled: bool = False
+    base_distance_cost: float | None = None
+    marine_penalty_cost: float | None = None
+    total_route_cost: float | None = None
+    omitted_cost_factors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class DecisionInfo(BaseModel):

@@ -137,6 +137,19 @@ class RouteResult(BaseModel):
     algorithm_version: str = ROUTING_VERSION
     reasons: tuple[str, ...] = ()
 
+    # ---- Phase 10D: marine-aware route cost (soft cost only) --------------
+    # These NEVER affect ``status`` or whether a route was found - they are
+    # additive reporting fields alongside the existing ``grid_path_cost``.
+    # ``base_distance_cost`` is the same pure-distance quantity as
+    # ``grid_path_cost``; ``total_route_cost`` also folds in the marine
+    # penalty when marine cost was enabled (see app.routing.marine_cost).
+    base_distance_cost: float | None = None
+    marine_penalty_cost: float | None = None
+    total_route_cost: float | None = None
+    marine_cost_enabled: bool = False
+    omitted_cost_factors: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+
     @property
     def found(self) -> bool:
         return self.status is RouteStatus.ROUTE_FOUND

@@ -67,6 +67,7 @@ class RouteAgent:
         origin: Coordinate | None,
         destination: Coordinate | None,
         hard_geofences: Sequence[Geofence] = (),
+        soft_geofences: Sequence[Geofence] = (),
         risk: RiskResult | None = None,
         destination_geofence: GeofenceResult | None = None,
     ) -> RouteAgentResult:
@@ -85,9 +86,15 @@ class RouteAgent:
 
         # ---- destination validation happens inside plan_route (Phase 3):
         #      coords -> grid bounds -> point-in-hard-geofence -> cell free -> A*.
+        # Phase 10D: `risk` (already computed upstream - never re-fetched or
+        # re-derived here) additionally lets plan_route apply a bounded, soft
+        # marine-aware cost on top of distance; it can never change whether a
+        # route is found or blocked. `soft_geofences` feeds only the hazard
+        # raster component of that cost, never the blocked mask.
         grid = _grid_for(origin, destination, self.settings)
         request = RouteRequest(origin=origin, destination=destination, grid=grid)
-        route = plan_route(request, list(hard_geofences), self.land_backend)
+        all_geofences = list(hard_geofences) + list(soft_geofences)
+        route = plan_route(request, all_geofences, self.land_backend, risk=risk)
 
         route_geofence: GeofenceResult | None = None
         safety_after: SafetyGuardResult | None = None

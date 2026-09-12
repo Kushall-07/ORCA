@@ -21,8 +21,17 @@ constraint is applied (existing grid/geofence-only callers are unaffected);
 the production path (``RouteAgent``) always supplies a real backend so a
 route can never be found across land.
 
+``risk`` (optional, Phase 10D) supplies an already-computed
+:class:`app.models.risk.RiskResult` so A* can additionally minimise a bounded
+marine-cost penalty (wave / wind / hazard / advisory / cyclone - see
+``app.routing.marine_cost``) alongside distance. This is a SOFT cost only: it
+never touches the blocked mask built above and never changes whether a route
+is found, blocked, or valid - omitting it (the default) reproduces the exact
+prior distance-only behaviour.
+
 Everything is deterministic and offline. No LLM, no network beyond whatever
-``land_backend`` itself already does.
+``land_backend`` itself already does. Marine cost issues zero additional
+network requests: it is built once from data the caller already has.
 """
 
 from __future__ import annotations
@@ -33,6 +42,7 @@ from app.gis.geofencing import check_geofences
 from app.gis.operations import geodesic_distance_m
 from app.gis.validation import CoordinateError, validate_coordinate
 from app.models.geo import Geofence
+from app.models.risk import RiskResult
 from app.models.routing import (
     ROUTING_ALGORITHM,
     ROUTING_VERSION,
@@ -41,9 +51,10 @@ from app.models.routing import (
     RouteResult,
     RouteStatus,
 )
-from app.routing.astar import a_star, path_cost
+from app.routing.astar import a_star, path_cost, weighted_path_cost
 from app.routing.grid import Cell, Grid, GridError, rasterize_geofences
 from app.routing.land_mask import LandBackend, rasterize_land
+from app.routing.marine_cost import MarineCostWeights, build_marine_cost
 from app.routing.validation import validate_route
 
 _NEIGHBOUR_DELTAS = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1))
@@ -84,6 +95,9 @@ def plan_route(
     request: RouteRequest,
     geofences: Sequence[Geofence] = (),
     land_backend: LandBackend | None = None,
+    *,
+    risk: RiskResult | None = None,
+    marine_cost_weights: MarineCostWeights | None = None,
 ) -> RouteResult:
     # ---- 1 & 2: coordinate validation (defensive; Coordinate already enforces) ----
     try:
@@ -206,7 +220,9 @@ def plan_route(
     if origin_cell == dest_cell:
         return _trivial_route(request, grid, hard_geofences, origin_cell)
 
-    # ---- 10: A* ----
+    # ---- 10: A* (marine cost is a SOFT cost only; it never affects the
+    #            blocked mask built above and is computed once, offline) ----
+    marine_result = build_marine_cost(grid, risk, geofences, marine_cost_weights)
     budget = request.max_expanded_nodes
     cells, expanded = a_star(
         grid,
@@ -214,6 +230,7 @@ def plan_route(
         dest_cell,
         allow_diagonal=request.allow_diagonal,
         max_expanded=budget,
+        cost_field=marine_result.cost_field,
     )
     if cells is None:
         if budget is not None and expanded >= budget:
@@ -274,17 +291,29 @@ def plan_route(
         RoutePoint(row=cell[0], col=cell[1], coordinate=coord)
         for cell, coord in zip(cells, coordinates)
     )
+    base_distance_cost = path_cost(cells)
+    if marine_result.cost_field is not None:
+        total_route_cost = weighted_path_cost(cells, marine_result.cost_field)
+    else:
+        total_route_cost = base_distance_cost
+    marine_penalty_cost = round(total_route_cost - base_distance_cost, 6)
     return _result(
         request,
         RouteStatus.ROUTE_FOUND,
         reasons=(f"A* path with {len(path)} waypoints",),
         path=path,
         node_count=len(path),
-        grid_path_cost=path_cost(cells),
+        grid_path_cost=base_distance_cost,
         total_distance_m=round(total_distance, 3),
         expanded_nodes=expanded,
         blocked_cell_count=grid.blocked_count,
         validation=route_validation,
+        base_distance_cost=base_distance_cost,
+        marine_penalty_cost=marine_penalty_cost,
+        total_route_cost=total_route_cost,
+        marine_cost_enabled=marine_result.enabled,
+        omitted_cost_factors=marine_result.omitted_factors,
+        warnings=marine_result.warnings,
     )
 
 

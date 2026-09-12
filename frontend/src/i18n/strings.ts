@@ -166,6 +166,9 @@ export type StringKey =
   | "route.reason"
   | "route.notRequested"
   | "route.validated"
+  | "route.marineAware"
+  | "route.marineAwareNote"
+  | "route.marinePenalty"
   | "evidence.source"
   | "evidence.type"
   | "evidence.status"
@@ -468,6 +471,9 @@ const en: Table = {
   "route.reason": "Reason",
   "route.notRequested": "No routing was requested for this query.",
   "route.validated": "Route validated by ORCA Route Agent",
+  "route.marineAware": "Marine-aware route",
+  "route.marineAwareNote": "Wave/wind conditions included in route cost",
+  "route.marinePenalty": "Marine cost penalty",
   "evidence.source": "Source",
   "evidence.type": "Type",
   "evidence.status": "Status",
@@ -780,6 +786,9 @@ const hi: Table = {
   "route.reason": "कारण",
   "route.notRequested": "इस प्रश्न के लिए मार्ग नहीं माँगा गया।",
   "route.validated": "ORCA मार्ग एजेंट द्वारा सत्यापित मार्ग",
+  "route.marineAware": "समुद्री-जागरूक मार्ग",
+  "route.marineAwareNote": "लहर/हवा की स्थिति मार्ग लागत में शामिल",
+  "route.marinePenalty": "समुद्री लागत दंड",
   "evidence.source": "स्रोत",
   "evidence.type": "प्रकार",
   "evidence.status": "स्थिति",
@@ -1090,6 +1099,9 @@ const kn: Table = {
   "route.reason": "ಕಾರಣ",
   "route.notRequested": "ಈ ಪ್ರಶ್ನೆಗೆ ಮಾರ್ಗ ವಿನಂತಿಸಲಾಗಿಲ್ಲ.",
   "route.validated": "ORCA ಮಾರ್ಗ ಏಜೆಂಟ್‌ನಿಂದ ಮೌಲ್ಯೀಕರಿಸಲಾಗಿದೆ",
+  "route.marineAware": "ಸಮುದ್ರ-ಜಾಗೃತ ಮಾರ್ಗ",
+  "route.marineAwareNote": "ಅಲೆ/ಗಾಳಿ ಸ್ಥಿತಿಗಳು ಮಾರ್ಗ ವೆಚ್ಚದಲ್ಲಿ ಸೇರಿಸಲಾಗಿದೆ",
+  "route.marinePenalty": "ಸಮುದ್ರ ವೆಚ್ಚ ದಂಡ",
   "evidence.source": "ಮೂಲ",
   "evidence.type": "ಪ್ರಕಾರ",
   "evidence.status": "ಸ್ಥಿತಿ",

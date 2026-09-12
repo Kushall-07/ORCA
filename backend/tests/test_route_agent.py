@@ -10,10 +10,10 @@ from app.models.common import Coordinate
 from app.models.decision import DecisionStatus
 from app.models.query import QueryIntent, QueryUnderstanding
 from app.models.routing import RouteStatus
-from app.models.safety import SafetyGuardInput
+from app.models.safety import SafetyGuardInput, SafetyStatus
 from app.policy.safety_guard import evaluate_safety
 from app.risk.engine import RiskEngine, RiskEngineInput
-from tests.factories import FakeLandBackend
+from tests.factories import FakeLandBackend, soft_geofence
 from tests.orchestration_fakes import hard_zone
 
 # NOTE: (12.87, 74.84) - the harbour/river-mouth point historically used here
@@ -161,3 +161,43 @@ def test_injected_land_backend_is_used_instead_of_the_real_one() -> None:
         origin=MANGALORE, destination=KOCHI, risk=r,
     )
     assert res.route.status is RouteStatus.ORIGIN_BLOCKED
+
+
+# ---- Phase 10D: marine-aware route cost (reuses the already-computed `risk`) --
+
+def test_route_agent_enables_marine_cost_when_risk_has_wave_and_wind() -> None:
+    d, r = _ok_decision()
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
+                            origin=MANGALORE, destination=KOCHI, risk=r)
+    assert res.route.status is RouteStatus.ROUTE_FOUND
+    assert res.route.marine_cost_enabled is True
+    assert res.route.total_route_cost >= res.route.base_distance_cost
+
+
+def test_route_agent_falls_back_to_distance_only_when_wave_missing() -> None:
+    risk = RiskEngine().evaluate(RiskEngineInput(wind_speed_ms=5.0))  # wave missing
+    # This particular risk is data-insufficient for SAFETY purposes; build a
+    # permissive decision directly (bypassing evaluate_safety) purely to
+    # isolate the marine-COST fallback from the routing_allowed gate, which is
+    # a separate concern already covered by test_skips_when_decision_forbids_routing.
+    from app.models.safety import SafetyGuardResult
+
+    permissive_decision = decide(
+        SafetyGuardResult(status=SafetyStatus.ALLOWED, reasons=(), triggered_rules=(), guard_version="test"),
+        risk=risk,
+    )
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=permissive_decision,
+                            origin=MANGALORE, destination=KOCHI, risk=risk)
+    assert res.route.status is RouteStatus.ROUTE_FOUND
+    assert res.route.marine_cost_enabled is False
+    assert res.route.total_route_cost == res.route.base_distance_cost
+
+
+def test_route_agent_threads_soft_geofences_into_marine_hazard_only() -> None:
+    d, r = _ok_decision()
+    res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
+                            origin=MANGALORE, destination=KOCHI, risk=r,
+                            soft_geofences=[soft_geofence()])
+    # A SOFT geofence must never block the route.
+    assert res.route.status is RouteStatus.ROUTE_FOUND
+    assert res.route.marine_cost_enabled is True
