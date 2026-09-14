@@ -2,9 +2,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n";
 import { getStakeholder, type StakeholderId } from "../../stakeholders";
 import type { ChatMessage } from "../../hooks/useOrcaQuery";
-import { useSpeechInput } from "../../hooks/useSpeechInput";
+import { useSpeechInput, type SpeechInputError } from "../../hooks/useSpeechInput";
 import { useSpeechOutput } from "../../hooks/useSpeechOutput";
 import { Spinner } from "../common";
+import type { StringKey } from "../../i18n/strings";
+
+// One message per failure category - never collapse a specific cause (permission
+// denied, no device, insecure connection) into a generic "unavailable" string.
+const MIC_ERROR_STRING: Record<SpeechInputError, StringKey> = {
+  unsupported: "voice.mic.unsupported",
+  "insecure-context": "voice.mic.insecureContext",
+  "permission-denied": "voice.mic.permissionDenied",
+  "device-unavailable": "voice.mic.deviceUnavailable",
+  "recording-failed": "voice.mic.error",
+};
 
 function StatusLine({ msg }: { msg: ChatMessage }) {
   const { t } = useI18n();
@@ -13,6 +24,7 @@ function StatusLine({ msg }: { msg: ChatMessage }) {
   const bits: string[] = [];
   if (r.status === "CLARIFICATION_NEEDED") bits.push("clarification needed");
   if (r.status === "QUERY_UNDERSTANDING_FAILED") bits.push("could not understand");
+  if (r.status === "CAPABILITY_UNSUPPORTED") bits.push("capability not supported");
   if (r.decision) bits.push(r.decision.status.replace(/_/g, " "));
   if (r.intent) bits.push(`intent: ${r.intent.replace(/_/g, " ")}`);
   return (
@@ -241,7 +253,7 @@ export function ChatPanel({
           role="status"
           aria-live="polite"
         >
-          {mic.error ? t("voice.mic.error") : t("voice.listening")}
+          {mic.error ? t(MIC_ERROR_STRING[mic.error]) : t("voice.listening")}
         </p>
       )}
     </div>

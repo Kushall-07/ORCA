@@ -91,3 +91,20 @@ class GisQueryResult(BaseModel):
     @property
     def blocking(self) -> bool:
         return self.inside_hard_geofence
+
+    @property
+    def backend_label(self) -> str:
+        """Human-legible status for ``backend``, for provenance / data-quality
+        display only - never used in any decision. ``backend`` itself already
+        distinguishes a genuine failure ("unavailable", set only when the
+        spatial backend raised) from which implementation answered the query
+        ("offline" = the git-tracked static/local reference layers; "postgis"
+        = the live database) - "offline" here means "answered from static
+        data", NOT "the GIS check did not run". This only relabels that same
+        distinction so it reads unambiguously in the UI; it never changes
+        ``backend`` itself or any geofence/risk/safety value."""
+        return {
+            "postgis": "PostGIS (live database)",
+            "offline": "Static/local reference data (checked)",
+            "unavailable": "Unavailable",
+        }.get(self.backend, self.backend)

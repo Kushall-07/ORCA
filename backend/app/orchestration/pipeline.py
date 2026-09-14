@@ -36,13 +36,20 @@ from app.models.api import (
     RiskInfo,
     RouteInfo,
     SuitabilityInfo,
+    WhatIfInfo,
 )
 from app.models.common import Coordinate
 from app.models.query import Language
 from app.models.routing import RouteStatus
 from app.orchestration.deps import OrcaDeps, build_default_deps
 from app.orchestration.graph import build_orca_graph
-from app.orchestration.state import STATUS_CLARIFY, STATUS_OK, STATUS_QU_FAILED
+from app.orchestration.nodes import _geofence_evaluated_clear
+from app.orchestration.state import (
+    STATUS_CLARIFY,
+    STATUS_OK,
+    STATUS_QU_FAILED,
+    STATUS_UNSUPPORTED,
+)
 
 logger = get_logger(__name__)
 
@@ -140,6 +147,8 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     clarification_question = None
     if pipeline_status == STATUS_QU_FAILED:
         status = "QUERY_UNDERSTANDING_FAILED"
+    elif pipeline_status == STATUS_UNSUPPORTED:
+        status = "CAPABILITY_UNSUPPORTED"
     elif pipeline_status == STATUS_CLARIFY or (u and u.needs_clarification):
         status = "CLARIFICATION_NEEDED"
         needs_clarification = True
@@ -222,6 +231,25 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             retrieved_at=pfz.retrieved_at.isoformat() if pfz.retrieved_at else None,
             source_url=pfz.source_url,
             disclaimer=pfz.disclaimer,
+        )
+
+    whatif_result = state.get("whatif_result")
+    whatif_info = None
+    if whatif_result is not None:
+        perturbed = whatif_result.perturbed_inputs[0] if whatif_result.perturbed_inputs else None
+        whatif_info = WhatIfInfo(
+            label=whatif_result.label,
+            variable=perturbed.variable if perturbed else "",
+            baseline_value=perturbed.baseline if perturbed else None,
+            scenario_value=perturbed.scenario if perturbed else None,
+            unit=perturbed.unit if perturbed else "",
+            baseline_risk_level=whatif_result.baseline.risk.risk_level.value,
+            baseline_risk_score=whatif_result.baseline.risk.overall_score,
+            scenario_risk_level=whatif_result.scenario.risk.risk_level.value,
+            scenario_risk_score=whatif_result.scenario.risk.overall_score,
+            scenario_decision=whatif_result.scenario.decision.status.value,
+            decision_changed=whatif_result.decision_changed,
+            explanation=whatif_result.explanation,
         )
 
     def _obs_info(o):  # type: ignore[no-untyped-def]
@@ -425,6 +453,18 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             violations = sum(
                 1 for v in route.validation.violations if "hard geofence" in v.lower()
             )
+        maritime_origin = state.get("maritime_origin")
+        origin_note = None
+        if maritime_origin is not None and maritime_origin.assumed:
+            from app.gis.pfz_reference import MANGALURU_ORIGIN_NOTE
+
+            origin_note = MANGALURU_ORIGIN_NOTE
+        elif maritime_origin is not None and maritime_origin.substituted:
+            origin_note = maritime_origin.landing_centre_name
+            if origin_note and maritime_origin.distance_km is not None:
+                origin_note += f" ({maritime_origin.distance_km:.1f} km from the query location)"
+        pfz_route_destination = state.get("pfz_route_destination")
+        pfz_auto_destination = bool(pfz_route_destination and pfz_route_destination.available)
         route_info = RouteInfo(
             status=route.status.value,
             waypoint_count=route.node_count,
@@ -442,6 +482,13 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             total_route_cost=route.total_route_cost,
             omitted_cost_factors=list(route.omitted_cost_factors),
             warnings=list(route.warnings),
+            maritime_origin_verified=bool(maritime_origin and maritime_origin.substituted),
+            maritime_origin_assumed=bool(maritime_origin and maritime_origin.assumed),
+            origin_note=origin_note,
+            pfz_auto_destination=pfz_auto_destination,
+            pfz_zone_distance_km=(
+                pfz_route_destination.distance_km if pfz_auto_destination else None
+            ),
         )
 
     origin_coord = state.get("resolved_origin")
@@ -468,6 +515,12 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     gis_result = state.get("gis_result")
     gis_summary = None
     if gis_result is not None:
+        if gis_result.inside_hard_geofence:
+            geofence_status = "inside"
+        elif _geofence_evaluated_clear(state):
+            geofence_status = "clear"
+        else:
+            geofence_status = "unavailable"
         gis_summary = GisSummary(
             backend=gis_result.backend,
             eez_inside=(gis_result.eez.inside if gis_result.eez else None),
@@ -478,6 +531,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             inside_hard_geofence=gis_result.inside_hard_geofence,
             hard_geofence_ids=list(gis_result.hard_geofence_ids),
             soft_geofence_ids=list(gis_result.soft_geofence_ids),
+            geofence_status=geofence_status,
             protected_areas=[
                 ProtectedAreaInfo(
                     name=p.name,
@@ -545,7 +599,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     dq = DataQualityInfo(
         weather_tier=_tier(state.get("weather_result")),
         ocean_tier=_tier(state.get("ocean_result")),
-        gis_backend=(state["gis_result"].backend if state.get("gis_result") else None),
+        gis_backend=(state["gis_result"].backend_label if state.get("gis_result") else None),
         warnings=list(fabric.warnings) if fabric is not None else [],
     )
 
@@ -578,6 +632,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         reference=references,
         advisory=advisory_info,
         pfz_reference=pfz_info,
+        whatif=whatif_info,
         alerts=alerts,
         conflicts=conflicts,
         evidence=evidence,

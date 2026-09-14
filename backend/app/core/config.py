@@ -139,6 +139,12 @@ class Settings(BaseSettings):
     )
     oceancolor_noaa_chl_dataset: str = Field(default="noaacwNPPVIIRSchlaDaily")
     oceancolor_noaa_chl_variable: str = Field(default="chlor_a")
+    # Official NOAA CoastWatch secondary: same ERDDAP host/variable, a
+    # different (Science Quality, more deeply reprocessed) VIIRS S-NPP global
+    # daily product - tried only when the primary NRT dataset yields no
+    # spatially/temporally acceptable pixel (e.g. an NRT processing gap).
+    # Blank disables it (falls straight through to INCOIS, if configured).
+    oceancolor_noaa_chl_fallback_dataset: str = Field(default="noaacwNPPVIIRSSQchlaDaily")
     # Blank unless a real INCOIS ERDDAP dataset id has been verified.
     oceancolor_incois_erddap_url: str = Field(default="")
     oceancolor_incois_chl_dataset: str = Field(default="")
@@ -152,6 +158,15 @@ class Settings(BaseSettings):
     # not an acceptable observation. Kept consistent with the Temporal Validity
     # Gate's chlorophyll_a stale window.
     oceancolor_chl_max_age_seconds: int = Field(default=864000, gt=0)   # 10 d
+
+    # ---- Marine Researcher: local INCOIS Oceansat-2 OCM archive (R2/R3) ----
+    # A real, already-downloaded NetCDF-3 classic file - historical CHL + TSM,
+    # 2015-01-01 to 2019-12-31, Mangalore/Netravati coastal box only. Read by
+    # app.services.oceansat2's own small pure-Python reader (no netCDF4/xarray
+    # dependency). Purely offline/local: no network access, never blocking.
+    oceansat2_nc_path: str = Field(
+        default="data/ocean_color/incois_oceansat2_datasets_da14_9092_a246_U1789400830217.nc"
+    )
 
     # ---- Official IMD marine advisory (Sea Area Bulletin) ----
     # The live API (api.imd.gov.in) requires BOTH an API key header and a
@@ -250,6 +265,10 @@ class Settings(BaseSettings):
     @property
     def reference_path(self) -> Path:
         return self._resolve(self.data_reference_dir)
+
+    @property
+    def oceansat2_path(self) -> Path:
+        return self._resolve(self.oceansat2_nc_path)
 
 
 @lru_cache

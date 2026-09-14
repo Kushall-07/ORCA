@@ -10,9 +10,9 @@
       -> fabric -> temporal -> fusion -> arbitration -> conflicts
       -> suitability (conditional) -> risk -> policy -> decision
       -> (route requested & allowed) -> route
-      -> alerts -> pfz -> productivity -> environmental_comparison
+      -> alerts -> whatif -> pfz -> productivity -> environmental_comparison
       -> environmental_stability -> environmental_neighbourhood
-      -> environmental_evidence
+      -> environmental_evidence -> research
       -> provenance -> explain -> assemble -> END
 
 The productivity node (Phase 9 Step 3), the environmental_comparison node
@@ -105,12 +105,14 @@ def build_orca_graph(deps: OrcaDeps):
     add("decision", nodes.decision_node)
     add("route", nodes.route_node)
     add("alerts", nodes.alerts_node)
+    add("whatif", nodes.whatif_node)
     add("pfz", nodes.pfz_node)
     add("productivity", nodes.productivity_node)
     add("environmental_comparison", nodes.environmental_comparison_node)
     add("environmental_stability", nodes.environmental_stability_node)
     add("environmental_neighbourhood", nodes.environmental_neighbourhood_node)
     add("environmental_evidence", nodes.environmental_evidence_node)
+    add("research", nodes.research_node)
     add("provenance", nodes.provenance_node)
     add("explain", nodes.explain_node)
     add("assemble", nodes.assemble_node)
@@ -140,13 +142,15 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_edge("policy", "decision")
     g.add_conditional_edges("decision", _after_decision, ["route", "alerts"])
     g.add_edge("route", "alerts")
-    g.add_edge("alerts", "pfz")
+    g.add_edge("alerts", "whatif")
+    g.add_edge("whatif", "pfz")
     g.add_edge("pfz", "productivity")
     g.add_edge("productivity", "environmental_comparison")
     g.add_edge("environmental_comparison", "environmental_stability")
     g.add_edge("environmental_stability", "environmental_neighbourhood")
     g.add_edge("environmental_neighbourhood", "environmental_evidence")
-    g.add_edge("environmental_evidence", "provenance")
+    g.add_edge("environmental_evidence", "research")
+    g.add_edge("research", "provenance")
     g.add_edge("provenance", "explain")
     g.add_edge("explain", "assemble")
     g.add_edge("assemble", END)

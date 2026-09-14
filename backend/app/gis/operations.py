@@ -62,6 +62,21 @@ def distance_point_to_geometry_m(
     return geodesic_distance_m(latitude, longitude, nearest.y, nearest.x)
 
 
+def nearest_point_on_geometry(
+    latitude: float, longitude: float, geometry: BaseGeometry
+) -> tuple[float, float]:
+    """The (lat, lon) of the point on ``geometry`` nearest to (latitude,
+    longitude). Returns the input point itself when it lies inside/on
+    ``geometry``. Companion to :func:`distance_point_to_geometry_m` - the same
+    ``nearest_points`` call, so the two stay consistent by construction.
+    """
+    point = Point(longitude, latitude)
+    if geometry.covers(point):
+        return latitude, longitude
+    _, nearest = nearest_points(point, geometry)
+    return nearest.y, nearest.x
+
+
 def segment_intersects_geometry(
     lat1: float,
     lon1: float,

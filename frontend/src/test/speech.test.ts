@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  checkMicrophoneAccess,
+  classifyRecognitionError,
   createRecognizer,
   getSpeakingId,
   isSttSupported,
@@ -22,7 +24,114 @@ afterEach(() => {
   delete w.webkitSpeechRecognition;
   delete w.speechSynthesis;
   delete w.SpeechSynthesisUtterance;
+  delete (navigator as unknown as Record<string, unknown>).mediaDevices;
   vi.restoreAllMocks();
+});
+
+describe("classifyRecognitionError — SpeechRecognition error code -> user-facing category", () => {
+  it("treats brief silence and the normal stop path as non-errors", () => {
+    expect(classifyRecognitionError("no-speech")).toBeNull();
+    expect(classifyRecognitionError("aborted")).toBeNull();
+  });
+
+  it("maps missing-device codes to device-unavailable", () => {
+    expect(classifyRecognitionError("audio-capture")).toBe("device-unavailable");
+  });
+
+  it("maps access-refused codes to permission-denied", () => {
+    expect(classifyRecognitionError("not-allowed")).toBe("permission-denied");
+    expect(classifyRecognitionError("service-not-allowed")).toBe("permission-denied");
+  });
+
+  it("maps unrecognised/other codes to recording-failed, never a fabricated category", () => {
+    expect(classifyRecognitionError("network")).toBe("recording-failed");
+    expect(classifyRecognitionError("some-future-code")).toBe("recording-failed");
+  });
+});
+
+describe("checkMicrophoneAccess — capability probe", () => {
+  it("resolves ok without a getUserMedia call when the browser exposes no mediaDevices API", async () => {
+    expect(await checkMicrophoneAccess()).toEqual({ ok: true });
+  });
+
+  it("reports insecure-context and never calls getUserMedia when the page is not a secure context", async () => {
+    const getUserMedia = vi.fn();
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+    vi.spyOn(window, "isSecureContext", "get").mockReturnValue(false);
+    expect(await checkMicrophoneAccess()).toEqual({
+      ok: false,
+      reason: "insecure-context",
+    });
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("resolves ok and stops every acquired track when getUserMedia grants access", async () => {
+    const stopA = vi.fn();
+    const stopB = vi.fn();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: stopA }, { stop: stopB }],
+    });
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+    expect(await checkMicrophoneAccess()).toEqual({ ok: true });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(stopA).toHaveBeenCalledTimes(1);
+    expect(stopB).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps NotAllowedError/SecurityError to permission-denied", async () => {
+    for (const name of ["NotAllowedError", "SecurityError"]) {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: vi
+            .fn()
+            .mockRejectedValue(Object.assign(new Error(name), { name })),
+        },
+      });
+      expect(await checkMicrophoneAccess()).toEqual({
+        ok: false,
+        reason: "permission-denied",
+      });
+    }
+  });
+
+  it("maps NotFoundError/NotReadableError to device-unavailable", async () => {
+    for (const name of ["NotFoundError", "NotReadableError"]) {
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: vi
+            .fn()
+            .mockRejectedValue(Object.assign(new Error(name), { name })),
+        },
+      });
+      expect(await checkMicrophoneAccess()).toEqual({
+        ok: false,
+        reason: "device-unavailable",
+      });
+    }
+  });
+
+  it("maps an unrecognised getUserMedia failure to recording-failed", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error("boom"), { name: "AbortError" })),
+      },
+    });
+    expect(await checkMicrophoneAccess()).toEqual({
+      ok: false,
+      reason: "recording-failed",
+    });
+  });
 });
 
 describe("speechLocale — ORCA language → speech locale", () => {

@@ -12,7 +12,7 @@ Phase 9 Step 7 chlorophyll-a pixel-neighbourhood representativeness cases.
 from __future__ import annotations
 
 from app.scenario import SCENARIOS, by_id, run_all, run_scenario
-from app.scenario.fixtures import fixture_names, pipeline_for_fixture
+from app.scenario.fixtures import SCENARIO_NOW, fixture_names, pipeline_for_fixture
 from app.scenario.library import SCENARIOS as LIB_SCENARIOS
 from app.scenario.run import main as cli_main
 
@@ -95,3 +95,49 @@ async def test_scenarios_are_offline_and_deterministic_data() -> None:
         pipe = pipeline_for_fixture(name)
         assert pipe.deps.qu_agent.llm is None
         assert pipe.deps.explanation_agent.llm is None
+
+
+# The mid-corridor hard geofence app.scenario.fixtures' "route_around" fixture
+# draws for 06_route_around_geofence (kept in sync with that module - see its
+# own comment for the real-bathymetry verification this box's placement was
+# derived from).
+_ROUTE_AROUND_GEOFENCE_BOX = (75.05, 11.70, 75.45, 12.20)  # min_lon, min_lat, max_lon, max_lat
+
+
+async def test_scenario_06_route_genuinely_detours_around_the_hard_geofence() -> None:
+    """Deterministic, hard-asserted proof that 06_route_around_geofence still
+    exercises a real A* detour (06_route_around_geofence's own
+    ExpectedBehavior is deliberately flexible - route_status_in also allows
+    ORIGIN_BLOCKED/NO_ROUTE in case the dataset changes - so it alone cannot
+    prove ROUTE_FOUND was actually reached). Kozhikode (not Kochi) is a
+    verified-navigable destination at both its exact gazetteer point and its
+    0.05 deg raster cell centre, so this is expected to deterministically
+    reach A* and find a route around the geofence, not just possibly do so."""
+    scenario = by_id("06_route_around_geofence")
+    assert scenario is not None
+    pipe = pipeline_for_fixture(scenario.fixture)
+    resp = await pipe.run(
+        message=scenario.turns[0], session_id="test-06-detour-proof", now=SCENARIO_NOW,
+    )
+
+    assert resp.route is not None
+    assert resp.route.status == "ROUTE_FOUND"
+    assert resp.route.maritime_origin_assumed is True
+    assert resp.route.validation_passed is True
+
+    # Non-degenerate: a real multi-hop path, not a trivial same-cell route.
+    assert resp.route.waypoint_count is not None and resp.route.waypoint_count >= 5
+    assert len(resp.route.waypoints) == resp.route.waypoint_count
+
+    # The hard-geofence guarantee holds.
+    assert (resp.route.hard_geofence_violations or 0) <= 0
+
+    # The genuine-detour proof (same semantic as
+    # tests/test_route_planner.py::test_route_avoids_hard_geofence): no
+    # waypoint sits inside the hard zone.
+    min_lon, min_lat, max_lon, max_lat = _ROUTE_AROUND_GEOFENCE_BOX
+    for lat, lon in resp.route.waypoints:
+        assert not (min_lat <= lat <= max_lat and min_lon <= lon <= max_lon), (
+            f"waypoint ({lat}, {lon}) falls inside the hard-geofence box - "
+            "this is not a genuine detour"
+        )

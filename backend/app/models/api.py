@@ -57,6 +57,16 @@ class GisSummary(BaseModel):
     hard_geofence_ids: list[str] = Field(default_factory=list)
     soft_geofence_ids: list[str] = Field(default_factory=list)
     protected_areas: list[ProtectedAreaInfo] = Field(default_factory=list)
+    # Truthful hard-geofence check status - "inside_hard_geofence: false" alone
+    # is ambiguous between "checked against real spatial data and clear" and
+    # "could not be checked at all", so this is never left for the frontend to
+    # infer from inside_hard_geofence. "inside" - the point is inside a hard
+    # geofence / hard-classified protected area. "clear" - the check
+    # genuinely ran against real spatial data and found nothing (see
+    # app.orchestration.nodes._geofence_evaluated_clear). "unavailable" - the
+    # spatial backend could not load its reference layers, so no genuine
+    # check was performed; NEVER reported as "clear".
+    geofence_status: str = "unavailable"
 
 
 class ReferenceInfo(BaseModel):
@@ -111,6 +121,30 @@ class RouteInfo(BaseModel):
     origin: list[float] | None = None
     destination: list[float] | None = None
     hard_geofence_violations: int | None = None
+    # True when `origin` is a verified maritime departure point substituted
+    # for the query location (e.g. an official INCOIS landing centre standing
+    # in for a city coordinate that is on land) - see
+    # app.gis.pfz_reference.resolve_maritime_origin. `origin_note` names that
+    # substituted point when known; both are omitted/false for an ordinary
+    # already-navigable origin.
+    maritime_origin_verified: bool = False
+    origin_note: str | None = None
+    # True only for the narrowly-scoped Phase 9.x Mangaluru Fishing Harbour
+    # demo planning assumption (see app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR)
+    # - never true for an ordinary INCOIS-verified `maritime_origin_verified`
+    # substitution. `origin_note` carries the required user-facing disclosure
+    # ("Assumption: the boat starts here...") whenever this is true.
+    maritime_origin_assumed: bool = False
+    # True when `destination` was automatically derived from the nearest
+    # official INCOIS PFZ zone for an explicit "PFZ + route" compound
+    # natural-language request (see app.orchestration.nodes.normalize /
+    # app.gis.pfz_reference.resolve_pfz_route_destination) rather than a
+    # place name / explicit override the caller supplied. `pfz_zone_distance_km`
+    # is the straight-line geodesic distance from the query origin to that
+    # zone point (distinct from `total_distance_m`, the actual road-network
+    # route length).
+    pfz_auto_destination: bool = False
+    pfz_zone_distance_km: float | None = None
     # ---- Phase 10D: marine-aware route cost (soft cost only; additive) ----
     marine_cost_enabled: bool = False
     base_distance_cost: float | None = None
@@ -412,6 +446,29 @@ class PfzReferenceInfo(BaseModel):
     disclaimer: str = ""
 
 
+class WhatIfInfo(BaseModel):
+    """Deterministic hypothetical/"what-if" scenario summary (see
+    app.orchestration.nodes.whatif_node / app.whatif.engine.run_what_if).
+    Reuses the SAME RiskEngine -> SafetyGuard -> Decision chain
+    ``POST /whatif`` uses, perturbing a COPY of THIS turn's own realised risk
+    input - a live observation is never overwritten, only compared against."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = "SIMULATION - NOT LIVE DATA"
+    variable: str = ""
+    baseline_value: float | None = None
+    scenario_value: float | None = None
+    unit: str = ""
+    baseline_risk_level: str | None = None
+    baseline_risk_score: float | None = None
+    scenario_risk_level: str | None = None
+    scenario_risk_score: float | None = None
+    scenario_decision: str | None = None
+    decision_changed: bool = False
+    explanation: str = ""
+
+
 class DataQualityInfo(BaseModel):
     weather_tier: str | None = None
     ocean_tier: str | None = None
@@ -467,6 +524,8 @@ class QueryResponse(BaseModel):
     # Official INCOIS PFZ reference (B) - fishing-potential reference only,
     # never safety. Null when no coordinate was resolved.
     pfz_reference: PfzReferenceInfo | None = None
+    # Deterministic hypothetical/"what-if" scenario - only for intent == what_if.
+    whatif: WhatIfInfo | None = None
 
     alerts: list[AlertItem] = Field(default_factory=list)
     conflicts: list[ConflictItem] = Field(default_factory=list)

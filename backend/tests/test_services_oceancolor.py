@@ -26,7 +26,11 @@ WHEN = datetime(2026, 9, 9, 12, 0, tzinfo=timezone.utc)
 
 
 def _settings(**over) -> Settings:
-    base = dict(oceancolor_enabled=True)
+    # Most tests exercise only the primary NOAA dataset (or its fallthrough to
+    # INCOIS) in isolation; the NOAA secondary (Science Quality) dataset is
+    # covered by its own dedicated tests below, so it is disabled here unless
+    # a test explicitly re-enables it.
+    base = dict(oceancolor_enabled=True, oceancolor_noaa_chl_fallback_dataset="")
     base.update(over)
     return Settings(**base)
 
@@ -68,7 +72,51 @@ async def test_url_construction_uses_griddap_json_and_axis_order() -> None:
     assert "/griddap/noaacwNPPVIIRSchlaDaily.json?chlor_a" in url
     # axis order time-range, altitude index, lat, lon
     assert "%5B0%5D" in url or "[0]" in url          # altitude singleton
-    assert "12.87000" in url and "74.84000" in url
+    # a small bounded box around the point (nearest-valid-pixel search), not a
+    # single fixed grid cell - see _PIXEL_SEARCH_HALF_WIDTH_DEG
+    hw = oc._PIXEL_SEARCH_HALF_WIDTH_DEG
+    assert f"{LAT + hw:.5f}" in url and f"{LAT - hw:.5f}" in url
+    assert f"{LON - hw:.5f}" in url and f"{LON + hw:.5f}" in url
+
+
+@respx.mock
+async def test_point_query_picks_nearest_valid_pixel_in_the_box() -> None:
+    """A cloud-masked cell right at the requested point must not shadow a real
+    valid pixel a few km away, within the same bounded search box."""
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_table([
+        _row(1.0, 0.77, lat=LAT + 0.05, lon=LON + 0.05),   # farther, same age
+        _row(1.0, 0.33, lat=LAT + 0.01, lon=LON + 0.01),   # nearest, same age
+    ]))
+    r = await oc.fetch_chlorophyll(LAT, LON, WHEN, settings=_settings())
+    assert r.value == pytest.approx(0.33)
+
+
+@respx.mock
+async def test_noaa_secondary_used_when_primary_dataset_yields_nothing() -> None:
+    noaa_sq_info = "https://coastwatch.noaa.gov/erddap/info/noaacwNPPVIIRSSQchlaDaily/index.json"
+    noaa_sq_data = "https://coastwatch.noaa.gov/erddap/griddap/noaacwNPPVIIRSSQchlaDaily.json"
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_table([]))          # primary: NRT processing gap
+    respx.get(noaa_sq_info).respond(json=_info())
+    respx.get(noaa_sq_data).respond(json=_table([_row(2.0, 0.95)]))
+    r = await oc.fetch_chlorophyll(
+        LAT, LON, WHEN,
+        settings=_settings(oceancolor_noaa_chl_fallback_dataset="noaacwNPPVIIRSSQchlaDaily"),
+    )
+    assert r.value == pytest.approx(0.95)
+    assert r.source == "noaa-coastwatch-erddap-secondary:noaacwNPPVIIRSSQchlaDaily"
+
+
+@respx.mock
+async def test_noaa_secondary_not_tried_when_disabled() -> None:
+    noaa_sq_data = "https://coastwatch.noaa.gov/erddap/griddap/noaacwNPPVIIRSSQchlaDaily.json"
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_table([]))
+    secondary = respx.get(noaa_sq_data).respond(json=_table([_row(2.0, 0.95)]))
+    with pytest.raises(oc.OceanColorNoData):
+        await oc.fetch_chlorophyll(LAT, LON, WHEN, settings=_settings())
+    assert secondary.call_count == 0
 
 
 @respx.mock
@@ -349,6 +397,28 @@ async def test_neighbourhood_missing_cells_are_counted_but_never_zeroed() -> Non
 
 
 @respx.mock
+async def test_neighbourhood_range_404_retries_with_last() -> None:
+    """The SAME "Stop is greater than the axis maximum" ERDDAP behaviour the
+    single-point fetch already retries for (test_range_404_retries_with_last):
+    when the requested [(start):(stop)] range's stop bound is beyond the
+    dataset's actual latest composite, ERDDAP 404s the WHOLE ranged query even
+    though real data exists earlier in the window. The retry with the single
+    most-recent composite ([(last)]) must recover it, exactly like the
+    point fetch."""
+    respx.get(NOAA_INFO).respond(json=_info())
+    data = respx.get(NOAA_DATA)
+    data.side_effect = [
+        httpx.Response(404, text='Error {code=404; message="axis maximum";}'),
+        httpx.Response(200, json=_box_table(valid=5, missing=0)),
+    ]
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+    )
+    assert len(r.pixels) == 5
+    assert data.call_count == 2
+
+
+@respx.mock
 async def test_neighbourhood_404_is_typed_no_data() -> None:
     respx.get(NOAA_INFO).respond(json=_info())
     respx.get(NOAA_DATA).respond(404, text='Error {code=404; message="axis maximum";}')
@@ -367,6 +437,41 @@ async def test_neighbourhood_all_composites_too_old_is_no_data() -> None:
         await oc.fetch_chlorophyll_neighbourhood(
             LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
         )
+
+
+@respx.mock
+async def test_neighbourhood_noaa_secondary_used_when_primary_yields_nothing() -> None:
+    """The same coastal / NRT-processing-gap fallback the single-point fetch
+    already has (see test_noaa_secondary_used_when_primary_dataset_yields_nothing)
+    must also apply to the box/neighbourhood fetch - a coastal point (e.g.
+    Mangalore) can have no acceptable pixel in the primary NRT dataset's box
+    while the NOAA secondary (Science Quality) dataset has one."""
+    noaa_sq_info = "https://coastwatch.noaa.gov/erddap/info/noaacwNPPVIIRSSQchlaDaily/index.json"
+    noaa_sq_data = "https://coastwatch.noaa.gov/erddap/griddap/noaacwNPPVIIRSSQchlaDaily.json"
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(404, text='Error {code=404; message="axis maximum";}')
+    respx.get(noaa_sq_info).respond(json=_info())
+    respx.get(noaa_sq_data).respond(json=_box_table(valid=5, missing=0))
+    r = await oc.fetch_chlorophyll_neighbourhood(
+        LAT, LON, WHEN, half_width_deg=0.09,
+        settings=_settings(oceancolor_noaa_chl_fallback_dataset="noaacwNPPVIIRSSQchlaDaily"),
+    )
+    assert len(r.pixels) == 5
+    assert r.dataset == "noaacwNPPVIIRSSQchlaDaily"
+    assert r.source == "noaa-coastwatch-erddap-secondary:noaacwNPPVIIRSSQchlaDaily"
+
+
+@respx.mock
+async def test_neighbourhood_secondary_not_tried_when_disabled() -> None:
+    noaa_sq_data = "https://coastwatch.noaa.gov/erddap/griddap/noaacwNPPVIIRSSQchlaDaily.json"
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(404, text='Error {code=404; message="axis maximum";}')
+    secondary = respx.get(noaa_sq_data).respond(json=_box_table(valid=5, missing=0))
+    with pytest.raises(oc.OceanColorNoData):
+        await oc.fetch_chlorophyll_neighbourhood(
+            LAT, LON, WHEN, half_width_deg=0.09, settings=_settings()
+        )
+    assert secondary.call_count == 0
 
 
 @respx.mock

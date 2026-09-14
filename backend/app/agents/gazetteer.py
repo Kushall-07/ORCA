@@ -48,6 +48,17 @@ _PLACES: dict[str, tuple[float, float]] = {
     "gulf of mannar": (9.10, 78.90),
     "arabian sea": (13.0, 72.0),
     "bay of bengal": (14.0, 84.0),
+    # Dakshina Kannada coastal localities - added for Marine Researcher /
+    # Oceanographer questions naming a specific stretch of the Mangalore
+    # coast (e.g. "between Ullal and Surathkal", "Bengre spit versus
+    # Ullal"). Approximate coastal reference points, same demo-quality
+    # precision as the harbour points above - not survey-grade.
+    "dakshina kannada": (12.87, 74.84),   # district HQ = Mangaluru
+    "ullal": (12.8038, 74.8558),
+    "surathkal": (13.0100, 74.7900),
+    "bengre": (12.9200, 74.8100),
+    "bengre spit": (12.9200, 74.8100),
+    "netravati": (12.8500, 74.8400),      # river mouth near Mangaluru old port
     # native-script aliases for the common demo ports
     "मंगलुरु": (12.87, 74.84),
     "मंगलौर": (12.87, 74.84),

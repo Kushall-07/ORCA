@@ -27,10 +27,12 @@ from app.models.environmental import (
 from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
 from app.models.geo import GeofenceResult
+from app.gis.pfz_reference import MaritimeOriginResolution, PfzRouteDestination
 from app.models.gis_agent import GisQueryResult
 from app.models.pfz import PfzReferenceResult
 from app.models.provenance import ProvenanceGraph
 from app.models.query import QueryUnderstanding
+from app.models.research import ResearchResult
 from app.models.risk import RiskResult
 from app.models.routing import RouteResult
 from app.models.safety import SafetyGuardResult
@@ -40,12 +42,20 @@ from app.observability.trace import NodeTrace
 from app.reasoning.arbitration import ArbitrationOutput
 from app.reasoning.fusion import FusionResult
 from app.risk.engine import RiskEngineInput
+from app.whatif.models import ScenarioSimResult
 
 # pipeline_status values
 STATUS_OK = "OK"
 STATUS_QU_FAILED = "QUERY_UNDERSTANDING_FAILED"
 STATUS_CLARIFY = "CLARIFICATION_NEEDED"
 STATUS_ERROR = "ERROR"
+# A genuinely UNDERSTOOD request for a semantic category ORCA's existing
+# deterministic pipelines cannot answer (see app.models.query.CapabilityStatus
+# / app.agents.query_understanding capability validation) - distinct from
+# STATUS_CLARIFY (missing information) and STATUS_QU_FAILED (could not
+# understand at all). Short-circuits the same way, so no data is fetched or
+# fabricated for a request ORCA cannot actually fulfil.
+STATUS_UNSUPPORTED = "CAPABILITY_UNSUPPORTED"
 
 
 class OrcaGraphState(TypedDict, total=False):
@@ -63,6 +73,15 @@ class OrcaGraphState(TypedDict, total=False):
     # deterministic (no LLM in the loop) and reuses the existing Risk / Safety
     # / Decision / RouteAgent chain unchanged.
     destination_override: Coordinate | None
+    # Deterministic nearest-official-PFZ-zone destination, resolved by
+    # `normalize` ONLY for an explicit compound "PFZ + route" natural-language
+    # request that names no distinct second place (e.g. "Show me the nearest
+    # PFZ at Mangalore and route me there.") - see
+    # app.gis.pfz_reference.resolve_pfz_route_destination. `None` for every
+    # other query, including a PFZ-only query (no route requested) and a
+    # manual destination_override navigate-to-PFZ click (which already
+    # supplies its own explicit coordinate and never needs this).
+    pfz_route_destination: PfzRouteDestination | None
     date_hint_override: str | None
     stakeholder: str | None
     language_hint: str | None
@@ -103,6 +122,11 @@ class OrcaGraphState(TypedDict, total=False):
     # ---- routing ----
     route_agent_result: RouteAgentResult | None
     route_result: RouteResult | None
+    # Verified maritime routing origin (see app.gis.pfz_reference), resolved
+    # only when routing is requested. Never affects `resolved_origin` (the
+    # ordinary safety-query coordinate) - it only substitutes the coordinate
+    # RouteAgent uses to plan a route.
+    maritime_origin: MaritimeOriginResolution | None
 
     # ---- environmental intelligence (Phase 9 Step 3/4, downstream of decision) ----
     productivity_result: EnvironmentalProductivityResult | None
@@ -126,11 +150,25 @@ class OrcaGraphState(TypedDict, total=False):
     # one extra batched HTTP request; downstream-only research context; never
     # feeds the safety chain, the fabric, fusion, arbitration or evidence[].
     environmental_neighbourhood: EnvironmentalNeighbourhoodResult | None
+    # Marine Researcher / Oceanographer analytical support (see
+    # app.orchestration.nodes.research_node / app.research.*). Downstream-only
+    # research context - reuses the SAME SST/chlorophyll-a data the Phase 9
+    # engines above already fetched; never feeds the safety chain, the Marine
+    # Data Fabric, fusion, arbitration, RiskEngineInput or routing. Populated
+    # only for intent == RESEARCH_QUERY.
+    research_result: ResearchResult | None
 
     # Official INCOIS PFZ reference (B). Downstream of decision, strictly
     # isolated from risk / safety / decision / route - a fishing-potential
     # reference summary only. See app.services.incois_pfz.
     pfz_result: PfzReferenceResult | None
+
+    # Deterministic hypothetical/"what-if" scenario (see
+    # app.orchestration.nodes.whatif_node / app.whatif.engine.run_what_if).
+    # Reuses the SAME RiskEngine.evaluate -> evaluate_safety -> decide chain
+    # POST /whatif already uses, perturbing a COPY of THIS turn's own realised
+    # risk_input - only ever populated for intent == WHAT_IF.
+    whatif_result: ScenarioSimResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

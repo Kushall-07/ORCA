@@ -210,7 +210,7 @@ async def test_explanation_uses_clean_groq_text_when_grounded() -> None:
     agent = ExplanationAgent(client)
     expl = await agent.explain(
         language=Language.EN,
-        understanding=QueryUnderstanding(intent=QueryIntent.OCEAN_CONDITIONS),
+        understanding=QueryUnderstanding(intent=QueryIntent.FISHING_SAFETY),
         decision=decision, risk=risk, suitability=None, conflicts=(), route=None,
         alerts=(), fabric=None, provenance=None,
     )

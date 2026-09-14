@@ -39,7 +39,10 @@ async def test_template_states_the_decision_in_english() -> None:
     e = await _explain(ExplanationAgent(None), decision=decision, risk=risk)
     assert e.generated_via == "template"
     assert e.grounded is True
-    assert "acceptable" in e.text.lower()
+    # the plain-language decision + safety + risk sentence (Fix 1)
+    assert "the system decision is proceed" in e.text.lower()
+    assert "safety status allowed" in e.text.lower()
+    assert "risk level is low" in e.text.lower()
     assert e.language is Language.EN
 
 
@@ -47,8 +50,8 @@ async def test_template_hindi_and_kannada() -> None:
     decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
     hi = await _explain(ExplanationAgent(None), language=Language.HI, decision=decision, risk=risk)
     kn = await _explain(ExplanationAgent(None), language=Language.KN, decision=decision, risk=risk)
-    assert "ORCA" in hi.text and any("ऀ" <= ch <= "ॿ" for ch in hi.text)
-    assert any("ಀ" <= ch <= "೿" for ch in kn.text)
+    assert "PROCEED" in hi.text and any("ऀ" <= ch <= "ॿ" for ch in hi.text)
+    assert "PROCEED" in kn.text and any("ಀ" <= ch <= "೿" for ch in kn.text)
 
 
 async def test_no_safe_recommendation_is_explained_not_softened() -> None:
@@ -137,7 +140,7 @@ async def test_valid_location_decision_state_reaches_the_explanation() -> None:
     assert e.grounded is True
     assert "were not included" not in e.text.lower()
     # the deterministic decision sentence is present
-    assert "orca" in e.text.lower()
+    assert "the system decision is" in e.text.lower()
     assert e.reasoning_summary and e.reasoning_summary != "no decision"
 
 
@@ -217,8 +220,8 @@ async def test_template_explains_sst_chlorophyll_class_and_productivity() -> Non
     assert "chlorophyll" in low
     assert "productivity" in low
     assert "moderate" in low
-    # the mandatory disclaimer is always present
-    assert ("does not indicate fish presence, abundance, or catch") in low
+    # the mandatory plain-language disclaimer is always present
+    assert "does not tell you how many fish" in low
     assert e.grounded is True
 
 
@@ -228,7 +231,7 @@ async def test_template_reports_unknown_when_chlorophyll_missing() -> None:
     e = await _explain_env(ExplanationAgent(None), p)
     low = e.text.lower()
     assert "could not be determined" in low or "unavailable" in low
-    assert "does not indicate fish presence" in low
+    assert "does not tell you how many fish" in low
 
 
 async def test_environmental_explanation_never_claims_fish_or_catch() -> None:

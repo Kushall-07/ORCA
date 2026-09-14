@@ -29,9 +29,11 @@ from app.models.geo import (
     GeofenceType,
     LayerAuthority,
 )
+from app.models.advisory import AdvisoryAvailability
 from app.models.observations import Evidence
-from app.models.query import Language, QueryIntent
+from app.models.query import CapabilityStatus, Language, QueryIntent
 from app.models.reference import ReferenceKind
+from app.models.routing import RouteStatus
 from app.models.session import SessionTurn
 from app.models.suitability import SuitabilityInputs, SuitabilityLevel
 from app.decision.engine import decide
@@ -46,12 +48,13 @@ from app.orchestration.state import (
     STATUS_CLARIFY,
     STATUS_OK,
     STATUS_QU_FAILED,
+    STATUS_UNSUPPORTED,
     OrcaGraphState,
 )
 
 logger = get_logger(__name__)
 
-_SHORT_CIRCUIT = {STATUS_QU_FAILED, STATUS_CLARIFY}
+_SHORT_CIRCUIT = {STATUS_QU_FAILED, STATUS_CLARIFY, STATUS_UNSUPPORTED}
 
 
 def _now(state: OrcaGraphState) -> datetime:
@@ -91,6 +94,36 @@ def _apply_explicit_destination_override(u, state: OrcaGraphState):  # type: ign
     )
 
 
+def _apply_explicit_origin_override(u, state: OrcaGraphState):  # type: ignore[no-untyped-def]
+    """Symmetric to :func:`_apply_explicit_destination_override`, for the
+    ORIGIN side: an explicit ``coordinate_override`` supplied by the
+    application (e.g. the browser's current/selected map location) describes
+    *where*, not *what the user meant* - Query Understanding only ever sees
+    the raw message text, so a message naming no place (e.g. a follow-up
+    "What if the waves are very high?") can legitimately ask for
+    clarification on a location it cannot resolve from natural language even
+    though the application already supplied one. When that is the ONLY
+    reason understanding is asking for clarification, the explicit
+    coordinate takes precedence and understanding proceeds so ``normalize``
+    can consult ``coordinate_override`` normally. Never touches safety, risk,
+    geofence or routing validation; a no-op when no coordinate override is
+    supplied."""
+    if u.failed or not u.needs_clarification:
+        return u
+    if state.get("coordinate_override") is None:
+        return u
+    return u.model_copy(
+        update={
+            "needs_clarification": False,
+            "clarification_question": None,
+            "notes": u.notes + (
+                "explicit origin coordinates supplied by the application; "
+                "proceeding without natural-language origin resolution",
+            ),
+        }
+    )
+
+
 async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     session = deps.session_store.get(state["session_id"])
     try:
@@ -106,8 +139,11 @@ async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
             notes=("query understanding node raised an exception",),
         )
     u = _apply_explicit_destination_override(u, state)
+    u = _apply_explicit_origin_override(u, state)
     if u.failed:
         status = STATUS_QU_FAILED
+    elif u.capability_status is CapabilityStatus.UNSUPPORTED:
+        status = STATUS_UNSUPPORTED
     elif u.needs_clarification:
         status = STATUS_CLARIFY
     else:
@@ -118,6 +154,52 @@ async def understand(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
         "pipeline_status": status,
         "agent_trace": ["understand"],
     }
+
+
+def _no_distinct_destination_named(u) -> bool:  # type: ignore[no-untyped-def]
+    """True when Query Understanding did not name a distinct second place for
+    the destination - either it found none at all, or it echoed the SAME
+    place already used for the origin (a known false-positive of the NL
+    place-extraction regex - see ``query_understanding._extract_places``:
+    "Show me the nearest PFZ at Mangalore and route me there." has no second
+    place, yet the regex's trailing "(?: [a-z\\-]+)?" group captures
+    ``origin.name == "mangalore and"`` while the gazetteer-substring fallback
+    separately sets ``destination.name == "mangalore"`` - two DIFFERENT name
+    strings for the one place actually named). Comparing the two GeoRefs'
+    already gazetteer-resolved COORDINATES (not their name strings) catches
+    this reliably; a name-only comparison would not. This intentionally
+    inspects Query Understanding's own parse, never the final resolved
+    origin, so it is unaffected by any coordinate_override/session fallback
+    the caller may separately apply to the origin."""
+    if u.destination is None:
+        return True
+    if u.origin is None:
+        return False
+    dest_coord = u.destination.coordinate
+    origin_coord = u.origin.coordinate
+    if dest_coord is not None and origin_coord is not None:
+        return (
+            dest_coord.latitude == origin_coord.latitude
+            and dest_coord.longitude == origin_coord.longitude
+        )
+    if u.destination.name and u.origin.name:
+        return u.destination.name.strip().lower() == u.origin.name.strip().lower()
+    return False
+
+
+async def _resolve_pfz_auto_destination(deps, origin):  # type: ignore[no-untyped-def]
+    """Deterministic nearest-official-PFZ-zone destination (see
+    app.gis.pfz_reference.resolve_pfz_route_destination) - never raises: any
+    failure is treated the same as "no PFZ zone available nearby"."""
+    try:
+        from app.gis.pfz_reference import resolve_pfz_route_destination
+
+        return await resolve_pfz_route_destination(
+            origin, settings=deps.settings, cache=deps.pfz_cache,
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("PFZ auto-destination resolution node error: %s", type(exc).__name__)
+        return None
 
 
 async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
@@ -137,6 +219,31 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
     if destination is None and u.destination is not None:
         destination = u.destination.coordinate or gazetteer.lookup(u.destination.name)
 
+    # Explicit compound "PFZ + route" request naming no distinct second place
+    # (e.g. "Show me the nearest PFZ at Mangalore and route me there.") - the
+    # nearest official INCOIS PFZ zone becomes the route destination
+    # automatically (see app.gis.pfz_reference.resolve_pfz_route_destination).
+    # A PFZ-only request (`requests_route` False) is untouched - "Show me the
+    # nearest PFZ at Mangalore." still only shows/highlights the PFZ - and so
+    # is a route request that already names two distinct places (e.g. "route
+    # from Kochi to Mangalore and show me the PFZ"): this only ever fills in
+    # a destination the query itself never supplied.
+    pfz_route_destination = None
+    if (
+        destination_override is None
+        and origin is not None
+        and u.requests_route
+        and u.requests_pfz
+        and _no_distinct_destination_named(u)
+    ):
+        pfz_route_destination = await _resolve_pfz_auto_destination(deps, origin)
+        if pfz_route_destination is not None and pfz_route_destination.available:
+            destination = pfz_route_destination.coordinate
+        else:
+            # Never fabricate a route to the NL artifact "destination" (no
+            # real second place was named) when no PFZ zone is available.
+            destination = None
+
     date_hint = state.get("date_hint_override") or u.date_hint
     decision_time = _resolve_decision_time(_now(state), date_hint, u.time_window)
 
@@ -150,6 +257,7 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
         "understanding": u,
         "resolved_origin": origin,
         "resolved_destination": destination,
+        "pfz_route_destination": pfz_route_destination,
         "decision_time": decision_time,
         "agent_trace": ["normalize"],
     }
@@ -498,6 +606,43 @@ def _advisory_safety_inputs(state: OrcaGraphState):  # type: ignore[no-untyped-d
     return advisory.severity, advisory.availability, applicable, advisory.area
 
 
+def _advisory_evaluated_clear(state: OrcaGraphState) -> bool:
+    """True only when the deterministic marine-area lookup actually ran and
+    concluded no official-advisory zone covers this coordinate at all
+    (``NO_LOCATION_MATCH``) - a genuine "no constraint applies" finding, not a
+    retrieval failure. Any other non-available reason (source unreachable /
+    not configured, expired, not yet valid) is a real data gap and must keep
+    the honest "unavailable" wording - see ``_render_simple_core``."""
+    agent_result = state.get("advisory_result")
+    advisory = getattr(agent_result, "advisory", None) if agent_result is not None else None
+    if advisory is None:
+        return False
+    return advisory.availability is AdvisoryAvailability.NO_LOCATION_MATCH
+
+
+def _geofence_evaluated_clear(state: OrcaGraphState) -> bool:
+    """True only when the hard-geofence / protected-area check actually ran
+    against real spatial data for this coordinate and found the point is not
+    inside (or near) any hard geofence - a genuine "no constraint triggered"
+    finding. The Risk Engine's numeric proximity factor can still be
+    MISSING_DATA (no continuous distance-to-nearest-hard-geofence dataset is
+    configured) while this deterministic membership check is real and
+    conclusive; the two are different questions - see
+    ``app.risk.factors.evaluate_geofence_factor`` vs
+    ``app.gis.gis_geofencing.GisGeofencingAgent.query``. If the spatial
+    backend itself could not load its reference layers, this stays False so
+    the genuinely-missing wording is kept."""
+    gis = state.get("gis_result")
+    dest_geofence = state.get("dest_geofence")
+    if gis is None or dest_geofence is None:
+        return False
+    if any("static gis layers not found" in w.lower() for w in gis.warnings):
+        return False
+    if gis.backend == "unavailable":
+        return False
+    return not dest_geofence.inside_hard
+
+
 async def decision_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     if state.get("pipeline_status") in _SHORT_CIRCUIT:
         return {"agent_trace": ["decision:skip"]}
@@ -506,25 +651,109 @@ async def decision_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
     return {"decision": decision, "agent_trace": ["decision"]}
 
 
+async def _resolve_route_origin(deps, origin):  # type: ignore[no-untyped-def]
+    """Verified maritime routing origin (see app.gis.pfz_reference) - never
+    raises: any failure is treated the same as "no verified origin nearby",
+    letting the existing ORIGIN_BLOCKED path apply."""
+    try:
+        from app.gis.pfz_reference import resolve_maritime_origin
+
+        return await resolve_maritime_origin(
+            origin,
+            settings=deps.settings,
+            cache=deps.pfz_cache,
+            land_backend=deps.route_agent.land_backend,
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("maritime origin resolution node error: %s", type(exc).__name__)
+        return None
+
+
+_NO_MARITIME_ORIGIN_MESSAGE = (
+    "No verified maritime departure point is available here. "
+    "Select a fishing harbour or landing centre."
+)
+
+
+def _mangaluru_demo_assumption(u):  # type: ignore[no-untyped-def]
+    """Phase 9.x: the ONE narrowly-scoped demo planning assumption - see
+    app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR. Applies only when Query
+    Understanding itself recognized the query's place name as Mangaluru/
+    Mangalore (never inferred from coordinates), so it cannot fire for any
+    other on-land origin - those still fail honestly as ORIGIN_BLOCKED."""
+    from app.gis.pfz_reference import (
+        MANGALURU_FISHING_HARBOUR,
+        MaritimeOriginResolution,
+        is_recognized_mangaluru_query,
+    )
+
+    if u.origin is None or not is_recognized_mangaluru_query(u.origin.name):
+        return None
+    return MaritimeOriginResolution(
+        coordinate=MANGALURU_FISHING_HARBOUR,
+        substituted=True,
+        assumed=True,
+        landing_centre_name="Mangaluru Fishing Harbour",
+    )
+
+
 # ---- routing ----------------------------------------------------------
 async def route_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     u = state["understanding"]
     decision = state.get("decision")
     if decision is None:
         return {"agent_trace": ["route:skip"]}
+
+    origin = state.get("resolved_origin")
+    maritime_origin = None
+    # Only a routing request needs a verified *maritime* origin; the ordinary
+    # safety-query coordinate (`resolved_origin`, already used upstream by
+    # weather/risk/safety) is never touched here - only the coordinate handed
+    # to RouteAgent for THIS route may be substituted.
+    if u.requests_route and origin is not None:
+        maritime_origin = await _resolve_route_origin(deps, origin)
+        if maritime_origin is not None and maritime_origin.unavailable:
+            # No verified live INCOIS substitution - the ONE recognized demo
+            # exception (Mangaluru Fishing Harbour) still applies; every
+            # other on-land origin stays honestly unavailable/ORIGIN_BLOCKED.
+            assumption = _mangaluru_demo_assumption(u)
+            if assumption is not None:
+                maritime_origin = assumption
+        if maritime_origin is not None and not maritime_origin.unavailable:
+            origin = maritime_origin.coordinate
+
     ra = deps.route_agent.plan(
         understanding=u,
         decision=decision,
-        origin=state.get("resolved_origin"),
+        origin=origin,
         destination=state.get("resolved_destination"),
         hard_geofences=deps.hard_geofences,
         soft_geofences=deps.soft_geofences,
         risk=state.get("risk_result"),
         destination_geofence=state.get("dest_geofence"),
+        # Phase 9.x: `assumed` is true ONLY for the narrowly-scoped Mangaluru
+        # Fishing Harbour demo planning assumption (never for an ordinary
+        # INCOIS-verified substitution) - see
+        # app.routing.planner.plan_route's `allow_blocked_origin_cell`
+        # docstring for what this does and does not excuse.
+        allow_blocked_origin_cell=bool(maritime_origin is not None and maritime_origin.assumed),
     )
+    route = ra.route
+    if (
+        route is not None
+        and route.status is RouteStatus.ORIGIN_BLOCKED
+        and maritime_origin is not None
+        and maritime_origin.unavailable
+    ):
+        route = route.model_copy(
+            update={"reasons": route.reasons + (_NO_MARITIME_ORIGIN_MESSAGE,)}
+        )
+        ra = ra.model_copy(update={"route": route})
+
     updates: dict = {
         "route_agent_result": ra,
         "route_result": ra.route,
+        "maritime_origin": maritime_origin,
         "agent_trace": ["route" if ra.ran else "route:skip"],
     }
     if ra.downgraded and ra.safety_after_route is not None:
@@ -546,6 +775,98 @@ async def alerts_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         conflicts=tuple(state.get("conflicts", ())),
     )
     return {"alerts": alerts, "agent_trace": ["alerts"]}
+
+
+def _whatif_tier_value(breakpoints, tier: str) -> float:  # type: ignore[no-untyped-def]
+    """Resolve a qualitative intensity tier against the SAME breakpoints the
+    live RiskEngine already uses for this factor - never a number invented by
+    query understanding or by this node. "very_high" is the factor's top
+    (saturating) breakpoint; "high" is the next one down."""
+    if tier == "very_high" or len(breakpoints) < 2:
+        return breakpoints[-1][0]
+    return breakpoints[-2][0]
+
+
+def _build_whatif_perturbation(hyp, risk_input: RiskEngineInput, risk_engine):  # type: ignore[no-untyped-def]
+    """Turn a deterministically-extracted :class:`HypotheticalSpec` into a
+    bounded :class:`ScenarioPerturbation` against THIS turn's own realised
+    risk input - the same perturbation shape ``POST /whatif`` accepts. Returns
+    ``None`` when there is no live baseline value to perturb, or the assumed
+    condition is already met (nothing to simulate)."""
+    from app.whatif.models import MAX_WAVE_DELTA_M, MAX_WIND_DELTA_MS, ScenarioPerturbation
+
+    if hyp.variable == "wave_height":
+        baseline, factor_name, max_delta = risk_input.wave_height_m, "wave", MAX_WAVE_DELTA_M
+    elif hyp.variable == "wind_speed":
+        baseline, factor_name, max_delta = risk_input.wind_speed_ms, "wind", MAX_WIND_DELTA_MS
+    else:
+        return None
+    if baseline is None:
+        return None
+
+    if hyp.mode.value == "absolute":
+        target = hyp.value
+    else:
+        breakpoints = risk_engine.config.factor(factor_name).breakpoints
+        target = _whatif_tier_value(breakpoints, hyp.tier or "high")
+    if target is None:
+        return None
+
+    delta = round(target - baseline, 4)
+    delta = max(-max_delta, min(max_delta, delta))
+    if delta == 0:
+        return None
+    kwargs = (
+        {"wave_height_delta_m": delta}
+        if hyp.variable == "wave_height"
+        else {"wind_speed_delta_ms": delta}
+    )
+    try:
+        return ScenarioPerturbation(**kwargs)
+    except Exception:  # noqa: BLE001 - an out-of-range/invalid delta just skips the simulation
+        return None
+
+
+async def whatif_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Deterministic hypothetical/"what-if" scenario for an explicit
+    ``QueryIntent.WHAT_IF`` query (see
+    ``app.agents.query_understanding._detect_hypothetical``).
+
+    Reuses the SAME deterministic chain ``POST /whatif`` already uses
+    (``app.whatif.engine.run_what_if`` -> ``RiskEngine.evaluate`` ->
+    ``evaluate_safety`` -> ``decide``), perturbing a COPY of THIS turn's own
+    realised ``risk_input`` - never a second RiskEngine, never a hardcoded
+    score or decision. Strictly downstream of decision/policy and
+    non-blocking: any failure or missing precondition (no baseline, nothing
+    to perturb) resolves to ``None``, never a graph failure."""
+    if state.get("pipeline_status") in _SHORT_CIRCUIT:
+        return {"whatif_result": None, "agent_trace": ["whatif:skip"]}
+    u = state.get("understanding")
+    risk_input = state.get("risk_input")
+    if u is None or u.intent is not QueryIntent.WHAT_IF or u.hypothetical is None or risk_input is None:
+        return {"whatif_result": None, "agent_trace": ["whatif:skip"]}
+
+    perturbation = _build_whatif_perturbation(u.hypothetical, risk_input, deps.risk_engine)
+    if perturbation is None:
+        return {"whatif_result": None, "agent_trace": ["whatif:skip"]}
+
+    safety = state.get("safety_result")
+    required_evidence_present = not (
+        safety is not None and "required_evidence_missing" in safety.triggered_rules
+    )
+    try:
+        from app.whatif.engine import run_what_if
+
+        result = run_what_if(
+            baseline_input=risk_input,
+            perturbation=perturbation,
+            risk_engine=deps.risk_engine,
+            required_evidence_present=required_evidence_present,
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("whatif node error: %s", type(exc).__name__)
+        return {"whatif_result": None, "agent_trace": ["whatif:skip"]}
+    return {"whatif_result": result, "agent_trace": ["whatif"]}
 
 
 async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
@@ -648,7 +969,9 @@ async def productivity_node(deps, state: OrcaGraphState) -> dict:  # type: ignor
     engine = getattr(deps, "productivity_engine", None)
     u = state.get("understanding")
     fabric = state.get("fabric")
-    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    is_env_intent = u is not None and u.intent in (
+        QueryIntent.ENVIRONMENTAL_CONDITIONS, QueryIntent.RESEARCH_QUERY,
+    )
 
     if engine is None or (not is_env_intent and not _has_usable_env_record(fabric)):
         return {"productivity_result": None, "agent_trace": ["productivity:skip"]}
@@ -691,7 +1014,9 @@ async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  #
     fabric = state.get("fabric")
     coord = state.get("resolved_origin")
 
-    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    is_env_intent = u is not None and u.intent in (
+        QueryIntent.ENVIRONMENTAL_CONDITIONS, QueryIntent.RESEARCH_QUERY,
+    )
     wants = bool(getattr(u, "wants_comparison", False)) if u is not None else False
 
     if (
@@ -834,7 +1159,9 @@ async def environmental_neighbourhood_node(deps, state: OrcaGraphState) -> dict:
     fabric = state.get("fabric")
     coord = state.get("resolved_origin")
 
-    is_env_intent = u is not None and u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    is_env_intent = u is not None and u.intent in (
+        QueryIntent.ENVIRONMENTAL_CONDITIONS, QueryIntent.RESEARCH_QUERY,
+    )
     chl_current = _env_observation(state, fabric, "chlorophyll_a", role="current")
     usable = chl_current is not None and chl_current.usable
 
@@ -972,6 +1299,299 @@ async def environmental_evidence_node(deps, state: OrcaGraphState) -> dict:  # t
     }
 
 
+def _agent_result_observation(res, variable: str):  # type: ignore[no-untyped-def]
+    """One observation for `variable` out of a raw AgentResult, shaped as an
+    EnvironmentalObservation for the research renderer. Used ONLY for a
+    research SECOND location (see `_fetch_research_location`) - a lightweight,
+    honestly-labelled isolated reading, never added to the Marine Data Fabric,
+    fusion, arbitration or the Temporal Validity Gate's gated set (same
+    posture as app.agents.historical_environment)."""
+    from app.models.environmental import EnvironmentalObservation
+
+    if res is None or not getattr(res, "observations", None):
+        return None
+    obs = next(
+        (o for o in res.observations if o.variable == variable and o.value is not None),
+        None,
+    )
+    if obs is None:
+        return None
+    ts = obs.observed_at or obs.valid_from
+    tier = res.source_status.tier.value if res.source_status is not None else "MISSING"
+    validity = "VALID" if tier in ("LIVE", "CACHE") else "STALE" if tier == "DEMO" else "MISSING"
+    return EnvironmentalObservation(
+        variable=variable,
+        value=obs.value,
+        unit=obs.unit,
+        validity=validity,
+        data_tier=tier,
+        source=(res.source_status.source if res.source_status is not None else obs.source) or obs.source,
+        source_tier=int(obs.source_tier),
+        observed_at=ts.isoformat() if ts is not None else None,
+    )
+
+
+def _oceansat2_dataset_used(stats, location_name: str | None):  # type: ignore[no-untyped-def]
+    """Turn one real Oceansat-2 historical reference statistic into a
+    render-facing ``ResearchDatasetUsed`` entry. The full truthful metadata
+    (INCOIS Oceansat-2 OCM, historical local dataset, Mangalore/Netravati box,
+    coverage period, satellite-derived TSM, not direct in-situ turbidity)
+    lives in ``source``/``observed_at`` so it is guaranteed to render - see
+    app.agents.evidence_explanation._render_research_intent's `research_data_line`."""
+    from app.models.research import ResearchDatasetUsed
+
+    if stats.variable == "CHL":
+        variable_key = "chlorophyll_a"
+        source = (
+            "INCOIS Oceansat-2 OCM chlorophyll-a - historical local NetCDF archive, "
+            "Mangalore/Netravati coastal box, nearest valid grid cell "
+            f"{stats.cell_latitude:.3f}N {stats.cell_longitude:.3f}E "
+            f"({stats.distance_km:.1f} km away), median of {stats.n_valid}/{stats.n_total} "
+            "cloud-free days"
+        )
+    else:
+        variable_key = "suspended_matter_proxy"
+        source = (
+            "INCOIS Oceansat-2 OCM Total Suspended Matter (TSM) - a satellite "
+            "suspended-matter/turbidity PROXY, NOT direct in-situ turbidity or "
+            "salinity, historical local NetCDF archive, Mangalore/Netravati coastal "
+            f"box, nearest valid grid cell {stats.cell_latitude:.3f}N "
+            f"{stats.cell_longitude:.3f}E ({stats.distance_km:.1f} km away), median of "
+            f"{stats.n_valid}/{stats.n_total} cloud-free days"
+        )
+    return ResearchDatasetUsed(
+        variable=variable_key,
+        value=round(stats.median, 3),
+        unit=stats.unit,
+        location=location_name,
+        source=source,
+        observed_at=f"{stats.coverage_start} to {stats.coverage_end} (historical archive, not live)",
+        validity="historical reference",
+    )
+
+
+async def _fetch_research_location(deps, state: OrcaGraphState, coord: Coordinate, name: str | None):  # type: ignore[no-untyped-def]
+    """Isolated, non-blocking SST + chlorophyll-a reading for a SECOND named
+    research location (e.g. the "Surathkal" in "between Ullal and Surathkal",
+    or "Ullal" in "Bengre spit versus erosion at Ullal"). At most two extra
+    HTTP calls, the SAME agents the primary location already uses - never a
+    new data source. Any failure degrades to a missing reading for that
+    variable; it never raises and never touches the Marine Data Fabric, risk,
+    safety, decision, route or suitability."""
+    from app.models.research import ResearchLocationObservation
+
+    when = state["decision_time"]
+    sst_obs = None
+    chl_obs = None
+    ocean_agent = getattr(deps, "ocean_agent", None)
+    env_agent = getattr(deps, "environment_agent", None)
+    if ocean_agent is not None:
+        try:
+            res = await ocean_agent.fetch(coord, when)
+            sst_obs = _agent_result_observation(res, "sea_surface_temperature")
+        except Exception as exc:  # noqa: BLE001 - non-blocking
+            logger.warning("research second-location SST fetch failed: %s", type(exc).__name__)
+    if env_agent is not None:
+        try:
+            res = await env_agent.fetch(coord, when)
+            chl_obs = _agent_result_observation(res, "chlorophyll_a")
+        except Exception as exc:  # noqa: BLE001 - non-blocking
+            logger.warning("research second-location chlorophyll fetch failed: %s", type(exc).__name__)
+    gis_res = None
+    gis_agent = getattr(deps, "gis_agent", None)
+    if gis_agent is not None:
+        try:
+            gis_res = await gis_agent.query(coord)
+        except Exception as exc:  # noqa: BLE001 - non-blocking
+            logger.warning("research second-location GIS fetch failed: %s", type(exc).__name__)
+    return ResearchLocationObservation(
+        name=name or "second location",
+        coordinate=coord,
+        sst=sst_obs,
+        chlorophyll_a=chl_obs,
+        coastline_distance_m=(getattr(gis_res, "coastline_distance_m", None)),
+        depth_m=(getattr(gis_res, "depth_m", None)),
+    )
+
+
+async def research_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Marine Researcher / Oceanographer analytical support.
+
+    Runs strictly downstream of environmental_evidence and is completely
+    isolated from Risk / Safety / Decision / Suitability / geofencing /
+    routing / alerts, the Marine Data Fabric, fusion, arbitration and the
+    Temporal Validity Gate's gated set - the same posture as productivity_node
+    / environmental_comparison_node. Gated on intent == RESEARCH_QUERY.
+
+    A SUPPORTED or PARTIAL capability_status (see
+    app.agents.query_understanding / app.research.capability) keeps the whole
+    pipeline running upstream, so fabric / productivity_result /
+    environmental_comparison already carry whatever SST / chlorophyll-a ORCA
+    could fetch for the primary location (identical reuse to
+    QueryIntent.ENVIRONMENTAL_CONDITIONS - see the widened `is_env_intent`
+    checks above). This node only adds the research-specific structure on top
+    of that: an R2-style chlorophyll-a anomaly classification, an isolated
+    second-location fetch for a spatial comparison (Bengre vs Ullal, Ullal vs
+    Surathkal), and the dataset/capability summary the researcher template
+    renders. A fully UNSUPPORTED capability_status short-circuits the whole
+    graph before this node ever runs (see STATUS_UNSUPPORTED) - the
+    evidence_explanation template renders that case from `understanding`
+    alone, with no live fetch spent.
+    """
+    from app.models.query import AnalysisType, ResearchDomain
+    from app.models.research import (
+        ResearchDatasetUsed,
+        ResearchLocationObservation,
+        ResearchResult,
+        ResearchSpatialComparison,
+    )
+    from app.research import capability as research_capability
+    from app.research.anomaly import classify_chlorophyll_anomaly
+    from app.services import oceansat2 as oceansat2_service
+
+    u = state.get("understanding")
+    if (
+        state.get("pipeline_status") in _SHORT_CIRCUIT
+        or u is None
+        or u.intent is not QueryIntent.RESEARCH_QUERY
+    ):
+        return {"research_result": None, "agent_trace": ["research:skip"]}
+
+    fabric = state.get("fabric")
+    productivity = state.get("productivity_result")
+    comparison = state.get("environmental_comparison")
+    gis = state.get("gis_result")
+
+    sst_current = _env_observation(state, fabric, "sea_surface_temperature", role="current")
+    chl_current = _env_observation(state, fabric, "chlorophyll_a", role="current")
+
+    origin = state.get("resolved_origin")
+    origin_name = u.origin.name if u.origin is not None else None
+    datasets_used: list[ResearchDatasetUsed] = []
+    for var, obs in (
+        ("sea_surface_temperature", sst_current), ("chlorophyll_a", chl_current)
+    ):
+        if obs is not None and obs.value is not None:
+            datasets_used.append(
+                ResearchDatasetUsed(
+                    variable=var, value=obs.value, unit=obs.unit,
+                    location=origin_name, source=obs.source,
+                    observed_at=obs.observed_at, validity=obs.validity,
+                )
+            )
+
+    anomaly = None
+    if u.research_domain is ResearchDomain.CHLOROPHYLL_ANOMALY:
+        current_class = productivity.chlorophyll_class if productivity is not None else None
+        anomaly = classify_chlorophyll_anomaly(
+            comparison.chlorophyll_a if comparison is not None else None,
+            current_class=current_class,
+        )
+
+    spatial_comparison = None
+    destination = state.get("resolved_destination")
+    if destination is not None and origin is not None:
+        dest_name = u.destination.name if u.destination is not None else None
+        second = await _fetch_research_location(deps, state, destination, dest_name)
+        point_a = ResearchLocationObservation(
+            name=origin_name or "location A",
+            coordinate=origin,
+            sst=sst_current,
+            chlorophyll_a=chl_current,
+            coastline_distance_m=(gis.coastline_distance_m if gis is not None else None),
+            depth_m=(gis.depth_m if gis is not None else None),
+        )
+        spatial_comparison = ResearchSpatialComparison(point_a=point_a, point_b=second)
+        for var, obs in (
+            ("sea_surface_temperature", second.sst), ("chlorophyll_a", second.chlorophyll_a)
+        ):
+            if obs is not None and obs.value is not None:
+                datasets_used.append(
+                    ResearchDatasetUsed(
+                        variable=var, value=obs.value, unit=obs.unit,
+                        location=second.name, source=obs.source,
+                        observed_at=obs.observed_at, validity=obs.validity,
+                    )
+                )
+
+    assessment = research_capability.assess(u.datasets_required)
+
+    # ---- INCOIS Oceansat-2 OCM: local historical CHL/TSM archive (R2/R3) ----
+    # Read-only, deterministic, fully offline (see app.services.oceansat2).
+    # Silently a no-op wherever it doesn't apply: outside the dataset's fixed
+    # Mangalore/Netravati box, when the file is missing, or when this request
+    # names neither a chlorophyll anomaly nor a river-discharge/turbidity/
+    # suspended-matter/Oceansat-2 topic. Never replaces NOAA CoastWatch as the
+    # current/live chlorophyll-a source - it only ADDS a clearly-labelled
+    # historical reference dataset entry alongside whatever `datasets_used`
+    # already holds.
+    extra_limitations: list[str] = []
+    if origin is not None:
+        oceansat2_ds = oceansat2_service.get_dataset(getattr(deps, "settings", None))
+        if oceansat2_ds is not None:
+            wants_chl_reference = u.research_domain is ResearchDomain.CHLOROPHYLL_ANOMALY
+            wants_tsm = (
+                u.research_domain is ResearchDomain.RIVER_DISCHARGE_COASTAL
+                or "suspended_matter_proxy" in u.research_variables
+            )
+            wants_oceansat = "oceansat2_ocm" in u.research_variables
+            if wants_chl_reference or wants_oceansat:
+                chl_stats = oceansat2_ds.reference_stats(
+                    "CHL", origin.latitude, origin.longitude
+                )
+                if chl_stats is not None:
+                    datasets_used.append(_oceansat2_dataset_used(chl_stats, origin_name))
+                    if wants_chl_reference:
+                        extra_limitations.append(
+                            "INCOIS Oceansat-2 OCM historical chlorophyll-a reference "
+                            f"covers {chl_stats.coverage_start} to {chl_stats.coverage_end} "
+                            f"only ({chl_stats.n_valid}/{chl_stats.n_total} cloud-free days "
+                            f"at the nearest valid grid cell, {chl_stats.distance_km:.1f} km "
+                            "away); shown for historical context alongside the current "
+                            "NOAA CoastWatch reading above, not extrapolated to the present, "
+                            "and not used in the anomaly classification above."
+                        )
+            if wants_tsm or wants_oceansat:
+                tsm_stats = oceansat2_ds.reference_stats(
+                    "TSM", origin.latitude, origin.longitude
+                )
+                if tsm_stats is not None:
+                    datasets_used.append(_oceansat2_dataset_used(tsm_stats, origin_name))
+
+    # ---- general "what datasets do you have" capability listing ----
+    notes: tuple[str, ...] = ()
+    if (
+        u.research_domain is ResearchDomain.GENERAL_ENVIRONMENTAL
+        and u.analysis_type is AnalysisType.DATASET_COMPARISON
+    ):
+        notes = research_capability.configured_datasets_summary()
+
+    place_bits = [n for n in (origin_name, (u.destination.name if u.destination else None)) if n]
+    spatial_description = (
+        " and ".join(place_bits) if place_bits else "an unresolved location"
+    )
+    temporal_description = (
+        u.temporal_scope.value.replace("_", " ") if u.temporal_scope is not None else "current"
+    )
+
+    result = ResearchResult(
+        research_domain=u.research_domain or ResearchDomain.GENERAL_ENVIRONMENTAL,
+        analysis_type=u.analysis_type or AnalysisType.SCIENTIFIC_SUMMARY,
+        spatial_description=spatial_description,
+        temporal_description=temporal_description,
+        capability=assessment,
+        datasets_used=tuple(datasets_used),
+        anomaly=anomaly,
+        spatial_comparison=spatial_comparison,
+        limitations=tuple(
+            [f"{v}: {research_capability.reason_for(v)}" for v in assessment.unavailable]
+            + extra_limitations
+        ),
+        notes=notes,
+    )
+    return {"research_result": result, "agent_trace": ["research"]}
+
+
 async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     prov = build_provenance(
         message=state["message"],
@@ -1020,8 +1640,72 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         environmental_evidence=state.get("environmental_evidence"),
         stability=state.get("environmental_stability"),
         neighbourhood=state.get("environmental_neighbourhood"),
+        research=state.get("research_result"),
+        pfz=state.get("pfz_result"),
+        pfz_route_destination=state.get("pfz_route_destination"),
+        advisory_clear=_advisory_evaluated_clear(state),
+        geofence_clear=_geofence_evaluated_clear(state),
+        gis=state.get("gis_result"),
     )
+    expl = _append_pfz_auto_route_note(state, expl, language)
+    expl = _apply_whatif_answer(state, expl)
     return {"explanation": expl, "agent_trace": ["explain"]}
+
+
+def _apply_whatif_answer(state: OrcaGraphState, expl):  # type: ignore[no-untyped-def]
+    """For an explicit hypothetical query, the deterministic scenario
+    simulation IS the answer - replace the (template or Groq) explanation
+    text with ``run_what_if``'s own deterministic sentence, which already
+    carries the ``SIMULATION - NOT LIVE DATA`` label so it can never be
+    confused with a live observation. No-op for every other query."""
+    result = state.get("whatif_result")
+    if result is None:
+        return expl
+    return expl.model_copy(update={"text": result.explanation})
+
+
+def _append_pfz_auto_route_note(state: OrcaGraphState, expl, language):  # type: ignore[no-untyped-def]
+    """Deterministic, always-on notice for an explicit compound "PFZ + route"
+    request (see ``normalize`` / ``pfz_route_destination``) - added AFTER the
+    (template or Groq) explanation is generated, never sent through the LLM
+    grounding path, so it always appears verbatim regardless of LLM
+    availability/output. No-op for every other query, including a PFZ-only
+    request or a route to an explicit, named destination."""
+    from app.i18n.messages import frag
+
+    pfz_route_destination = state.get("pfz_route_destination")
+    if pfz_route_destination is None:
+        return expl
+    route = state.get("route_result")
+    decision = state.get("decision")
+    if pfz_route_destination.available and route is not None and route.status is RouteStatus.ROUTE_FOUND:
+        note = frag(language, "pfz_route_auto_found")
+    elif not pfz_route_destination.available:
+        note = frag(language, "pfz_route_auto_unavailable")
+    elif pfz_route_destination.available and route is not None:
+        # A PFZ zone WAS found, but the route to it hit a real deterministic
+        # block (e.g. a hard geofence, ORIGIN_BLOCKED, NO_ROUTE) - state that
+        # actual reason honestly rather than staying silent.
+        reason = route.reasons[0] if route.reasons else route.status.value
+        note = frag(language, "pfz_route_auto_blocked", status=route.status.value, reason=reason)
+    elif (
+        pfz_route_destination.available
+        and route is None
+        and decision is not None
+        and not decision.routing_allowed
+    ):
+        # The nearest PFZ zone WAS found, but routing was never attempted
+        # because the Decision Engine did not permit it for this turn (e.g.
+        # NO_SAFE_RECOMMENDATION from missing safety evidence) - the genuine
+        # reason, not a generic failure.
+        reason = decision.reasons[0] if decision.reasons else decision.status.value
+        note = frag(
+            language, "pfz_route_auto_not_attempted",
+            status=decision.status.value, reason=reason,
+        )
+    else:
+        return expl
+    return expl.model_copy(update={"text": f"{note} {expl.text}".strip()})
 
 
 async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]

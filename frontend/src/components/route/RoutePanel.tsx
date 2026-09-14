@@ -31,6 +31,9 @@ export function RoutePanel({ resp }: { resp: QueryResponse }) {
             </ul>
           </div>
         )}
+        {r.maritime_origin_assumed && r.origin_note && (
+          <p className="route__origin-assumption">⚠ {r.origin_note}</p>
+        )}
       </Panel>
     );
   }
@@ -67,6 +70,9 @@ export function RoutePanel({ resp }: { resp: QueryResponse }) {
           <p className="route__validated">
             {r.validation_passed ? `✓ ${t("route.validated")}` : "⚠ validation failed"}
           </p>
+        )}
+        {r.maritime_origin_assumed && r.origin_note && (
+          <p className="route__origin-assumption">⚠ {r.origin_note}</p>
         )}
         {r.marine_cost_enabled && (
           <div className="route__marine">

@@ -380,10 +380,15 @@ _FIXTURES = {
     "route_dest_blocked": lambda: dict(hard_geofences=[
         _hard_zone("kochi-box", "POLYGON((76.0 9.7, 76.5 9.7, 76.5 10.2, 76.0 10.2, 76.0 9.7))"),
     ]),
-    # A mid-corridor exclusion box astride the direct Mangalore->Kochi line,
-    # with open sea to its south so a real detour exists.
+    # A mid-corridor exclusion box astride the direct Mangaluru Fishing
+    # Harbour -> Kozhikode line (the verified-navigable pair 06_route_around
+    # _geofence uses - see app.scenario.library), with open water to its
+    # west/south so a real detour exists. Confirmed against the real
+    # bathymetry backend: the unobstructed route crosses this box (10 of 34
+    # waypoints fall inside it); with the geofence, A* finds a 40-waypoint
+    # detour around its west/south side with zero waypoints inside it.
     "route_around": lambda: dict(hard_geofences=[
-        _hard_zone("mid-box", "POLYGON((75.15 10.60, 75.70 10.60, 75.70 12.20, 75.15 12.20, 75.15 10.60))"),
+        _hard_zone("mid-box", "POLYGON((75.05 11.70, 75.45 11.70, 75.45 12.20, 75.05 12.20, 75.05 11.70))"),
     ]),
     # A full-height wall spanning the whole padded grid -> no navigable path.
     "route_no_path": lambda: dict(hard_geofences=[

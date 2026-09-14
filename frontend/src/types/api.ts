@@ -8,6 +8,7 @@ export type QueryStatus =
   | "OK"
   | "CLARIFICATION_NEEDED"
   | "QUERY_UNDERSTANDING_FAILED"
+  | "CAPABILITY_UNSUPPORTED"
   | "ERROR";
 
 export type DecisionStatus =
@@ -283,6 +284,23 @@ export interface RouteInfo {
   total_route_cost?: number | null;
   omitted_cost_factors?: string[];
   warnings?: string[];
+  // True when `origin` is a verified maritime departure point substituted for
+  // the query location (e.g. an official INCOIS landing centre standing in
+  // for a city coordinate that is on land). `origin_note` names it when known.
+  maritime_origin_verified?: boolean;
+  origin_note?: string | null;
+  // True only for the narrowly-scoped Mangaluru Fishing Harbour demo planning
+  // assumption (the verified harbour reference stands in for the departure
+  // point because no authoritative harbour-mouth coordinate is available).
+  // `origin_note` always carries the required disclosure text when this is true.
+  maritime_origin_assumed?: boolean;
+  // True when `destination` was automatically derived from the nearest
+  // official INCOIS PFZ zone for an explicit "PFZ + route" compound
+  // natural-language request (e.g. "Show me the nearest PFZ at Mangalore and
+  // route me there.") rather than a place name / explicit override.
+  // `pfz_zone_distance_km` is the straight-line distance to that zone point.
+  pfz_auto_destination?: boolean;
+  pfz_zone_distance_km?: number | null;
 }
 
 export interface ProtectedAreaInfo {
@@ -295,6 +313,13 @@ export interface ProtectedAreaInfo {
   wdpa_id: string | null;
 }
 
+// "inside" - the point is inside a hard geofence / hard-classified protected
+// area. "clear" - the hard-geofence check genuinely ran against real spatial
+// data and found nothing. "unavailable" - the spatial backend could not load
+// its reference layers, so no genuine check was performed; never render this
+// as "clear" or "0 violations".
+export type GeofenceStatus = "inside" | "clear" | "unavailable";
+
 export interface GisSummary {
   backend: string;
   eez_inside: boolean | null;
@@ -305,6 +330,7 @@ export interface GisSummary {
   inside_hard_geofence: boolean;
   hard_geofence_ids: string[];
   soft_geofence_ids: string[];
+  geofence_status: GeofenceStatus;
   protected_areas: ProtectedAreaInfo[];
 }
 

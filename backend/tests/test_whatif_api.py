@@ -103,4 +103,8 @@ def test_whatif_is_additive_query_response_unchanged(client) -> None:
     body = _seed(client, "wf-additive")
     for key in ("session_id", "turn", "status", "decision", "risk", "provenance"):
         assert key in body
-    assert "whatif" not in body  # nothing leaked into the query contract
+    # An ordinary (non-hypothetical) query computes no in-query scenario -
+    # `whatif` is a legitimate, always-present field (see QueryResponse /
+    # app.orchestration.nodes.whatif_node for the explicit what_if-intent
+    # pathway) but must stay null here; nothing leaked into this query.
+    assert body["whatif"] is None

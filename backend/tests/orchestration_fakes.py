@@ -96,24 +96,27 @@ class FakeOceanAgent:
 
 class FakeGisAgent:
     def __init__(self, *, inside_hard=False, hard_ids=(), protected_areas=(), depth_m=-560.0,
-                 fail=False, on_land=False):
+                 fail=False, on_land=False, warnings=(), backend="offline"):
         self._inside_hard = inside_hard
         self._hard_ids = tuple(hard_ids)
         self._pas = tuple(protected_areas)
         self._depth = depth_m
         self._fail = fail
         self._on_land = on_land
+        self._warnings = tuple(warnings)
+        self._backend = backend
 
     async def query(self, coordinate):
         if self._fail:
             raise RuntimeError("spatial backend unavailable")
         return GisQueryResult(
-            coordinate=coordinate, backend="offline",
+            coordinate=coordinate, backend=self._backend,
             source_status=SourceStatus(tier=DataTier.REFERENCE, source="static-gis:offline"),
             eez=EezResult(inside=True, zones=("Indian Exclusive Economic Zone",)),
             coastline_distance_m=88000.0, depth_m=self._depth, on_land=self._on_land,
             protected_areas=self._pas,
             inside_hard_geofence=self._inside_hard, hard_geofence_ids=self._hard_ids,
+            warnings=self._warnings,
         )
 
 

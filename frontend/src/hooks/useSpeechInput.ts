@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LanguageCode } from "../types/api";
 import {
+  checkMicrophoneAccess,
+  classifyRecognitionError,
   createRecognizer,
   isSttSupported,
+  type MicErrorKind,
   type Recognizer,
 } from "../services/speech";
+
+export type SpeechInputError = MicErrorKind | "unsupported";
 
 export interface SpeechInput {
   /** Browser exposes SpeechRecognition at all. */
   supported: boolean;
   /** A recognition session is currently active. */
   listening: boolean;
-  /** Last error code (e.g. "not-allowed", "no-speech", "language-not-supported"). */
-  error: string | null;
+  /** Last failure category, or null when there is none to report. */
+  error: SpeechInputError | null;
   start: () => void;
   stop: () => void;
   toggle: () => void;
@@ -24,8 +29,11 @@ export interface SpeechInput {
  * never auto-submitted, so the user reviews / edits before pressing Send and the
  * normal ORCA pipeline is always used.
  *
- * A missing API or a denied microphone permission only sets `error`; it never
- * throws and never blocks typing.
+ * `start()` first runs a capability probe (secure-context + getUserMedia) so
+ * "permission denied", "no device" and "insecure connection" are distinguished
+ * up front, then starts SpeechRecognition itself. Only a genuine failure sets
+ * `error`; transient/expected codes (brief silence, the normal stop path) are
+ * swallowed. Typing always stays available regardless of `error`.
  */
 export function useSpeechInput(
   lang: LanguageCode,
@@ -33,8 +41,9 @@ export function useSpeechInput(
 ): SpeechInput {
   const supported = isSttSupported();
   const [listening, setListening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SpeechInputError | null>(null);
   const recRef = useRef<Recognizer | null>(null);
+  const requestingRef = useRef(false);
   const onTextRef = useRef(onFinalText);
   onTextRef.current = onFinalText;
 
@@ -42,15 +51,14 @@ export function useSpeechInput(
     recRef.current?.stop();
   }, []);
 
-  const start = useCallback(() => {
-    if (!supported || recRef.current) return;
-    setError(null);
+  const beginRecognition = useCallback(() => {
     const rec = createRecognizer(lang, {
       onResult: (text, isFinal) => {
         if (isFinal && text) onTextRef.current(text);
       },
       onError: (code) => {
-        setError(code);
+        const kind = classifyRecognitionError(code);
+        if (kind) setError(kind);
         setListening(false);
         recRef.current = null;
       },
@@ -66,7 +74,26 @@ export function useSpeechInput(
     recRef.current = rec;
     setListening(true);
     rec.start();
-  }, [supported, lang]);
+  }, [lang]);
+
+  const start = useCallback(() => {
+    if (!supported || recRef.current || requestingRef.current) return;
+    setError(null);
+    requestingRef.current = true;
+    checkMicrophoneAccess()
+      .then((access) => {
+        requestingRef.current = false;
+        if (!access.ok) {
+          setError(access.reason);
+          return;
+        }
+        beginRecognition();
+      })
+      .catch(() => {
+        requestingRef.current = false;
+        beginRecognition();
+      });
+  }, [supported, beginRecognition]);
 
   const toggle = useCallback(() => {
     if (recRef.current) stop();

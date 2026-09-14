@@ -70,6 +70,7 @@ class RouteAgent:
         soft_geofences: Sequence[Geofence] = (),
         risk: RiskResult | None = None,
         destination_geofence: GeofenceResult | None = None,
+        allow_blocked_origin_cell: bool = False,
     ) -> RouteAgentResult:
         # ---- conditions to run at all ----
         if not understanding.requests_route:
@@ -94,7 +95,18 @@ class RouteAgent:
         grid = _grid_for(origin, destination, self.settings)
         request = RouteRequest(origin=origin, destination=destination, grid=grid)
         all_geofences = list(hard_geofences) + list(soft_geofences)
-        route = plan_route(request, all_geofences, self.land_backend, risk=risk)
+        # `allow_blocked_origin_cell` (Phase 9.x): the ONE narrowly-scoped
+        # Mangaluru Fishing Harbour demo start-node exception - see
+        # app.routing.planner.plan_route's docstring. The caller (route_node)
+        # only ever sets this True when `origin` is itself the verified
+        # harbour reference substituted by the recognized demo assumption.
+        route = plan_route(
+            request,
+            all_geofences,
+            self.land_backend,
+            risk=risk,
+            allow_blocked_origin_cell=allow_blocked_origin_cell,
+        )
 
         route_geofence: GeofenceResult | None = None
         safety_after: SafetyGuardResult | None = None

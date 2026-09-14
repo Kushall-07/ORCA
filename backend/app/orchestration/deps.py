@@ -29,9 +29,10 @@ from app.services import oceancolor
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
 from app.models.reference import ReferenceArtifact
+from app.core.redis import get_redis
 from app.reasoning.arbitration import HierarchyArbitrator
 from app.risk.engine import RiskEngine
-from app.services.cache import InMemoryCache, JsonCache
+from app.services.cache import InMemoryCache, JsonCache, RedisCache
 from app.services.llm import build_llm_client
 from app.session.store import InMemorySessionStore, SessionStore
 from app.suitability.engine import SuitabilityEngine
@@ -102,20 +103,33 @@ class OrcaDeps:
 def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
     settings = settings or get_settings()
     llm = build_llm_client(settings)
+    # Shared Redis-backed cache for the live fetch agents (weather / ocean /
+    # environment / advisory). Without this they fell back to a NullCache, so
+    # every transient upstream hiccup skipped straight past the CACHE tier to
+    # a hard "missing" result instead of replaying a recent LIVE reading -
+    # RedisCache degrades to a cache miss on any Redis failure, never raises,
+    # so this is a strict improvement with no new failure mode.
+    live_cache = JsonCache(RedisCache(get_redis()))
     return OrcaDeps(
         settings=settings,
         qu_agent=QueryUnderstandingAgent(llm, max_retries=settings.llm_max_retries),
-        weather_agent=WeatherAgent(settings=settings),
-        ocean_agent=OceanographicAgent(settings=settings),
+        weather_agent=WeatherAgent(settings=settings, cache=live_cache),
+        ocean_agent=OceanographicAgent(settings=settings, cache=live_cache),
         gis_agent=GisGeofencingAgent(),
-        explanation_agent=ExplanationAgent(llm, max_retries=settings.llm_max_retries),
+        # Fix 1 (UX hardening): the final answer must be simple enough for a
+        # non-technical fisherman, every time. An LLM's phrasing is not
+        # reliably "simple" even when its numbers are grounded, so the answer
+        # is always the deterministic plain-language template - see
+        # ExplanationAgent.explain / render_template. Query Understanding
+        # still uses Groq for intent/place parsing.
+        explanation_agent=ExplanationAgent(None, max_retries=settings.llm_max_retries),
         route_agent=RouteAgent(settings),
         risk_engine=RiskEngine(),
         suitability_engine=SuitabilityEngine(),
         arbitrator=HierarchyArbitrator(),
         session_store=InMemorySessionStore(settings.session_max_turns),
         references=load_reference_registry(),
-        environment_agent=EnvironmentalAgent(settings=settings),
+        environment_agent=EnvironmentalAgent(settings=settings, cache=live_cache),
         productivity_engine=EnvironmentalProductivityEngine(),
         comparison_engine=EnvironmentalComparisonEngine(),
         historical_environment_agent=HistoricalEnvironmentalAgent(settings=settings),
@@ -123,6 +137,6 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         stability_engine=EnvironmentalStabilityEngine(),
         neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
         neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
-        advisory_agent=MarineAdvisoryAgent(settings=settings),
+        advisory_agent=MarineAdvisoryAgent(settings=settings, cache=live_cache),
         pfz_cache=JsonCache(InMemoryCache()),
     )

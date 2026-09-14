@@ -18,6 +18,17 @@ cell being entered. Multipliers are clamped to a minimum of 1.0 so a step can
 only ever cost *more* than the base 1.0 / sqrt(2) - this keeps the existing
 heuristic admissible without any change to it, and ``cost_field=None`` (the
 default) reproduces the exact prior distance-only behaviour bit-for-bit.
+
+``allow_blocked_start`` (Phase 9.x, default ``False``) lets a caller accept a
+blocked ``start`` cell rather than immediately failing the search - see
+``app.routing.planner.plan_route``'s ``allow_blocked_origin_cell`` for the
+one narrowly-scoped caller (the Mangaluru Fishing Harbour demo assumption)
+this exists for. It affects ONLY the initial admissibility check on
+``start`` itself: every neighbour expansion still calls
+``grid.is_navigable`` unchanged, so every cell the search actually MOVES
+INTO - starting with the very first step out of ``start`` - is still held to
+the exact same land/water and diagonal corner-cutting rules as any other
+search. ``goal`` is unaffected and still rejected if blocked.
 """
 
 from __future__ import annotations
@@ -72,6 +83,7 @@ def a_star(
     allow_diagonal: bool = True,
     max_expanded: int | None = None,
     cost_field: np.ndarray | None = None,
+    allow_blocked_start: bool = False,
 ) -> tuple[list[Cell] | None, int]:
     """Return ``(path, expanded_node_count)``.
 
@@ -92,7 +104,9 @@ def a_star(
         )
     if not (grid.in_bounds(start) and grid.in_bounds(goal)):
         return None, 0
-    if grid.is_blocked(start) or grid.is_blocked(goal):
+    if grid.is_blocked(goal):
+        return None, 0
+    if grid.is_blocked(start) and not allow_blocked_start:
         return None, 0
     if start == goal:
         return [start], 0

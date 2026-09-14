@@ -79,14 +79,20 @@ SCENARIOS: tuple[Scenario, ...] = (
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
-                # The gazetteer's "Mangalore" reference point is the harbour
-                # centroid, which the git-tracked bathymetry dataset (the same
-                # one the GIS agent's `on_land` and the routing land/water
-                # constraint both use) classifies as on_land - so this
-                # deterministically comes back ORIGIN_BLOCKED, not a
-                # fabricated route. ROUTE_FOUND / NO_ROUTE are kept as
-                # possibilities in case the underlying dataset changes.
-                route_status_in=("ORIGIN_BLOCKED", "ROUTE_FOUND", "NO_ROUTE"),
+                # The Mangaluru Fishing Harbour demo assumption (see
+                # app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR) substitutes
+                # a verified navigable origin, so this no longer fails at the
+                # origin gate. "Kochi" is only an approximate gazetteer point
+                # (app.agents.gazetteer), not a verified maritime reference -
+                # its coarse 0.05 deg raster cell classifies as land even
+                # though its exact point is water, so this deterministically
+                # comes back DESTINATION_BLOCKED, not a fabricated route.
+                # ORIGIN_BLOCKED / ROUTE_FOUND / NO_ROUTE are kept as
+                # possibilities in case the underlying dataset or the origin
+                # substitution's availability changes.
+                route_status_in=(
+                    "DESTINATION_BLOCKED", "ORIGIN_BLOCKED", "ROUTE_FOUND", "NO_ROUTE",
+                ),
                 provenance_has_kinds=("route",),
                 provenance_complete=True,
             ),
@@ -118,33 +124,50 @@ SCENARIOS: tuple[Scenario, ...] = (
     ),
     Scenario(
         scenario_id="06_route_around_geofence",
-        title="Origin on land is rejected before a hard-geofence detour is even attempted",
+        title="Verified maritime origin lets a real hard-geofence detour run",
         stakeholder="marine_operator",
         fixture="route_around",
-        turns=("Give a safe sea route from Mangalore to Kochi.",),
+        # "Kozhikode" (not Kochi) is deliberately used as the destination
+        # here: it is water at BOTH its exact gazetteer point AND its 0.05
+        # deg raster cell centre (unlike Kochi - see 04_maritime_route /
+        # 05_route_destination_blocked), so this scenario can actually
+        # reach A* and prove a real hard-geofence detour instead of being
+        # pre-empted by an unrelated destination-classification gap. See
+        # tests/test_scenarios.py::test_scenario_06_route_genuinely_detours_
+        # around_the_hard_geofence for the deterministic, hard-asserted
+        # proof this scenario's flexible route_status_in below cannot give.
+        turns=("Give a safe sea route from Mangalore to Kozhikode.",),
         expects=(
             ExpectedBehavior(
                 status_in=("OK",),
                 intent="route",
                 route_present=True,
                 # The gazetteer's "Mangalore" point is on land per the real
-                # bathymetry dataset (see 04_maritime_route), so this scenario
-                # now demonstrates the land constraint rather than a
-                # geofence detour. Dedicated, non-gazetteer-coordinate unit
-                # coverage of "A* finds a real detour around a hard geofence"
-                # lives in tests/test_route_planner.py
-                # (test_route_avoids_hard_geofence /
-                # test_route_crossing_land_is_rejected_in_favour_of_going_around)
-                # and tests/test_route_agent.py.
-                route_status_in=("ORIGIN_BLOCKED",),
+                # bathymetry dataset (see 04_maritime_route); RouteAgent now
+                # resolves it to the verified Mangaluru Fishing Harbour
+                # reference (see app.gis.pfz_reference.MANGALURU_FISHING_
+                # HARBOUR) before planning, so this scenario demonstrates its
+                # original purpose - a real A* detour around the mid-corridor
+                # hard geofence. `hard_geofence_violations_max=0` and
+                # `route_waypoints_min` are the actual detour proof;
+                # ORIGIN_BLOCKED/NO_ROUTE are kept as possibilities in case
+                # no verified maritime origin is available for the dataset
+                # in use.
+                route_status_in=("ROUTE_FOUND", "ORIGIN_BLOCKED", "NO_ROUTE"),
+                route_waypoints_min=5,
+                hard_geofence_violations_max=0,
                 provenance_has_kinds=("route",),
             ),
         ),
         tags=("demo", "route", "safety"),
-        notes="The demo's 'Mangalore' coordinate is real land per the "
-              "bathymetry dataset, so the route is correctly rejected "
-              "(ORIGIN_BLOCKED) rather than fabricated - not a detour demo "
-              "any more; see test_route_planner.py for detour coverage.",
+        notes="'Mangalore' is real land per the bathymetry dataset, so "
+              "RouteAgent substitutes the verified Mangaluru Fishing Harbour "
+              "origin before planning. The destination was changed from the "
+              "unverified 'Kochi' gazetteer point to 'Kozhikode' (verified "
+              "water at both its exact point and its raster cell centre) so "
+              "the route can legitimately reach A* and detour around the "
+              "mid-corridor hard geofence instead of being pre-empted by an "
+              "unrelated destination-classification gap.",
     ),
     Scenario(
         scenario_id="07_route_no_safe_path",

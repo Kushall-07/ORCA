@@ -9,6 +9,14 @@ corner-cutting. If anything fails, the planner refuses to report ROUTE_FOUND.
 A single-point route is accepted only when ``origin`` and ``destination`` are both
 supplied and equal to that point (the origin == destination case); an
 unqualified single-point list is treated as degenerate.
+
+``allow_blocked_start_cell`` (Phase 9.x, default ``False``) mirrors
+``app.routing.planner.plan_route``'s ``allow_blocked_origin_cell`` /
+``app.routing.astar.a_star``'s ``allow_blocked_start`` - the ONE narrowly-
+scoped Mangaluru Fishing Harbour demo start-node exception. It excuses ONLY
+``cells[0]`` (the route's own start cell) from the ``cells_navigable``
+land/hard-geofence-raster check; every other cell - starting with the very
+first step out of the start - is still required to be navigable, unchanged.
 """
 
 from __future__ import annotations
@@ -32,6 +40,7 @@ def validate_route(
     origin: Coordinate | None = None,
     destination: Coordinate | None = None,
     allow_diagonal: bool = True,
+    allow_blocked_start_cell: bool = False,
 ) -> RouteValidation:
     checks_passed: list[str] = []
     violations: list[str] = []
@@ -82,7 +91,10 @@ def validate_route(
             checks_passed.append("cells_in_bounds")
         else:
             violations.append("route enters a cell outside the grid")
-        if all(grid.is_navigable(c) for c in cells):
+        navigability_checked_cells = (
+            cells[1:] if allow_blocked_start_cell and cells else cells
+        )
+        if all(grid.is_navigable(c) for c in navigability_checked_cells):
             checks_passed.append("cells_navigable")
         else:
             violations.append("route enters a blocked cell")

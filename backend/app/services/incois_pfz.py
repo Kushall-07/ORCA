@@ -43,7 +43,11 @@ from shapely.geometry import shape
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.gis.operations import distance_point_to_geometry_m, geodesic_distance_m
+from app.gis.operations import (
+    distance_point_to_geometry_m,
+    geodesic_distance_m,
+    nearest_point_on_geometry,
+)
 from app.models.common import Coordinate
 
 logger = get_logger(__name__)
@@ -450,6 +454,54 @@ def match_nearby_lines(
     return [f for _, f in scored[:max_features]]
 
 
+def nearest_pfz_zone_point(
+    lines_fc: dict[str, Any],
+    coordinate: Coordinate,
+    *,
+    state_name: str | None,
+    max_distance_km: float,
+    max_features: int,
+) -> tuple[Coordinate, dict[str, Any], float] | None:
+    """Single deterministic nearest point on any matched PFZ zone geometry, for
+    use as a routing *destination* - e.g. an explicit "nearest PFZ ... route
+    me there" request (see ``app.orchestration.nodes.normalize``).
+
+    Reuses :func:`match_nearby_lines` for the candidate set (so it never
+    considers a zone that map rendering would not also show), then - unlike
+    ``match_nearby_lines``, which may return a same-sector candidate set
+    unsorted, since it is built for display, not for picking one point -
+    resolves a single globally-nearest point via the real geodesic nearest
+    point on each candidate's actual official geometry
+    (:func:`app.gis.operations.nearest_point_on_geometry`; never an invented
+    or interpolated-off-geometry coordinate). Ties (equal distance) are
+    broken by each candidate's position in ``match_nearby_lines``'s own
+    result order, which is itself deterministic for a given cached fetch -
+    so repeated calls for the same inputs always return the same point.
+    Returns ``None`` when no candidate falls within ``max_distance_km``.
+    """
+    candidates = match_nearby_lines(
+        lines_fc, coordinate, state_name=state_name,
+        max_distance_km=max_distance_km, max_features=max_features,
+    )
+    scored: list[tuple[float, int, float, float, dict[str, Any]]] = []
+    for idx, f in enumerate(candidates):
+        geom = f.get("geometry")
+        if not geom:
+            continue
+        try:
+            shp = shape(geom)
+            lat, lon = nearest_point_on_geometry(coordinate.latitude, coordinate.longitude, shp)
+            dist_m = geodesic_distance_m(coordinate.latitude, coordinate.longitude, lat, lon)
+        except Exception:  # noqa: BLE001 - a malformed single feature must not fail the whole match
+            continue
+        scored.append((dist_m, idx, lat, lon, f))
+    if not scored:
+        return None
+    scored.sort(key=lambda t: (t[0], t[1]))
+    dist_m, _idx, lat, lon, feature = scored[0]
+    return Coordinate(latitude=lat, longitude=lon), feature, round(dist_m / 1000.0, 2)
+
+
 def nearest_landing_centre(
     landing_fc: dict[str, Any],
     coordinate: Coordinate,
@@ -489,6 +541,53 @@ def nearest_landing_centre(
     if max_distance_km is not None and dist_m / 1000.0 > max_distance_km:
         return None
     return feature, round(dist_m / 1000.0, 2)
+
+
+def nearest_verified_landing_centre(
+    landing_fc: dict[str, Any],
+    coordinate: Coordinate,
+    *,
+    state_name: str | None,
+    max_distance_km: float | None,
+    is_navigable: Any,
+) -> tuple[dict[str, Any], float] | None:
+    """Like :func:`nearest_landing_centre`, but skips any candidate for which
+    ``is_navigable(latitude, longitude)`` is false - e.g. a landing-centre
+    point that itself falls on land per the caller's own bathymetry check (a
+    resolution mismatch between the two independent official datasets).
+    Candidates are still tried strictly in ascending-distance order (closest
+    first, ``max_distance_km`` still caps the search), so the result stays
+    deterministic and a coordinate far from every landing centre is never
+    silently matched to a distant one."""
+    features = landing_fc.get("features", [])
+    if state_name:
+        candidates = [
+            f for f in features
+            if str(f.get("properties", {}).get("SECTOR_NAM", "")).strip().upper() == state_name
+        ] or features
+    else:
+        candidates = features
+
+    scored: list[tuple[float, dict[str, Any], float, float]] = []
+    for f in candidates:
+        props = f.get("properties", {})
+        lat, lon = props.get("LATITUDE"), props.get("LONGITUDE")
+        if lat is None or lon is None:
+            continue
+        try:
+            lat_f, lon_f = float(lat), float(lon)
+            dist_m = geodesic_distance_m(coordinate.latitude, coordinate.longitude, lat_f, lon_f)
+        except (TypeError, ValueError):
+            continue
+        scored.append((dist_m, f, lat_f, lon_f))
+    scored.sort(key=lambda t: t[0])
+
+    for dist_m, feature, lat_f, lon_f in scored:
+        if max_distance_km is not None and dist_m / 1000.0 > max_distance_km:
+            break  # sorted ascending - nothing closer remains
+        if is_navigable(lat_f, lon_f):
+            return feature, round(dist_m / 1000.0, 2)
+    return None
 
 
 def incois_pfz_status(settings: Settings) -> dict[str, Any]:

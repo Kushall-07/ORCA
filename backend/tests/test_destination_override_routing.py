@@ -41,7 +41,12 @@ async def test_destination_override_triggers_a_route_without_route_wording() -> 
         now=NOW,
     )
     assert r.route is not None
-    assert r.route.origin == [ORIGIN.latitude, ORIGIN.longitude]
+    # ORIGIN (12.87, 74.84) is on land, so RouteAgent now resolves a verified
+    # maritime origin (see app.gis.pfz_reference.resolve_maritime_origin /
+    # test_maritime_origin.py) before planning - `route.origin` is therefore
+    # no longer guaranteed to equal ORIGIN verbatim. This test's own concern
+    # is only that a destination override triggers routing without any
+    # "route"/"navigate" wording in the message.
     assert r.route.destination == [DESTINATION.latitude, DESTINATION.longitude]
 
 

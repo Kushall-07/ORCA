@@ -1,4 +1,4 @@
-import type { QueryResponse, WhatIfResponse } from "../types/api";
+import type { PfzReferenceInfo, QueryResponse, WhatIfResponse } from "../types/api";
 
 export function makeResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
   return {
@@ -48,6 +48,7 @@ export function makeResponse(overrides: Partial<QueryResponse> = {}): QueryRespo
       inside_hard_geofence: false,
       hard_geofence_ids: [],
       soft_geofence_ids: [],
+      geofence_status: "clear",
       protected_areas: [],
     },
     reference: [
@@ -655,6 +656,66 @@ export function makeNoRouteResponse(): QueryResponse {
       destination: [12.5, 74.2],
       hard_geofence_violations: null,
     },
+  });
+}
+
+/** Matched INCOIS PFZ reference geometry - the signal the "pfz" map layer
+ * row (and its auto-enable effect) treat as "there is real geometry to show". */
+export function makePfzReference(overrides: Partial<PfzReferenceInfo> = {}): PfzReferenceInfo {
+  return {
+    source: "INCOIS",
+    availability: "available",
+    area_matched: "Mangalore coastal waters",
+    zone_count: 2,
+    nearest_landing_centre: null,
+    issued_at: "2026-09-07",
+    retrieved_at: "2026-09-07T06:00:00+00:00",
+    source_url: "https://incois.gov.in",
+    disclaimer: "Official INCOIS PFZ advisory reference snapshot.",
+    ...overrides,
+  };
+}
+
+/** A PFZ-intent response carrying matched INCOIS geometry (no routing).
+ * `intent: "pfz_reference"` mirrors the backend's QueryIntent.PFZ_REFERENCE
+ * value - the same reference snapshot is attached to non-PFZ queries too
+ * (e.g. plain sea-conditions queries), so the intent string is what actually
+ * distinguishes a PFZ-intent response from those. */
+export function makePfzResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
+  return makeResponse({
+    intent: "pfz_reference",
+    pfz_reference: makePfzReference(),
+    ...overrides,
+  });
+}
+
+/** Compound "PFZ + route" response: the backend picked a destination PFZ zone
+ * (route.pfz_auto_destination) AND returned the matched PFZ reference used to
+ * pick it - the "Show me the nearest PFZ ... and route me there" query. */
+export function makePfzRouteResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
+  return makeResponse({
+    intent: "ROUTE",
+    pfz_reference: makePfzReference(),
+    route: {
+      status: "ROUTE_FOUND",
+      waypoint_count: 4,
+      total_distance_m: 8200,
+      grid_path_cost: 5.6,
+      validation_passed: true,
+      reasons: [],
+      waypoints: [
+        [12.87, 74.84],
+        [12.9, 74.87],
+        [12.93, 74.89],
+        [12.95, 74.9],
+      ],
+      origin: [12.87, 74.84],
+      destination: [12.95, 74.9],
+      hard_geofence_violations: 0,
+      pfz_auto_destination: true,
+      pfz_zone_distance_km: 9.4,
+    },
+    ...overrides,
   });
 }
 

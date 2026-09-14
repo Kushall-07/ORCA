@@ -29,6 +29,23 @@ never touches the blocked mask built above and never changes whether a route
 is found, blocked, or valid - omitting it (the default) reproduces the exact
 prior distance-only behaviour.
 
+``allow_blocked_origin_cell`` (Phase 9.x, default ``False``) lets the ONE
+narrowly-scoped Mangaluru Fishing Harbour demo planning assumption (see
+``app.orchestration.nodes._mangaluru_demo_assumption`` /
+``app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR``) start a route from its
+verified harbour coordinate even when the coarse 0.05 deg land/water raster
+snaps that coordinate's OWN grid cell to "land" (the harbour's exact point
+already passed the independent, non-rasterised land check at step 4 above).
+It excuses ONLY step 8's land-raster verdict on the origin cell, and ONLY
+when that cell is not ALSO hard-geofence-blocked - hard-geofence blocking of
+the origin (exact-point at step 6, raster at step 8) is completely
+unaffected. It never touches the destination cell, the blocked mask itself,
+or any other cell A* visits: every cell the search actually moves into,
+starting with the very first step out of the origin, is still checked
+against the unmodified land/water + hard-geofence raster exactly as before
+(see ``app.routing.astar.a_star``'s ``allow_blocked_start``). The default
+``False`` reproduces the exact prior behaviour for every other caller.
+
 Everything is deterministic and offline. No LLM, no network beyond whatever
 ``land_backend`` itself already does. Marine cost issues zero additional
 network requests: it is built once from data the caller already has.
@@ -98,6 +115,7 @@ def plan_route(
     *,
     risk: RiskResult | None = None,
     marine_cost_weights: MarineCostWeights | None = None,
+    allow_blocked_origin_cell: bool = False,
 ) -> RouteResult:
     # ---- 1 & 2: coordinate validation (defensive; Coordinate already enforces) ----
     try:
@@ -191,11 +209,19 @@ def plan_route(
         )
 
     # ---- 8: origin / destination grid cells (raster: land OR hard geofence) ----
-    if grid.is_blocked(origin_cell):
+    origin_cell_land_blocked = bool(land_blocked[origin_cell])
+    origin_cell_geofence_blocked = bool(geofence_blocked[origin_cell])
+    # The Mangaluru demo assumption's start-node exception (see this
+    # function's docstring): only excuses a LAND-raster verdict, and only
+    # when the same cell is not also hard-geofence-blocked.
+    origin_start_exception = (
+        allow_blocked_origin_cell and origin_cell_land_blocked and not origin_cell_geofence_blocked
+    )
+    if grid.is_blocked(origin_cell) and not origin_start_exception:
         reasons = []
-        if land_blocked[origin_cell]:
+        if origin_cell_land_blocked:
             reasons.append("origin cell is blocked by the land/water raster (on land)")
-        if geofence_blocked[origin_cell]:
+        if origin_cell_geofence_blocked:
             reasons.append("origin cell is blocked by a hard-geofence raster")
         return _result(
             request,
@@ -224,6 +250,12 @@ def plan_route(
     #            blocked mask built above and is computed once, offline) ----
     marine_result = build_marine_cost(grid, risk, geofences, marine_cost_weights)
     budget = request.max_expanded_nodes
+    # `allow_blocked_start` is only ever passed when the narrow start-node
+    # exception above actually applied - every ordinary call keeps the exact
+    # prior a_star() call shape.
+    astar_kwargs: dict[str, object] = {}
+    if origin_start_exception:
+        astar_kwargs["allow_blocked_start"] = True
     cells, expanded = a_star(
         grid,
         origin_cell,
@@ -231,6 +263,7 @@ def plan_route(
         allow_diagonal=request.allow_diagonal,
         max_expanded=budget,
         cost_field=marine_result.cost_field,
+        **astar_kwargs,
     )
     if cells is None:
         if budget is not None and expanded >= budget:
@@ -273,6 +306,7 @@ def plan_route(
         origin=request.origin,
         destination=request.destination,
         allow_diagonal=request.allow_diagonal,
+        allow_blocked_start_cell=origin_start_exception,
     )
     if not route_validation.valid:
         return _result(

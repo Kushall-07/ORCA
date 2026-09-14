@@ -33,6 +33,7 @@ import {
 } from "../components/intel/IntelPanels";
 import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPanel";
 import { AdvisoryPanel } from "../components/advisory/AdvisoryPanel";
+import { GeofencePanel } from "../components/advisory/GeofencePanel";
 import { WhatIfPanel } from "../components/whatif/WhatIfPanel";
 import { ProvenanceViewer } from "../components/provenance/ProvenanceViewer";
 import { RoutePanel } from "../components/route/RoutePanel";
@@ -40,6 +41,8 @@ import { ReportView } from "../components/report/ReportView";
 import {
   buildLayerToggles,
   DataTierLegend,
+  isPfzIntentResponse,
+  isPfzLayerAvailable,
   LayerControl,
 } from "../components/map/MapControls";
 import { Disclose } from "../components/common";
@@ -129,6 +132,21 @@ export default function WorkspacePage() {
     return () => controller.abort();
   }, [activeLayers, latest?.location]);
 
+  // A PFZ-intent query (e.g. "Show me the nearest PFZ at Mangalore") already
+  // returns matched INCOIS PFZ geometry via `pfz_reference` - but the backend
+  // attaches that same reference snapshot to plain "sea conditions" or "can I
+  // go fishing" queries too (see isPfzLayerAvailable's note), so geometry
+  // alone isn't "the user asked about PFZ". Gate on isPfzIntentResponse as
+  // well, then turn the layer on automatically so the user never has to open
+  // Map Layers by hand. Keyed to `latest` (fires once per new response)
+  // rather than `activeLayers`, so a user who manually turns the layer back
+  // off afterwards is not immediately fought by this effect - it only
+  // re-enables the layer for the *next* PFZ-intent response.
+  useEffect(() => {
+    if (!isPfzIntentResponse(latest) || !isPfzLayerAvailable(latest)) return;
+    setActiveLayers((prev) => (prev.has("pfz") ? prev : new Set(prev).add("pfz")));
+  }, [latest]);
+
   const layerData = useMemo(() => {
     const extra: Record<string, GeoJsonFeatureCollection> = {};
     if (pfzData) extra.pfz = pfzData;
@@ -163,6 +181,30 @@ export default function WorkspacePage() {
       day: p.Julian_day ? String(p.Julian_day) : undefined,
     });
   };
+
+  // Explicit compound "PFZ + route" request (e.g. "Show me the nearest PFZ
+  // at Mangalore and route me there.") - the backend already picked the
+  // destination PFZ zone and generated a route to it (RouteInfo.
+  // pfz_auto_destination). Select/highlight it on the map the same way a
+  // manual map-click selection would, so the user never has to open Map
+  // Layers or click a PFZ marker themselves. A PFZ-only query (no route
+  // requested) never sets this flag, so it never fires here - the manual
+  // "Navigate to this PFZ" flow (onSelectPfz above) is unaffected.
+  useEffect(() => {
+    const route = latest?.route;
+    if (!route?.pfz_auto_destination || !route.destination) return;
+    const [lat, lon] = route.destination;
+    setSelectedPfz((prev) =>
+      prev && prev.lat === lat && prev.lon === lon
+        ? prev
+        : {
+            lat,
+            lon,
+            state: latest?.pfz_reference?.area_matched ?? undefined,
+            day: latest?.pfz_reference?.issued_at ?? undefined,
+          },
+    );
+  }, [latest]);
 
   // ---- Phase B: browser-GPS origin, only when the user explicitly asked --
   const gpsCoordinate = gps.status === "granted" && gps.latitude != null && gps.longitude != null
@@ -235,6 +277,7 @@ export default function WorkspacePage() {
                 {selectedPfz && (
                   <PfzSelectionCard
                     selection={selectedPfz}
+                    landingCentre={latest?.pfz_reference?.nearest_landing_centre}
                     canNavigate={!!navigateOrigin}
                     onNavigate={onNavigateToPfz}
                     onClear={() => setSelectedPfz(null)}
@@ -281,6 +324,11 @@ export default function WorkspacePage() {
                   {/* LIVE OFFICIAL ADVISORY — deliberately separate from the
                       computed decision/risk. */}
                   {latest.advisory && <AdvisoryPanel resp={latest} />}
+
+                  {/* ORCA's own hard-geofence check — separate from the IMD
+                      advisory above and from the computed risk/decision
+                      below; "unavailable" is never shown as "clear". */}
+                  {latest.gis && <GeofencePanel resp={latest} />}
 
                   <SuitabilityPanel resp={latest} />
 

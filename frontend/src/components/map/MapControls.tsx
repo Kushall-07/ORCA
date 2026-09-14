@@ -19,6 +19,15 @@ export interface LayerToggle {
   group: LayerGroup;
   available: boolean;
   provenance: "live" | "reference" | "derived" | "demo" | "missing";
+  /** The layer id this row actually shows/hides, when different from `id` -
+   * e.g. the SST/Chlorophyll rows are separate status readouts for the ONE
+   * existing environmental sample-point marker, not independent overlays, so
+   * both point `activeId` at "environmental" rather than duplicating it. */
+  activeId?: LayerId;
+  /** Keep `noteKey` visible as text even when the row is available (not just
+   * on hover) - used where the honesty caveat ("point data, not a gridded
+   * overlay") matters as much when the layer IS on as when it's off. */
+  alwaysShowNote?: boolean;
   /** Compact trailing badge (ORCA / INCOIS / LIVE); omitted for base reference layers. */
   badgeKey?: StringKey;
   /** One-line "what is this" tooltip, shown on the row when the layer is available. */
@@ -30,6 +39,31 @@ export interface LayerToggle {
   /** Official INCOIS PFZ matched zone count, shown under the row even when
    * `available` is true (see `layer.pfz.zoneCount`). */
   zoneCount?: number;
+}
+
+/** Whether `resp` carries matched INCOIS PFZ geometry worth showing on the
+ * map - the same condition that enables the "pfz" row's checkbox below.
+ * Shared with WorkspacePage so it can auto-enable the layer using the exact
+ * signal the layer control already treats as "PFZ data is available",
+ * instead of a second, possibly-divergent check. */
+export function isPfzLayerAvailable(resp: QueryResponse | null): boolean {
+  const pfzRef = resp?.pfz_reference;
+  return (
+    pfzRef?.availability === "available" &&
+    (pfzRef.zone_count > 0 || !!pfzRef.nearest_landing_centre)
+  );
+}
+
+/** Whether `resp` is itself a PFZ-intent response - the backend classifies
+ * every resolved-location query with a `pfz_reference` snapshot (e.g. a
+ * plain "sea conditions" or "can I go fishing" query still gets one for
+ * reference), so `isPfzLayerAvailable` alone is true far more often than the
+ * user actually asked about PFZ. `intent === "pfz_reference"` is the
+ * backend's own PFZ-intent classification (see QueryIntent.PFZ_REFERENCE);
+ * `route.pfz_auto_destination` is the existing signal for the compound
+ * "PFZ + route" case the selectedPfz effect below already relies on. */
+export function isPfzIntentResponse(resp: QueryResponse | null): boolean {
+  return resp?.intent === "pfz_reference" || !!resp?.route?.pfz_auto_destination;
 }
 
 export function buildLayerToggles(
@@ -45,9 +79,7 @@ export function buildLayerToggles(
     (resp?.gis?.hard_geofence_ids?.length ?? 0) > 0;
   const pfzSnapshotReady = (resp?.reference ?? []).some((r) => r.kind === "PFZ");
   const pfzRef = resp?.pfz_reference;
-  const pfzGeometryAvailable =
-    pfzRef?.availability === "available" &&
-    (pfzRef.zone_count > 0 || !!pfzRef.nearest_landing_centre);
+  const pfzGeometryAvailable = isPfzLayerAvailable(resp);
   const sstValue = resp?.environmental?.sst?.value != null;
   const chlValue = resp?.environmental?.chlorophyll_a?.value != null;
   const envReady = sstValue || chlValue;
@@ -159,11 +191,17 @@ export function buildLayerToggles(
       id: "sst",
       labelKey: "layer.sst",
       group: "fishing_environment",
-      // A point value only (Open-Meteo Marine) — no gridded raster to overlay,
-      // so the row stays non-interactive but reports its real status honestly.
-      available: false,
+      // A point value only (Open-Meteo Marine) — no gridded raster to
+      // overlay. When a value exists, this row toggles the SAME existing
+      // environmental sample-point marker (`activeId`) rather than a
+      // separate SST overlay, so the control is meaningful instead of
+      // permanently disabled — but the POINT DATA badge always makes clear
+      // this is one observation, never a spatial SST heatmap.
+      available: sstValue,
+      activeId: "environmental",
+      alwaysShowNote: true,
       provenance: sstValue ? "live" : "missing",
-      badgeKey: "layer.badge.live",
+      badgeKey: sstValue ? "layer.badge.pointData" : undefined,
       sourceTitleKey: "layer.source.live",
       noteKey: sstValue ? "layer.sst.available" : "layer.sst.unavailable",
     },
@@ -171,9 +209,15 @@ export function buildLayerToggles(
       id: "chlorophyll",
       labelKey: "layer.chlorophyll",
       group: "fishing_environment",
-      available: false,
+      // Same shared point marker as SST above when a value exists; CHL can
+      // legitimately be unavailable (satellite cloud/coverage/validity), in
+      // which case the row stays disabled with an honest reason rather than
+      // looking like a broken checkbox.
+      available: chlValue,
+      activeId: "environmental",
+      alwaysShowNote: true,
       provenance: chlValue ? "live" : "missing",
-      badgeKey: "layer.badge.live",
+      badgeKey: chlValue ? "layer.badge.pointData" : undefined,
       sourceTitleKey: "layer.source.live",
       noteKey: chlValue ? "layer.chlorophyll.available" : "layer.chlorophyll.unavailable",
     },
@@ -357,6 +401,7 @@ function LayerRow({
   const noteText = t(tg.noteKey ?? "map.noGeometry");
   const availableTitle = tg.descKey ? t(tg.descKey) : tg.sourceTitleKey ? t(tg.sourceTitleKey) : undefined;
   const title = tg.available ? availableTitle : noteText;
+  const targetId = tg.activeId ?? tg.id;
 
   return (
     <li className="layer-control__item">
@@ -368,7 +413,7 @@ function LayerRow({
           type="checkbox"
           checked={tg.available && active}
           disabled={!tg.available}
-          onChange={() => onToggle(tg.id)}
+          onChange={() => onToggle(targetId)}
         />
         <span className="layer-toggle__icon">
           <LayerIcon id={tg.id} />
@@ -381,6 +426,9 @@ function LayerRow({
         )}
       </label>
       {!tg.available && <p className="layer-toggle__note">{noteText}</p>}
+      {tg.available && tg.alwaysShowNote && tg.noteKey && (
+        <p className="layer-toggle__note layer-toggle__note--info">{t(tg.noteKey)}</p>
+      )}
       {tg.available && tg.zoneCount != null && (
         <p className="layer-toggle__note layer-toggle__note--info">
           {t("layer.pfz.zoneCount", { count: tg.zoneCount })}
@@ -412,7 +460,9 @@ export function LayerControl({
     rows: toggles.filter((tg) => tg.group === g),
   })).filter((g) => g.rows.length > 0);
 
-  const activeCount = toggles.filter((tg) => tg.available && active.has(tg.id)).length;
+  const activeCount = toggles.filter(
+    (tg) => tg.available && active.has(tg.activeId ?? tg.id),
+  ).length;
 
   return (
     <div className={`layer-control ${expanded ? "is-open" : ""}`}>
@@ -451,7 +501,12 @@ export function LayerControl({
               </button>
               <ul className="layer-control__list" hidden={!open}>
                 {rows.map((tg) => (
-                  <LayerRow key={tg.id} tg={tg} active={active.has(tg.id)} onToggle={onToggle} />
+                  <LayerRow
+                    key={tg.id}
+                    tg={tg}
+                    active={active.has(tg.activeId ?? tg.id)}
+                    onToggle={onToggle}
+                  />
                 ))}
               </ul>
             </div>

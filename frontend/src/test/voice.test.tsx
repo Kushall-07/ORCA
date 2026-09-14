@@ -75,6 +75,7 @@ afterEach(() => {
   delete w.webkitSpeechRecognition;
   delete w.speechSynthesis;
   delete w.SpeechSynthesisUtterance;
+  delete (navigator as unknown as Record<string, unknown>).mediaDevices;
   FakeRecognition.last = null;
   vi.restoreAllMocks();
 });
@@ -142,7 +143,7 @@ describe("microphone / speech-to-text", () => {
     expect(screen.queryByText("Listening…")).not.toBeInTheDocument();
   });
 
-  it("surfaces a non-blocking hint when the microphone errors", async () => {
+  it("surfaces a permission-denied hint (not a generic 'unavailable') on not-allowed", async () => {
     (window as unknown as Record<string, unknown>).SpeechRecognition =
       FakeRecognition;
     renderChat();
@@ -152,7 +153,8 @@ describe("microphone / speech-to-text", () => {
     await act(async () => {
       FakeRecognition.last!.onerror!({ error: "not-allowed" });
     });
-    expect(screen.getByText(/you can still type your question/i)).toBeInTheDocument();
+    expect(screen.getByText(/microphone permission denied/i)).toBeInTheDocument();
+    expect(screen.queryByText(/microphone unavailable/i)).not.toBeInTheDocument();
     // typing still works
     await userEvent.type(
       screen.getByPlaceholderText(/marine question/i),
@@ -162,6 +164,148 @@ describe("microphone / speech-to-text", () => {
       (screen.getByPlaceholderText(/marine question/i) as HTMLTextAreaElement)
         .value,
     ).toBe("hello");
+  });
+
+  it("surfaces a device-unavailable hint (not permission text) on audio-capture", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    renderChat();
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
+    await act(async () => {
+      FakeRecognition.last!.onerror!({ error: "audio-capture" });
+    });
+    expect(screen.getByText(/no microphone device found/i)).toBeInTheDocument();
+  });
+
+  it("does not show an error banner for brief silence (no-speech)", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    renderChat();
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
+    await act(async () => {
+      FakeRecognition.last!.onerror!({ error: "no-speech" });
+    });
+    expect(screen.queryByText(/microphone/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/unavailable|denied|failed/i)).not.toBeInTheDocument();
+  });
+
+  it("does not show an error banner for the normal stop path (aborted)", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    renderChat();
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
+    await act(async () => {
+      FakeRecognition.last!.onerror!({ error: "aborted" });
+    });
+    expect(screen.queryByText(/unavailable|denied|failed/i)).not.toBeInTheDocument();
+  });
+
+  it("does not falsely report 'microphone unavailable' when the capability check succeeds", async () => {
+    const stop = vi.fn();
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop }],
+        }),
+      },
+    });
+    renderChat();
+
+    await act(async () => {
+      await userEvent.click(
+        screen.getByRole("button", { name: /speak your question/i }),
+      );
+    });
+
+    expect(
+      screen.getByRole("button", { name: /stop listening/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/unavailable|denied|failed/i)).not.toBeInTheDocument();
+    // the probe stream must be released immediately, never left open
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  });
+
+  it("reports permission-denied (not unsupported/unavailable) when getUserMedia rejects with NotAllowedError", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("denied"), { name: "NotAllowedError" }),
+          ),
+      },
+    });
+    renderChat();
+
+    await act(async () => {
+      await userEvent.click(
+        screen.getByRole("button", { name: /speak your question/i }),
+      );
+    });
+
+    expect(screen.getByText(/microphone permission denied/i)).toBeInTheDocument();
+    // recognition itself must never have been started once the probe denied access
+    expect(FakeRecognition.last).toBeNull();
+
+    delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  });
+
+  it("reports a device-unavailable hint when getUserMedia rejects with NotFoundError", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("no device"), { name: "NotFoundError" }),
+          ),
+      },
+    });
+    renderChat();
+
+    await act(async () => {
+      await userEvent.click(
+        screen.getByRole("button", { name: /speak your question/i }),
+      );
+    });
+
+    expect(screen.getByText(/no microphone device found/i)).toBeInTheDocument();
+
+    delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  });
+
+  it("reports the insecure-connection hint (not a device/permission error) outside a secure context", async () => {
+    (window as unknown as Record<string, unknown>).SpeechRecognition =
+      FakeRecognition;
+    vi.spyOn(window, "isSecureContext", "get").mockReturnValue(false);
+    renderChat();
+
+    await act(async () => {
+      await userEvent.click(
+        screen.getByRole("button", { name: /speak your question/i }),
+      );
+    });
+
+    expect(
+      screen.getByText(/secure \(https or localhost\) connection/i),
+    ).toBeInTheDocument();
+    expect(FakeRecognition.last).toBeNull();
   });
 
   it("still sends a typed query on Enter (existing text behaviour preserved)", async () => {

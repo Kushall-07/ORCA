@@ -438,7 +438,11 @@ describe("ORCA workspace", () => {
     await waitForResponse();
     await openDetails();
 
-    expect(screen.getByText("Advisory data unavailable")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Optional IMD advisory reference unavailable; ORCA's independent safety assessment remains active.",
+      ),
+    ).toBeInTheDocument();
   });
 
   // ---- Phase 9 Step 3: researcher environmental panel ------------------

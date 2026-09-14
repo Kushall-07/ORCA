@@ -35,6 +35,69 @@ export function isSttSupported(): boolean {
   return recognitionCtor() != null;
 }
 
+/** User-facing microphone failure categories. `null` from {@link classifyRecognitionError} means "not a real failure - don't show a banner". */
+export type MicErrorKind =
+  | "insecure-context"
+  | "permission-denied"
+  | "device-unavailable"
+  | "recording-failed";
+
+/**
+ * Maps a raw SpeechRecognition `error` code to a user-facing category. `no-speech`
+ * (brief silence) and `aborted` (the normal user/system stop path) are not real
+ * failures and must not surface as "microphone unavailable" - they return null.
+ */
+export function classifyRecognitionError(code: string): MicErrorKind | null {
+  switch (code) {
+    case "no-speech":
+    case "aborted":
+      return null;
+    case "audio-capture":
+      return "device-unavailable";
+    case "not-allowed":
+    case "service-not-allowed":
+      return "permission-denied";
+    default:
+      return "recording-failed";
+  }
+}
+
+/**
+ * Best-effort microphone capability probe. Distinguishes "permission denied"
+ * from "no microphone device" *before* SpeechRecognition starts, and triggers
+ * the browser's permission prompt if it hasn't been shown yet. Any stream
+ * acquired is stopped immediately afterwards - this never leaves the
+ * microphone open. When the browser exposes no `getUserMedia` to probe with,
+ * this resolves ok so SpeechRecognition's own (coarser) prompt/error path is
+ * used instead - the absence of a probe API is never treated as "unavailable".
+ */
+export async function checkMicrophoneAccess(): Promise<
+  { ok: true } | { ok: false; reason: MicErrorKind }
+> {
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return { ok: false, reason: "insecure-context" };
+  }
+  const mediaDevices =
+    typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+  if (!mediaDevices || typeof mediaDevices.getUserMedia !== "function") {
+    return { ok: true };
+  }
+  try {
+    const stream = await mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((track) => track.stop());
+    return { ok: true };
+  } catch (err) {
+    const name = (err as { name?: string } | null)?.name ?? "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+      return { ok: false, reason: "permission-denied" };
+    }
+    if (name === "NotFoundError" || name === "NotReadableError") {
+      return { ok: false, reason: "device-unavailable" };
+    }
+    return { ok: false, reason: "recording-failed" };
+  }
+}
+
 export interface RecognizerHandlers {
   /** Fired for every hypothesis; `isFinal` marks the committed transcript. */
   onResult: (transcript: string, isFinal: boolean) => void;

@@ -67,15 +67,31 @@ class SessionContext(BaseModel):
 
     @property
     def last_date_hint(self) -> str | None:
-        return self._last(lambda u: u.date_hint)
+        # Only the immediately preceding turn, like `last_intent` below - NOT a
+        # scan back through the whole history. Date/time framing is transient
+        # per-request; if the previous turn already resolved to no date_hint of
+        # its own, an older turn's date/time several messages back is not a
+        # signal about *this* turn and must not be silently revived (it can
+        # shift decision_time onto an unrelated day/hour and make freshly
+        # fetched live data look INVALID against the wrong window).
+        return self.turns[-1].understanding.date_hint if self.turns else None
 
     @property
     def last_time_window(self) -> str | None:
-        return self._last(lambda u: u.time_window)
+        return self.turns[-1].understanding.time_window if self.turns else None
 
     @property
     def last_intent(self) -> QueryIntent | None:
         return self.turns[-1].understanding.intent if self.turns else None
+
+    @property
+    def last_research_domain(self):  # type: ignore[no-untyped-def]
+        """The most recent turn's research_domain, so a bare follow-up like
+        "What data did you use?" after a RESEARCH_QUERY can be re-routed back
+        into the same research context (see
+        app.agents.query_understanding.QueryUnderstandingAgent._merge_session)
+        instead of falling back to the fishing-safety explanation template."""
+        return self._last(lambda u: u.research_domain)
 
     @property
     def last_decision_status(self) -> str | None:

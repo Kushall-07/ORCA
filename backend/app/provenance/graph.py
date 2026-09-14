@@ -101,7 +101,8 @@ def build_provenance(
                      value=ocean_tier, source="open-meteo-marine"), parent_for_data)
     if gis is not None:
         add(ProvNode(id="agent:gis", kind=_AGENT_RESULT, label="GIS & geofencing agent",
-                     value=gis.backend, source=gis.source_status.source), parent_for_data)
+                     value=gis.backend_label, source=gis.source_status.source,
+                     detail={"backend": gis.backend}), parent_for_data)
     if environment_tier:
         add(ProvNode(id="agent:environment", kind=_AGENT_RESULT,
                      label="environmental (ocean-colour) agent",

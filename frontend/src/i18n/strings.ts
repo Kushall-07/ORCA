@@ -75,6 +75,13 @@ export type StringKey =
   | "advisory.retrievedLive"
   | "advisory.source"
   | "advisory.notApplicable"
+  | "panel.geofence"
+  | "geofence.status.inside"
+  | "geofence.status.clear"
+  | "geofence.status.unavailable"
+  | "geofence.note.inside"
+  | "geofence.note.clear"
+  | "geofence.note.unavailable"
   | "panel.environmental"
   | "env.productivity"
   | "env.sst"
@@ -230,6 +237,7 @@ export type StringKey =
   | "layer.badge.orca"
   | "layer.badge.incois"
   | "layer.badge.live"
+  | "layer.badge.pointData"
   | "layer.source.reference"
   | "layer.source.orca"
   | "layer.source.incois"
@@ -281,6 +289,13 @@ export type StringKey =
   | "pfz.notSafetyNote"
   | "pfz.clearSelection"
   | "pfz.cannotRoute"
+  | "pfz.direction"
+  | "pfz.bearing"
+  | "pfz.distance"
+  | "pfz.depth"
+  | "pfz.forecast"
+  | "pfz.validUntil"
+  | "pfz.officialSource"
   | "route.myLocationToPfz"
   | "env.interp"
   | "env.interp.limited"
@@ -290,6 +305,9 @@ export type StringKey =
   | "voice.mic.stop"
   | "voice.mic.unsupported"
   | "voice.mic.error"
+  | "voice.mic.permissionDenied"
+  | "voice.mic.deviceUnavailable"
+  | "voice.mic.insecureContext"
   | "voice.listening"
   | "voice.tts.play"
   | "voice.tts.stop"
@@ -361,12 +379,13 @@ const en: Table = {
   "suitability.pfzNote": "PFZ reference",
   "panel.advisory": "Official Marine Advisory",
   "advisory.distinctNote":
-    "Live official IMD advisory — separate from ORCA's computed risk assessment below.",
+    "IMD advisory reference — an optional official source, separate from ORCA's computed risk assessment below.",
   "advisory.area": "Marine area",
   "advisory.status.no_warning": "No Warning",
   "advisory.status.caution": "Caution",
   "advisory.status.do_not_venture": "Fishermen advised not to venture into the sea",
-  "advisory.availability.unavailable": "Advisory data unavailable",
+  "advisory.availability.unavailable":
+    "Optional IMD advisory reference unavailable; ORCA's independent safety assessment remains active.",
   "advisory.availability.expired": "Advisory has expired",
   "advisory.availability.not_yet_valid": "Advisory not yet in force",
   "advisory.availability.no_location_match": "No official advisory area for this location",
@@ -376,6 +395,16 @@ const en: Table = {
   "advisory.retrievedLive": "Live",
   "advisory.source": "Source",
   "advisory.notApplicable": "Not applicable to the requested time",
+  "panel.geofence": "Geofence Check",
+  "geofence.status.inside": "Inside a restricted area",
+  "geofence.status.clear": "Geofence validation: CLEAR",
+  "geofence.status.unavailable": "Geofence validation unavailable",
+  "geofence.note.inside":
+    "This location is inside a hard-restricted geofenced zone; ORCA's safety decision and routing already reflect this.",
+  "geofence.note.clear":
+    "ORCA checked this location against its currently loaded spatial reference data and found no hard-restricted-zone constraint triggered.",
+  "geofence.note.unavailable":
+    "Geofence data is currently unavailable, so restricted-area clearance could not be verified for this location. This is not the same as the area being clear.",
   "panel.environmental": "Environmental Context",
   "env.productivity": "Environmental productivity potential",
   "env.sst": "Sea-surface temperature",
@@ -538,6 +567,7 @@ const en: Table = {
   "layer.badge.orca": "ORCA",
   "layer.badge.incois": "INCOIS",
   "layer.badge.live": "LIVE",
+  "layer.badge.pointData": "POINT DATA",
   "layer.source.reference": "Official reference layer",
   "layer.source.orca": "Computed by ORCA",
   "layer.source.incois": "INCOIS official reference",
@@ -574,7 +604,7 @@ const en: Table = {
   "layer.desc.risk": "ORCA safety risk assessment",
   "layer.desc.route": "ORCA evaluated route — not a guaranteed safe path",
   "layer.desc.environmental": "Environmental sample point for this query",
-  "layer.desc.environmentalSuitability": "CHL-based environmental context",
+  "layer.desc.environmentalSuitability": "CHL-based spatial suitability grid (research/reference context)",
   "layer.desc.pfz": "Official INCOIS PFZ reference — not ORCA-derived",
   "env.suitability.title": "ORCA Environmental Suitability",
   "env.suitability.disclaimer": "Environmental context only — not a fish-presence or safety prediction.",
@@ -594,6 +624,13 @@ const en: Table = {
   "pfz.notSafetyNote": "PFZ reference is not a safety recommendation.",
   "pfz.clearSelection": "Clear selection",
   "pfz.cannotRoute": "Selected PFZ reference cannot be safely routed to.",
+  "pfz.direction": "Direction",
+  "pfz.bearing": "Bearing",
+  "pfz.distance": "Distance",
+  "pfz.depth": "Depth",
+  "pfz.forecast": "Forecast",
+  "pfz.validUntil": "Valid until",
+  "pfz.officialSource": "Official INCOIS reference",
   "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
@@ -604,7 +641,12 @@ const en: Table = {
   "voice.mic.start": "Speak your question",
   "voice.mic.stop": "Stop listening",
   "voice.mic.unsupported": "Speech input is not supported in this browser",
-  "voice.mic.error": "Microphone unavailable — you can still type your question",
+  "voice.mic.error": "Microphone recording failed — you can still type your question",
+  "voice.mic.permissionDenied":
+    "Microphone permission denied — allow access in your browser to use voice input, or type your question",
+  "voice.mic.deviceUnavailable": "No microphone device found — you can still type your question",
+  "voice.mic.insecureContext":
+    "Voice input needs a secure (HTTPS or localhost) connection — you can still type your question",
   "voice.listening": "Listening…",
   "voice.tts.play": "Read aloud",
   "voice.tts.stop": "Stop reading",
@@ -676,12 +718,13 @@ const hi: Table = {
   "suitability.pfzNote": "PFZ संदर्भ",
   "panel.advisory": "आधिकारिक समुद्री सलाह",
   "advisory.distinctNote":
-    "लाइव आधिकारिक IMD सलाह — नीचे दिए गए ORCA के गणना किए गए जोखिम आकलन से अलग।",
+    "IMD सलाह संदर्भ — यह एक वैकल्पिक आधिकारिक स्रोत है, नीचे दिए गए ORCA के अपने गणना किए गए जोखिम आकलन से अलग।",
   "advisory.area": "समुद्री क्षेत्र",
   "advisory.status.no_warning": "कोई चेतावनी नहीं",
   "advisory.status.caution": "सावधानी",
   "advisory.status.do_not_venture": "मछुआरों को समुद्र में न जाने की सलाह",
-  "advisory.availability.unavailable": "सलाह डेटा अनुपलब्ध",
+  "advisory.availability.unavailable":
+    "वैकल्पिक IMD सलाह संदर्भ अनुपलब्ध है; ORCA का स्वतंत्र सुरक्षा आकलन सक्रिय है।",
   "advisory.availability.expired": "सलाह समाप्त हो चुकी है",
   "advisory.availability.not_yet_valid": "सलाह अभी प्रभावी नहीं है",
   "advisory.availability.no_location_match": "इस स्थान के लिए कोई आधिकारिक सलाह क्षेत्र नहीं",
@@ -691,6 +734,16 @@ const hi: Table = {
   "advisory.retrievedLive": "लाइव",
   "advisory.source": "स्रोत",
   "advisory.notApplicable": "अनुरोधित समय पर लागू नहीं",
+  "panel.geofence": "जियोफेंस जांच",
+  "geofence.status.inside": "प्रतिबंधित क्षेत्र के भीतर",
+  "geofence.status.clear": "जियोफेंस सत्यापन: स्पष्ट (CLEAR)",
+  "geofence.status.unavailable": "जियोफेंस सत्यापन अनुपलब्ध",
+  "geofence.note.inside":
+    "यह स्थान एक कठोर-प्रतिबंधित जियोफेंस क्षेत्र के भीतर है; ORCA का सुरक्षा निर्णय और मार्ग-निर्धारण पहले से ही इसे दर्शाते हैं।",
+  "geofence.note.clear":
+    "ORCA ने इस स्थान की जांच अपने वर्तमान में लोड किए गए स्थानिक संदर्भ डेटा के विरुद्ध की और कोई कठोर-प्रतिबंधित-क्षेत्र बाधा सक्रिय नहीं पाई।",
+  "geofence.note.unavailable":
+    "जियोफेंस डेटा फिलहाल अनुपलब्ध है, इसलिए इस स्थान के लिए प्रतिबंधित-क्षेत्र मंजूरी सत्यापित नहीं की जा सकी। यह क्षेत्र के स्पष्ट (clear) होने के समान नहीं है।",
   "panel.environmental": "पर्यावरणीय संदर्भ",
   "env.productivity": "पर्यावरणीय उत्पादकता क्षमता",
   "env.sst": "समुद्री सतह तापमान",
@@ -852,6 +905,7 @@ const hi: Table = {
   "layer.badge.orca": "ORCA",
   "layer.badge.incois": "INCOIS",
   "layer.badge.live": "लाइव",
+  "layer.badge.pointData": "बिंदु डेटा",
   "layer.source.reference": "आधिकारिक संदर्भ परत",
   "layer.source.orca": "ORCA द्वारा गणना",
   "layer.source.incois": "INCOIS आधिकारिक संदर्भ",
@@ -887,7 +941,7 @@ const hi: Table = {
   "layer.desc.risk": "ORCA सुरक्षा जोखिम आकलन",
   "layer.desc.route": "ORCA द्वारा मूल्यांकित मार्ग — सुरक्षित मार्ग की गारंटी नहीं",
   "layer.desc.environmental": "इस प्रश्न के लिए पर्यावरणीय नमूना बिंदु",
-  "layer.desc.environmentalSuitability": "CHL-आधारित पर्यावरणीय संदर्भ",
+  "layer.desc.environmentalSuitability": "CHL-आधारित स्थानिक उपयुक्तता ग्रिड (शोध/संदर्भ संदर्भ)",
   "layer.desc.pfz": "आधिकारिक INCOIS PFZ संदर्भ — ORCA-व्युत्पन्न नहीं",
   "env.suitability.title": "ORCA पर्यावरणीय उपयुक्तता",
   "env.suitability.disclaimer": "केवल पर्यावरणीय संदर्भ — यह मछली-उपस्थिति या सुरक्षा भविष्यवाणी नहीं है।",
@@ -907,6 +961,13 @@ const hi: Table = {
   "pfz.notSafetyNote": "PFZ संदर्भ कोई सुरक्षा सिफारिश नहीं है।",
   "pfz.clearSelection": "चयन साफ़ करें",
   "pfz.cannotRoute": "चयनित PFZ संदर्भ तक सुरक्षित रूप से मार्ग नहीं बनाया जा सकता।",
+  "pfz.direction": "दिशा",
+  "pfz.bearing": "दिक्मान",
+  "pfz.distance": "दूरी",
+  "pfz.depth": "गहराई",
+  "pfz.forecast": "पूर्वानुमान",
+  "pfz.validUntil": "मान्य तक",
+  "pfz.officialSource": "आधिकारिक INCOIS संदर्भ",
   "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
@@ -917,7 +978,12 @@ const hi: Table = {
   "voice.mic.start": "अपना प्रश्न बोलें",
   "voice.mic.stop": "सुनना बंद करें",
   "voice.mic.unsupported": "इस ब्राउज़र में वाक् इनपुट समर्थित नहीं है",
-  "voice.mic.error": "माइक्रोफ़ोन अनुपलब्ध — आप फिर भी प्रश्न टाइप कर सकते हैं",
+  "voice.mic.error": "माइक्रोफ़ोन रिकॉर्डिंग विफल — आप फिर भी प्रश्न टाइप कर सकते हैं",
+  "voice.mic.permissionDenied":
+    "माइक्रोफ़ोन अनुमति अस्वीकृत — वॉइस इनपुट उपयोग करने के लिए ब्राउज़र में अनुमति दें, या प्रश्न टाइप करें",
+  "voice.mic.deviceUnavailable": "कोई माइक्रोफ़ोन डिवाइस नहीं मिला — आप फिर भी प्रश्न टाइप कर सकते हैं",
+  "voice.mic.insecureContext":
+    "वॉइस इनपुट के लिए सुरक्षित (HTTPS या localhost) कनेक्शन आवश्यक है — आप फिर भी प्रश्न टाइप कर सकते हैं",
   "voice.listening": "सुन रहा है…",
   "voice.tts.play": "ज़ोर से पढ़ें",
   "voice.tts.stop": "पढ़ना बंद करें",
@@ -989,12 +1055,13 @@ const kn: Table = {
   "suitability.pfzNote": "PFZ ಉಲ್ಲೇಖ",
   "panel.advisory": "ಅಧಿಕೃತ ಸಮುದ್ರ ಸಲಹೆ",
   "advisory.distinctNote":
-    "ಲೈವ್ ಅಧಿಕೃತ IMD ಸಲಹೆ — ಕೆಳಗಿನ ORCA ಲೆಕ್ಕಾಚಾರದ ಅಪಾಯದ ಮೌಲ್ಯಮಾಪನದಿಂದ ಪ್ರತ್ಯೇಕವಾಗಿದೆ.",
+    "IMD ಸಲಹಾ ಉಲ್ಲೇಖ — ಇದು ಒಂದು ಐಚ್ಛಿಕ ಅಧಿಕೃತ ಮೂಲವಾಗಿದ್ದು, ಕೆಳಗಿನ ORCA ದ ಸ್ವಂತ ಲೆಕ್ಕಾಚಾರದ ಅಪಾಯದ ಮೌಲ್ಯಮಾಪನದಿಂದ ಪ್ರತ್ಯೇಕವಾಗಿದೆ.",
   "advisory.area": "ಸಮುದ್ರ ಪ್ರದೇಶ",
   "advisory.status.no_warning": "ಎಚ್ಚರಿಕೆ ಇಲ್ಲ",
   "advisory.status.caution": "ಎಚ್ಚರಿಕೆ",
   "advisory.status.do_not_venture": "ಮೀನುಗಾರರು ಸಮುದ್ರಕ್ಕೆ ಹೋಗದಂತೆ ಸಲಹೆ",
-  "advisory.availability.unavailable": "ಸಲಹೆ ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
+  "advisory.availability.unavailable":
+    "ಐಚ್ಛಿಕ IMD ಸಲಹಾ ಉಲ್ಲೇಖ ಲಭ್ಯವಿಲ್ಲ; ORCA ದ ಸ್ವತಂತ್ರ ಸುರಕ್ಷತಾ ಮೌಲ್ಯಮಾಪನ ಸಕ್ರಿಯವಾಗಿದೆ.",
   "advisory.availability.expired": "ಸಲಹೆ ಅವಧಿ ಮುಗಿದಿದೆ",
   "advisory.availability.not_yet_valid": "ಸಲಹೆ ಇನ್ನೂ ಜಾರಿಯಲ್ಲಿಲ್ಲ",
   "advisory.availability.no_location_match": "ಈ ಸ್ಥಳಕ್ಕೆ ಯಾವುದೇ ಅಧಿಕೃತ ಸಲಹೆ ಪ್ರದೇಶವಿಲ್ಲ",
@@ -1004,6 +1071,16 @@ const kn: Table = {
   "advisory.retrievedLive": "ಲೈವ್",
   "advisory.source": "ಮೂಲ",
   "advisory.notApplicable": "ವಿನಂತಿಸಿದ ಸಮಯಕ್ಕೆ ಅನ್ವಯಿಸುವುದಿಲ್ಲ",
+  "panel.geofence": "ಜಿಯೋಫೆನ್ಸ್ ಪರಿಶೀಲನೆ",
+  "geofence.status.inside": "ನಿರ್ಬಂಧಿತ ಪ್ರದೇಶದೊಳಗೆ",
+  "geofence.status.clear": "ಜಿಯೋಫೆನ್ಸ್ ಪರಿಶೀಲನೆ: ಸ್ಪಷ್ಟ (CLEAR)",
+  "geofence.status.unavailable": "ಜಿಯೋಫೆನ್ಸ್ ಪರಿಶೀಲನೆ ಲಭ್ಯವಿಲ್ಲ",
+  "geofence.note.inside":
+    "ಈ ಸ್ಥಳವು ಕಠಿಣ-ನಿರ್ಬಂಧಿತ ಜಿಯೋಫೆನ್ಸ್ ವಲಯದೊಳಗಿದೆ; ORCA ದ ಸುರಕ್ಷತಾ ನಿರ್ಧಾರ ಮತ್ತು ಮಾರ್ಗ ಯೋಜನೆ ಈಗಾಗಲೇ ಇದನ್ನು ಪ್ರತಿಬಿಂಬಿಸುತ್ತದೆ.",
+  "geofence.note.clear":
+    "ORCA ಈ ಸ್ಥಳವನ್ನು ಪ್ರಸ್ತುತ ಲೋಡ್ ಮಾಡಲಾದ ಪ್ರಾದೇಶಿಕ ಉಲ್ಲೇಖ ದತ್ತಾಂಶದ ವಿರುದ್ಧ ಪರಿಶೀಲಿಸಿದೆ ಮತ್ತು ಯಾವುದೇ ಕಠಿಣ-ನಿರ್ಬಂಧಿತ-ವಲಯ ನಿರ್ಬಂಧ ಸಕ್ರಿಯಗೊಂಡಿಲ್ಲ ಎಂದು ಕಂಡುಕೊಂಡಿದೆ.",
+  "geofence.note.unavailable":
+    "ಜಿಯೋಫೆನ್ಸ್ ದತ್ತಾಂಶ ಪ್ರಸ್ತುತ ಲಭ್ಯವಿಲ್ಲ, ಆದ್ದರಿಂದ ಈ ಸ್ಥಳಕ್ಕೆ ನಿರ್ಬಂಧಿತ-ಪ್ರದೇಶ ಕ್ಲಿಯರೆನ್ಸ್ ಅನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಇದು ಪ್ರದೇಶ ಸ್ಪಷ್ಟ (clear) ಎಂದು ಅರ್ಥವಲ್ಲ.",
   "panel.environmental": "ಪರಿಸರ ಸಂದರ್ಭ",
   "env.productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ ಸಾಮರ್ಥ್ಯ",
   "env.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
@@ -1165,6 +1242,7 @@ const kn: Table = {
   "layer.badge.orca": "ORCA",
   "layer.badge.incois": "INCOIS",
   "layer.badge.live": "ಲೈವ್",
+  "layer.badge.pointData": "ಪಾಯಿಂಟ್ ಡೇಟಾ",
   "layer.source.reference": "ಅಧಿಕೃತ ಉಲ್ಲೇಖ ಪದರ",
   "layer.source.orca": "ORCA ಲೆಕ್ಕಹಾಕಿದ",
   "layer.source.incois": "INCOIS ಅಧಿಕೃತ ಉಲ್ಲೇಖ",
@@ -1200,7 +1278,7 @@ const kn: Table = {
   "layer.desc.risk": "ORCA ಸುರಕ್ಷತಾ ಅಪಾಯ ಮೌಲ್ಯಮಾಪನ",
   "layer.desc.route": "ORCA ಮೌಲ್ಯಮಾಪನ ಮಾಡಿದ ಮಾರ್ಗ — ಸುರಕ್ಷಿತ ಮಾರ್ಗದ ಖಾತರಿ ಅಲ್ಲ",
   "layer.desc.environmental": "ಈ ಪ್ರಶ್ನೆಗಾಗಿ ಪರಿಸರ ಮಾದರಿ ಬಿಂದು",
-  "layer.desc.environmentalSuitability": "CHL-ಆಧಾರಿತ ಪರಿಸರ ಸಂದರ್ಭ",
+  "layer.desc.environmentalSuitability": "CHL-ಆಧಾರಿತ ಪ್ರಾದೇಶಿಕ ಸೂಕ್ತತೆ ಗ್ರಿಡ್ (ಸಂಶೋಧನೆ/ಉಲ್ಲೇಖ ಸಂದರ್ಭ)",
   "layer.desc.pfz": "ಅಧಿಕೃತ INCOIS PFZ ಉಲ್ಲೇಖ — ORCA-ಪಡೆದದ್ದಲ್ಲ",
   "env.suitability.title": "ORCA ಪರಿಸರ ಸೂಕ್ತತೆ",
   "env.suitability.disclaimer": "ಕೇವಲ ಪರಿಸರ ಸಂದರ್ಭ — ಇದು ಮೀನು-ಇರುವಿಕೆ ಅಥವಾ ಸುರಕ್ಷತಾ ಮುನ್ಸೂಚನೆ ಅಲ್ಲ.",
@@ -1220,6 +1298,13 @@ const kn: Table = {
   "pfz.notSafetyNote": "PFZ ಉಲ್ಲೇಖವು ಸುರಕ್ಷತಾ ಶಿಫಾರಸು ಅಲ್ಲ.",
   "pfz.clearSelection": "ಆಯ್ಕೆ ತೆರವುಗೊಳಿಸಿ",
   "pfz.cannotRoute": "ಆಯ್ಕೆಮಾಡಿದ PFZ ಉಲ್ಲೇಖಕ್ಕೆ ಸುರಕ್ಷಿತವಾಗಿ ಮಾರ್ಗ ನಿರ್ದೇಶನ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
+  "pfz.direction": "ದಿಕ್ಕು",
+  "pfz.bearing": "ಬೇರಿಂಗ್",
+  "pfz.distance": "ದೂರ",
+  "pfz.depth": "ಆಳ",
+  "pfz.forecast": "ಮುನ್ಸೂಚನೆ",
+  "pfz.validUntil": "ಮಾನ್ಯವಾಗಿರುವವರೆಗೆ",
+  "pfz.officialSource": "ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ",
   "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
@@ -1230,7 +1315,12 @@ const kn: Table = {
   "voice.mic.start": "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಮಾತನಾಡಿ",
   "voice.mic.stop": "ಆಲಿಸುವುದನ್ನು ನಿಲ್ಲಿಸಿ",
   "voice.mic.unsupported": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬೆಂಬಲಿತವಲ್ಲ",
-  "voice.mic.error": "ಮೈಕ್ರೊಫೋನ್ ಲಭ್ಯವಿಲ್ಲ — ನೀವು ಇನ್ನೂ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಬಹುದು",
+  "voice.mic.error": "ಮೈಕ್ರೊಫೋನ್ ರೆಕಾರ್ಡಿಂಗ್ ವಿಫಲವಾಗಿದೆ — ನೀವು ಇನ್ನೂ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಬಹುದು",
+  "voice.mic.permissionDenied":
+    "ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ — ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬಳಸಲು ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಅನುಮತಿ ನೀಡಿ, ಅಥವಾ ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಿ",
+  "voice.mic.deviceUnavailable": "ಯಾವುದೇ ಮೈಕ್ರೊಫೋನ್ ಸಾಧನ ಕಂಡುಬಂದಿಲ್ಲ — ನೀವು ಇನ್ನೂ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಬಹುದು",
+  "voice.mic.insecureContext":
+    "ಧ್ವನಿ ಇನ್‌ಪುಟ್‌ಗೆ ಸುರಕ್ಷಿತ (HTTPS ಅಥವಾ localhost) ಸಂಪರ್ಕ ಅಗತ್ಯವಿದೆ — ನೀವು ಇನ್ನೂ ಪ್ರಶ್ನೆ ಟೈಪ್ ಮಾಡಬಹುದು",
   "voice.listening": "ಆಲಿಸುತ್ತಿದೆ…",
   "voice.tts.play": "ಗಟ್ಟಿಯಾಗಿ ಓದಿ",
   "voice.tts.stop": "ಓದುವುದನ್ನು ನಿಲ್ಲಿಸಿ",

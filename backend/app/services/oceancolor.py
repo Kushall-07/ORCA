@@ -1,10 +1,16 @@
 """Satellite ocean-colour (chlorophyll-a) client - Phase 9 Step 2.
 
 Primary source: **NOAA CoastWatch ERDDAP** (`noaacwNPPVIIRSchlaDaily`, VIIRS S-NPP
-near-real-time global 4 km daily, no authentication). Optional secondary:
-**INCOIS ERDDAP** - only tried when a URL *and* a dataset id are configured, and
-always with normal TLS verification (``verify=True``, or ``verify=<ca_bundle>``
-if a chain PEM is supplied). ``verify=False`` is never used.
+near-real-time global 4 km daily, no authentication), searched over a small
+bounded box around the requested point for the nearest valid pixel (a single
+fixed grid cell is often cloud/coastal-masked on any given day). If that
+dataset has no acceptable pixel (e.g. an NRT processing gap), an official NOAA
+CoastWatch **secondary** (`noaacwNPPVIIRSSQchlaDaily`, the same VIIRS S-NPP
+sensor's Science Quality reprocessing, same host/variable/units) is tried next.
+Optional further secondary: **INCOIS ERDDAP** - only tried when a URL *and* a
+dataset id are configured, and always with normal TLS verification
+(``verify=True``, or ``verify=<ca_bundle>`` if a chain PEM is supplied).
+``verify=False`` is never used.
 
 The client:
 
@@ -50,6 +56,16 @@ CHL_UNIT: Final[str] = "mg m-3"
 # equal to the Spatial-Temporal Fusion alignment threshold so an accepted
 # chlorophyll observation is also spatially aligned downstream.
 MAX_PIXEL_DISTANCE_M: Final[float] = 25_000.0
+_DEG_TO_M: Final[float] = 111_000.0
+# The "current value" fetch searches a small bounded box (never a single fixed
+# grid cell) around the requested point, sized to just cover
+# MAX_PIXEL_DISTANCE_M. A single 4 km cell is frequently cloud/coastal-masked
+# on any given day even when a same-composite neighbour a few km away is
+# valid; ORCA's own acceptance loop below still enforces the SAME distance and
+# freshness limits on every returned cell - this only lets it see enough real
+# candidates to pick a genuinely nearest valid one, instead of the single
+# (possibly-missing) grid cell ERDDAP would return for a bare point query.
+_PIXEL_SEARCH_HALF_WIDTH_DEG: Final[float] = round(MAX_PIXEL_DISTANCE_M / _DEG_TO_M, 3)
 # Some ERDDAP hosts (NOAA CoastWatch) 403 an empty User-Agent.
 _ERDDAP_HEADERS: Final[dict[str, str]] = {
     "User-Agent": "ORCA-marine-decision-support/0.1 (SIH26176)"
@@ -334,7 +350,8 @@ async def _fetch_erddap(
     max_age_s: int,
     client: httpx.AsyncClient,
 ) -> ChlorophyllResult:
-    """One ERDDAP griddap request + ORCA's own spatial/temporal acceptance."""
+    """One ERDDAP griddap request over a small bounded box + ORCA's own
+    spatial/temporal acceptance (see :data:`_PIXEL_SEARCH_HALF_WIDTH_DEG`)."""
     axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=client)
 
     lookback_days = max_age_s // 86400 + 2
@@ -343,9 +360,12 @@ async def _fetch_erddap(
     prefix = f"{base_url.rstrip('/')}/griddap/{dataset}.json?{variable}"
     range_expr = f"[({_iso_z(start)}):({_iso_z(stop)})]"
     last_expr = "[(last)]"
+    hw = _PIXEL_SEARCH_HALF_WIDTH_DEG
 
     async def _request(time_expr: str) -> dict[str, Any]:
-        url = prefix + _constraint(axes, latitude, longitude, time_expr)
+        url = prefix + _box_constraint(
+            axes, latitude - hw, latitude + hw, longitude - hw, longitude + hw, time_expr
+        )
         try:
             return await get_json(url, timeout_s=timeout_s, retries=1, client=client)
         except HttpDecodeError as exc:
@@ -386,6 +406,12 @@ async def _fetch_erddap(
             continue
         acceptable.append((age, row, dist))
 
+    # Freshest acceptable composite wins first; among same-composite pixels
+    # (identical age), the geodesically nearest one wins - a genuine "nearest
+    # valid pixel" selection instead of trusting whichever row ERDDAP listed
+    # first.
+    acceptable.sort(key=lambda t: (t[0], t[2]))
+
     if not acceptable:
         newest = max(rows, key=lambda r: r.observed_at)
         newest_age_d = abs((target - newest.observed_at).total_seconds()) / 86400.0
@@ -395,7 +421,6 @@ async def _fetch_erddap(
             f"window (freshest composite is {newest_age_d:.1f} d old)"
         )
 
-    acceptable.sort(key=lambda t: (t[0], -t[1].observed_at.timestamp()))
     _, row, dist = acceptable[0]
     return ChlorophyllResult(
         value=row.value,
@@ -453,6 +478,32 @@ async def fetch_chlorophyll(
         except (OceanColorError, SchemaValidationError) as exc:
             errors.append(str(exc)); seen.append(exc)
             logger.warning("ocean-colour NOAA source failed", extra={"source": "oceancolor:noaa"})
+
+        # ---- official NOAA CoastWatch secondary: a different, more deeply
+        # reprocessed VIIRS S-NPP product on the SAME ERDDAP host, tried only
+        # when the primary NRT dataset had no acceptable pixel (e.g. an NRT
+        # processing gap). Still NOAA CoastWatch, still chlor_a/mg m-3, still
+        # subject to the identical spatial/temporal acceptance check. ----
+        if settings.oceancolor_noaa_chl_fallback_dataset:
+            try:
+                return await _fetch_erddap(
+                    base_url=settings.oceancolor_noaa_erddap_url,
+                    dataset=settings.oceancolor_noaa_chl_fallback_dataset,
+                    variable=settings.oceancolor_noaa_chl_variable,
+                    latitude=latitude,
+                    longitude=longitude,
+                    when=when,
+                    source_label="noaa-coastwatch-erddap-secondary",
+                    timeout_s=settings.oceancolor_timeout_seconds,
+                    max_age_s=settings.oceancolor_chl_max_age_seconds,
+                    client=active,
+                )
+            except (OceanColorError, SchemaValidationError) as exc:
+                errors.append(str(exc)); seen.append(exc)
+                logger.warning(
+                    "ocean-colour NOAA secondary source failed",
+                    extra={"source": "oceancolor:noaa-secondary"},
+                )
 
         # ---- optional secondary: INCOIS (only when fully configured) ----
         if settings.oceancolor_incois_erddap_url and settings.oceancolor_incois_chl_dataset:
@@ -584,6 +635,114 @@ async def fetch_chlorophyll_series(
             await active.aclose()
 
 
+async def _fetch_neighbourhood_once(
+    *,
+    base_url: str,
+    dataset: str,
+    variable: str,
+    source_label: str,
+    latitude: float,
+    longitude: float,
+    when: datetime,
+    half_width_deg: float,
+    timeout_s: float,
+    max_age_s: int,
+    client: httpx.AsyncClient,
+) -> ChlorophyllNeighbourhood:
+    """ONE batched ERDDAP griddap box request against a single dataset. See
+    :func:`fetch_chlorophyll_neighbourhood` for the public, fallback-aware
+    entry point."""
+    hw = abs(float(half_width_deg))
+    box = (
+        f"lat {latitude - hw:.3f}..{latitude + hw:.3f}, "
+        f"lon {longitude - hw:.3f}..{longitude + hw:.3f} "
+        f"(+/-{hw:.2f} deg around {latitude:.3f}, {longitude:.3f})"
+    )
+
+    axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=client)
+    target = _as_utc(when)
+    lookback_days = max_age_s // 86400 + 2
+    start = target - timedelta(days=lookback_days)
+    stop = target + timedelta(days=1)
+    range_expr = f"[({_iso_z(start)}):({_iso_z(stop)})]"
+    last_expr = "[(last)]"
+    prefix = f"{base_url.rstrip('/')}/griddap/{dataset}.json?{variable}"
+
+    async def _request(time_expr: str) -> dict[str, Any]:
+        url = prefix + _box_constraint(
+            axes, latitude - hw, latitude + hw, longitude - hw, longitude + hw, time_expr
+        )
+        return await get_json(url, timeout_s=timeout_s, retries=1, client=client)
+
+    try:
+        payload = await _request(range_expr)
+    except HttpDecodeError as exc:
+        raise SchemaValidationError(
+            f"{source_label}: non-JSON ERDDAP neighbourhood response"
+        ) from exc
+    except HttpStatusError as exc:
+        if exc.status_code != 404:
+            raise OceanColorUnavailable(f"{source_label}: HTTP {exc.status_code}") from exc
+        # A 404 on the ranged request usually means either bound of the
+        # requested window falls outside the dataset's actual time axis (the
+        # SAME "lagging NRT feed" case the single-point fetch already retries
+        # for - see _fetch_erddap). ERDDAP rejects the WHOLE range query in
+        # that case even when part of the range has real data, so retry with
+        # the single most-recent composite and let the acceptance window
+        # below decide whether it is fresh enough.
+        try:
+            payload = await _request(last_expr)
+        except HttpDecodeError as exc2:
+            raise SchemaValidationError(
+                f"{source_label}: non-JSON ERDDAP neighbourhood response"
+            ) from exc2
+        except HttpStatusError as exc2:
+            raise OceanColorNoData(
+                f"{source_label}: no data (HTTP {exc2.status_code})"
+            ) from exc2
+        except HttpClientError as exc2:
+            raise OceanColorUnavailable(f"{source_label}: {exc2}") from exc2
+    except HttpClientError as exc:
+        raise OceanColorUnavailable(f"{source_label}: {exc}") from exc
+
+    total_by_ts, valid_by_ts = _extract_box_cells(
+        payload, variable, latitude, longitude
+    )
+    if not total_by_ts:
+        raise OceanColorNoData(
+            f"{source_label}: no chlorophyll-a cells returned for the neighbourhood box"
+        )
+
+    # pick the single composite nearest in time to the request, within the
+    # existing chlorophyll acceptance window (<= max_age_s).
+    acceptable = [
+        ts for ts in total_by_ts
+        if abs((target - ts).total_seconds()) <= max_age_s
+    ]
+    if not acceptable:
+        newest = max(total_by_ts)
+        age_d = abs((target - newest).total_seconds()) / 86400.0
+        raise OceanColorNoData(
+            f"{source_label}: nearest neighbourhood composite is {age_d:.1f} d old "
+            f"(outside the <= {max_age_s // 86400} d window)"
+        )
+    chosen = min(
+        acceptable, key=lambda ts: (abs((target - ts).total_seconds()), -ts.timestamp())
+    )
+    pixels = tuple(
+        sorted(valid_by_ts.get(chosen, ()), key=lambda p: p.distance_m)
+    )
+    return ChlorophyllNeighbourhood(
+        pixels=pixels,
+        cells_total=total_by_ts[chosen],
+        composite_at=chosen,
+        box=box,
+        half_width_deg=hw,
+        dataset=dataset,
+        source=f"{source_label}:{dataset}",
+    )
+
+
 async def fetch_chlorophyll_neighbourhood(
     latitude: float,
     longitude: float,
@@ -596,104 +755,87 @@ async def fetch_chlorophyll_neighbourhood(
     """Phase 9 Step 7 - ONE batched NOAA CoastWatch griddap request over a small
     fixed box (``+/- half_width_deg``) around the queried coordinate.
 
-    Used ONLY by the ``environmental_neighbourhood`` node to qualify whether the
-    single central chlorophyll-a pixel ORCA already uses is representative of the
-    valid nearby pixels on the SAME composite. It never touches INCOIS, never
-    enters the Marine Data Fabric / fusion / arbitration / evidence / risk /
-    safety / decision / routing, and never interpolates or zero-fills a cloud
-    cell. Returns the VALID native pixels for the single composite nearest in
-    time to ``when`` plus that composite's total cell count. Raises a typed
-    :class:`OceanColorError` on transport / schema failure or when no composite
-    is spatially + temporally acceptable, so the caller degrades to
-    ``neighbourhood = None`` (non-blocking).
+    Tries the primary NOAA NRT dataset first; if that dataset has no
+    acceptable composite for this box (the same kind of NRT processing /
+    coastal-masking gap the single-point :func:`fetch_chlorophyll` already
+    falls back on), the NOAA CoastWatch secondary (Science Quality
+    reprocessing) dataset is tried next, on the SAME host/variable/units.
+    Still never touches INCOIS.
+
+    Used by the ``environmental_neighbourhood`` node (to qualify whether the
+    single central chlorophyll-a pixel ORCA already uses is representative of
+    the valid nearby pixels on the SAME composite) and by the ORCA
+    Environmental Suitability spatial layer. Never enters the Marine Data
+    Fabric / fusion / arbitration / evidence / risk / safety / decision /
+    routing, and never interpolates or zero-fills a cloud cell. Returns the
+    VALID native pixels for the single composite nearest in time to ``when``
+    plus that composite's total cell count. Raises a typed
+    :class:`OceanColorError` on transport / schema failure or when no
+    composite from either dataset is spatially + temporally acceptable, so the
+    caller degrades to ``neighbourhood = None`` (non-blocking).
     """
     if not settings.oceancolor_enabled:
         raise OceanColorNotConfigured("ocean-colour integration is disabled")
 
     base_url = settings.oceancolor_noaa_erddap_url
-    dataset = settings.oceancolor_noaa_chl_dataset
     variable = settings.oceancolor_noaa_chl_variable
-    source_label = "noaa-coastwatch-erddap"
     timeout_s = settings.oceancolor_timeout_seconds
     max_age_s = settings.oceancolor_chl_max_age_seconds
-    hw = abs(float(half_width_deg))
-    box = (
-        f"lat {latitude - hw:.3f}..{latitude + hw:.3f}, "
-        f"lon {longitude - hw:.3f}..{longitude + hw:.3f} "
-        f"(+/-{hw:.2f} deg around {latitude:.3f}, {longitude:.3f})"
-    )
 
     owns_client = client is None
     active = client or httpx.AsyncClient(timeout=timeout_s, headers=_ERDDAP_HEADERS)
     try:
-        axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=active)
-        target = _as_utc(when)
-        lookback_days = max_age_s // 86400 + 2
-        start = target - timedelta(days=lookback_days)
-        stop = target + timedelta(days=1)
-        range_expr = f"[({_iso_z(start)}):({_iso_z(stop)})]"
-        url = (
-            f"{base_url.rstrip('/')}/griddap/{dataset}.json?{variable}"
-            + _box_constraint(
-                axes,
-                latitude - hw, latitude + hw,
-                longitude - hw, longitude + hw,
-                range_expr,
-            )
-        )
+        errors: list[str] = []
+        seen: list[Exception] = []
         try:
-            payload = await get_json(url, timeout_s=timeout_s, retries=1, client=active)
-        except HttpDecodeError as exc:
-            raise SchemaValidationError(
-                f"{source_label}: non-JSON ERDDAP neighbourhood response"
-            ) from exc
-        except HttpStatusError as exc:
-            if exc.status_code == 404:
-                raise OceanColorNoData(
-                    f"{source_label}: neighbourhood window outside the dataset time axis"
-                ) from exc
-            raise OceanColorUnavailable(
-                f"{source_label}: HTTP {exc.status_code}"
-            ) from exc
-        except HttpClientError as exc:
-            raise OceanColorUnavailable(f"{source_label}: {exc}") from exc
-
-        total_by_ts, valid_by_ts = _extract_box_cells(
-            payload, variable, latitude, longitude
-        )
-        if not total_by_ts:
-            raise OceanColorNoData(
-                f"{source_label}: no chlorophyll-a cells returned for the neighbourhood box"
+            return await _fetch_neighbourhood_once(
+                base_url=base_url,
+                dataset=settings.oceancolor_noaa_chl_dataset,
+                variable=variable,
+                source_label="noaa-coastwatch-erddap",
+                latitude=latitude,
+                longitude=longitude,
+                when=when,
+                half_width_deg=half_width_deg,
+                timeout_s=timeout_s,
+                max_age_s=max_age_s,
+                client=active,
+            )
+        except (OceanColorError, SchemaValidationError) as exc:
+            errors.append(str(exc)); seen.append(exc)
+            logger.warning(
+                "ocean-colour neighbourhood NOAA source failed",
+                extra={"source": "oceancolor:noaa"},
             )
 
-        # pick the single composite nearest in time to the request, within the
-        # existing chlorophyll acceptance window (<= max_age_s).
-        acceptable = [
-            ts for ts in total_by_ts
-            if abs((target - ts).total_seconds()) <= max_age_s
-        ]
-        if not acceptable:
-            newest = max(total_by_ts)
-            age_d = abs((target - newest).total_seconds()) / 86400.0
-            raise OceanColorNoData(
-                f"{source_label}: nearest neighbourhood composite is {age_d:.1f} d old "
-                f"(outside the <= {max_age_s // 86400} d window)"
-            )
-        chosen = min(
-            acceptable, key=lambda ts: (abs((target - ts).total_seconds()), -ts.timestamp())
-        )
-        pixels = tuple(
-            sorted(valid_by_ts.get(chosen, ()), key=lambda p: p.distance_m)
-        )
-        return ChlorophyllNeighbourhood(
-            pixels=pixels,
-            cells_total=total_by_ts[chosen],
-            composite_at=chosen,
-            box=box,
-            half_width_deg=hw,
-            dataset=dataset,
-            source=f"{source_label}:{dataset}",
-        )
+        if settings.oceancolor_noaa_chl_fallback_dataset:
+            try:
+                return await _fetch_neighbourhood_once(
+                    base_url=base_url,
+                    dataset=settings.oceancolor_noaa_chl_fallback_dataset,
+                    variable=variable,
+                    source_label="noaa-coastwatch-erddap-secondary",
+                    latitude=latitude,
+                    longitude=longitude,
+                    when=when,
+                    half_width_deg=half_width_deg,
+                    timeout_s=timeout_s,
+                    max_age_s=max_age_s,
+                    client=active,
+                )
+            except (OceanColorError, SchemaValidationError) as exc:
+                errors.append(str(exc)); seen.append(exc)
+                logger.warning(
+                    "ocean-colour neighbourhood NOAA secondary source failed",
+                    extra={"source": "oceancolor:noaa-secondary"},
+                )
+
+        combined = "; ".join(errors) or "no ocean-colour source produced an acceptable neighbourhood"
+        if any(isinstance(e, SchemaValidationError) for e in seen):
+            raise SchemaValidationError(combined)
+        if any(isinstance(e, OceanColorUnavailable) for e in seen):
+            raise OceanColorUnavailable(combined)
+        raise OceanColorNoData(combined)
     finally:
         if owns_client:
             await active.aclose()
@@ -774,6 +916,11 @@ def oceancolor_status(settings: Settings) -> dict[str, Any]:
         "provider": "NOAA CoastWatch ERDDAP (VIIRS S-NPP chlorophyll-a) + Open-Meteo Marine SST",
         "role": "environmental / non-blocking",
         "primary": f"noaa-coastwatch-erddap:{settings.oceancolor_noaa_chl_dataset}",
+        "noaa_secondary": (
+            f"noaa-coastwatch-erddap-secondary:{settings.oceancolor_noaa_chl_fallback_dataset}"
+            if settings.oceancolor_noaa_chl_fallback_dataset
+            else "none (NOAA secondary disabled)"
+        ),
         "fallback": (
             f"incois-erddap:{settings.oceancolor_incois_chl_dataset}"
             if incois_configured
@@ -783,7 +930,10 @@ def oceancolor_status(settings: Settings) -> dict[str, Any]:
         "integrated": True,
         "note": (
             "SST rides the existing Open-Meteo Marine call. Chlorophyll-a comes "
-            "from NOAA CoastWatch ERDDAP; INCOIS ERDDAP is an optional secondary "
+            "from NOAA CoastWatch ERDDAP, searched over a small bounded box for "
+            "the nearest valid pixel; a second, more deeply reprocessed NOAA "
+            "CoastWatch product is tried if the primary NRT dataset has an NRT "
+            "processing gap, and INCOIS ERDDAP is an optional further secondary "
             "(TLS always verified, never required). A cloud gap or unreachable "
             "server yields a structured MISSING result and never fails a query. "
             "Chlorophyll-a is a phytoplankton-biomass proxy, not a measure of "
