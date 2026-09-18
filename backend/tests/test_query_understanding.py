@@ -84,9 +84,14 @@ async def test_malformed_llm_output_retries_then_falls_back() -> None:
     agent = QueryUnderstandingAgent(stub, max_retries=1)
     u = await agent.understand("Is fishing safe near Mangalore now?")
     assert len(stub.calls) == 2  # original + one stricter retry
-    assert u.failed is True
-    assert u.understood_via == "rules"      # deterministic parser used as the failure result
+    # The deterministic rules parser fully resolves this message on its own
+    # (intent + location), so the LLM's failed structured output must NOT be
+    # treated as a query-understanding failure - see
+    # tests/test_llm_fallback_regression.py for the full regression coverage.
+    assert u.failed is False
+    assert u.understood_via == "rules"      # deterministic parser used as the fallback
     assert u.intent is QueryIntent.FISHING_SAFETY
+    assert u.needs_clarification is False
 
 
 async def test_second_attempt_can_recover() -> None:

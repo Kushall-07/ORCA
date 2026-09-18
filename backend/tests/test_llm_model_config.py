@@ -178,9 +178,12 @@ async def test_query_understanding_still_retries_then_falls_back_on_bad_json() -
     agent = QueryUnderstandingAgent(client, max_retries=1)
     u = await agent.understand("Is fishing safe near Mangalore now?")
 
-    # two Groq attempts (initial + one correction), then deterministic parser
+    # two Groq attempts (initial + one correction), then deterministic parser.
+    # The rules parser fully resolves this message on its own, so the failed
+    # Groq structured output must NOT be treated as a query-understanding
+    # failure - see tests/test_llm_fallback_regression.py.
     assert len(fake.calls) == 2
-    assert u.failed is True
+    assert u.failed is False
     assert u.understood_via == "rules"
     assert u.intent is not QueryIntent.GENERAL or u.needs_clarification
 

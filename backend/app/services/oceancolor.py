@@ -214,13 +214,13 @@ class _Row(BaseModel):
 
 
 async def _axis_order(
-    base_url: str, dataset: str, *, timeout_s: float, client: httpx.AsyncClient
+    base_url: str, dataset: str, *, timeout_s: float, retries: int, client: httpx.AsyncClient
 ) -> list[str]:
     """Ordered griddap dimension names for ``dataset`` (e.g.
     ``["time", "altitude", "latitude", "longitude"]``)."""
     url = f"{base_url.rstrip('/')}/info/{dataset}/index.json"
     try:
-        payload = await get_json(url, timeout_s=timeout_s, retries=1, client=client)
+        payload = await get_json(url, timeout_s=timeout_s, retries=retries, client=client)
     except HttpDecodeError as exc:
         raise SchemaValidationError(f"{dataset}: non-JSON ERDDAP info response") from exc
     except HttpClientError as exc:
@@ -347,12 +347,13 @@ async def _fetch_erddap(
     when: datetime,
     source_label: str,
     timeout_s: float,
+    retries: int,
     max_age_s: int,
     client: httpx.AsyncClient,
 ) -> ChlorophyllResult:
     """One ERDDAP griddap request over a small bounded box + ORCA's own
     spatial/temporal acceptance (see :data:`_PIXEL_SEARCH_HALF_WIDTH_DEG`)."""
-    axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=client)
+    axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, retries=retries, client=client)
 
     lookback_days = max_age_s // 86400 + 2
     start = _as_utc(when) - timedelta(days=lookback_days)
@@ -367,7 +368,7 @@ async def _fetch_erddap(
             axes, latitude - hw, latitude + hw, longitude - hw, longitude + hw, time_expr
         )
         try:
-            return await get_json(url, timeout_s=timeout_s, retries=1, client=client)
+            return await get_json(url, timeout_s=timeout_s, retries=retries, client=client)
         except HttpDecodeError as exc:
             raise SchemaValidationError(f"{source_label}: non-JSON ERDDAP response") from exc
         except HttpClientError as exc:  # timeout / transport / TLS / status
@@ -472,6 +473,7 @@ async def fetch_chlorophyll(
                 when=when,
                 source_label="noaa-coastwatch-erddap",
                 timeout_s=settings.oceancolor_timeout_seconds,
+                retries=settings.oceancolor_retries,
                 max_age_s=settings.oceancolor_chl_max_age_seconds,
                 client=active,
             )
@@ -495,6 +497,7 @@ async def fetch_chlorophyll(
                     when=when,
                     source_label="noaa-coastwatch-erddap-secondary",
                     timeout_s=settings.oceancolor_timeout_seconds,
+                    retries=settings.oceancolor_retries,
                     max_age_s=settings.oceancolor_chl_max_age_seconds,
                     client=active,
                 )
@@ -526,6 +529,7 @@ async def fetch_chlorophyll(
                     when=when,
                     source_label="incois-erddap",
                     timeout_s=settings.oceancolor_timeout_seconds,
+                    retries=settings.oceancolor_retries,
                     max_age_s=settings.oceancolor_chl_max_age_seconds,
                     client=incois_client,
                 )
@@ -580,11 +584,12 @@ async def fetch_chlorophyll_series(
     variable = settings.oceancolor_noaa_chl_variable
     source_label = "noaa-coastwatch-erddap"
     timeout_s = settings.oceancolor_timeout_seconds
+    retries = settings.oceancolor_retries
 
     owns_client = client is None
     active = client or httpx.AsyncClient(timeout=timeout_s, headers=_ERDDAP_HEADERS)
     try:
-        axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=active)
+        axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, retries=retries, client=active)
         start_u, end_u = _as_utc(start), _as_utc(end)
         range_expr = f"[({_iso_z(start_u)}):({_iso_z(end_u)})]"
         url = (
@@ -592,7 +597,7 @@ async def fetch_chlorophyll_series(
             + _constraint(axes, latitude, longitude, range_expr)
         )
         try:
-            payload = await get_json(url, timeout_s=timeout_s, retries=1, client=active)
+            payload = await get_json(url, timeout_s=timeout_s, retries=retries, client=active)
         except HttpDecodeError as exc:
             raise SchemaValidationError(
                 f"{source_label}: non-JSON ERDDAP response"
@@ -646,6 +651,7 @@ async def _fetch_neighbourhood_once(
     when: datetime,
     half_width_deg: float,
     timeout_s: float,
+    retries: int,
     max_age_s: int,
     client: httpx.AsyncClient,
 ) -> ChlorophyllNeighbourhood:
@@ -659,7 +665,7 @@ async def _fetch_neighbourhood_once(
         f"(+/-{hw:.2f} deg around {latitude:.3f}, {longitude:.3f})"
     )
 
-    axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, client=client)
+    axes = await _axis_order(base_url, dataset, timeout_s=timeout_s, retries=retries, client=client)
     target = _as_utc(when)
     lookback_days = max_age_s // 86400 + 2
     start = target - timedelta(days=lookback_days)
@@ -672,7 +678,7 @@ async def _fetch_neighbourhood_once(
         url = prefix + _box_constraint(
             axes, latitude - hw, latitude + hw, longitude - hw, longitude + hw, time_expr
         )
-        return await get_json(url, timeout_s=timeout_s, retries=1, client=client)
+        return await get_json(url, timeout_s=timeout_s, retries=retries, client=client)
 
     try:
         payload = await _request(range_expr)
@@ -780,6 +786,7 @@ async def fetch_chlorophyll_neighbourhood(
     base_url = settings.oceancolor_noaa_erddap_url
     variable = settings.oceancolor_noaa_chl_variable
     timeout_s = settings.oceancolor_timeout_seconds
+    retries = settings.oceancolor_retries
     max_age_s = settings.oceancolor_chl_max_age_seconds
 
     owns_client = client is None
@@ -798,6 +805,7 @@ async def fetch_chlorophyll_neighbourhood(
                 when=when,
                 half_width_deg=half_width_deg,
                 timeout_s=timeout_s,
+                retries=retries,
                 max_age_s=max_age_s,
                 client=active,
             )
@@ -820,6 +828,7 @@ async def fetch_chlorophyll_neighbourhood(
                     when=when,
                     half_width_deg=half_width_deg,
                     timeout_s=timeout_s,
+                    retries=retries,
                     max_age_s=max_age_s,
                     client=active,
                 )

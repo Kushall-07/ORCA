@@ -18,6 +18,7 @@ from app.models.query import (
     CapabilityStatus,
     Language,
     QueryIntent,
+    RequestedOutput,
     ResearchDomain,
 )
 from app.models.research import AnomalyClass
@@ -26,7 +27,9 @@ from tests.orchestration_fakes import (
     NOW,
     FakeEnvironmentalAgent,
     FakeHistoricalEnvironmentalAgent,
+    FakeOceanAgent,
     make_pipeline,
+    obs,
 )
 
 
@@ -387,6 +390,207 @@ async def test_multilingual_researcher_anomaly_question() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SIH26176 demo-readiness fix: finer researcher intent categories
+#
+# Several researcher questions correctly resolved to ENVIRONMENTAL_CONDITIONS
+# but fell through to a generic environmental response instead of activating
+# the specific deterministic capability (comparison / stability / neighbourhood
+# / evidence / provenance). These tests cover the new deterministic overrides
+# in app.agents.query_understanding that fix that - see
+# `_wants_environmental_dispersion_analysis`, `_is_environmental_neighbourhood_query`
+# and `_is_environmental_evidence_quality_query`.
+# ---------------------------------------------------------------------------
+async def test_sst_comparison_question_wants_comparison() -> None:
+    u = await _rules().understand(
+        "How does the current sea-surface temperature near Mangalore compare "
+        "with the last 30 days?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.wants_comparison is True
+
+
+async def test_sst_stability_question_reuses_comparison_pathway() -> None:
+    u = await _rules().understand(
+        "How variable has the sea-surface temperature been near Mangalore "
+        "over the last 30 days?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    # Stability reuses the SAME comparison pathway (Phase 9 Step 6) - no new
+    # intent, no new engine - so the reference-series fetch must still be
+    # requested even though the user said "variable", never "compare".
+    assert u.wants_comparison is True
+
+
+async def test_chlorophyll_stability_question_reuses_comparison_pathway() -> None:
+    u = await _rules().understand(
+        "How variable has chlorophyll-a been around Mangalore over the last "
+        "30 days?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.wants_comparison is True
+
+
+async def test_how_stable_phrasing_also_recognised() -> None:
+    u = await _rules().understand(
+        "How stable has chlorophyll-a been around Mangalore?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.wants_comparison is True
+
+
+async def test_chlorophyll_neighbourhood_representativeness_question() -> None:
+    u = await _rules().understand(
+        "Is the chlorophyll-a measurement at Mangalore representative of the "
+        "surrounding area?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert "deterministic environmental-neighbourhood override" in u.notes
+
+
+async def test_neighbourhood_question_nearby_pixels_paraphrase() -> None:
+    u = await _rules().understand(
+        "How representative is this chlorophyll value compared with nearby "
+        "pixels?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert "deterministic environmental-neighbourhood override" in u.notes
+
+
+async def test_evidence_sufficiency_question_routes_to_provenance() -> None:
+    u = await _rules().understand(
+        "Are the current environmental observations sufficient for reliable "
+        "analysis at Mangalore?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.requested_output is RequestedOutput.PROVENANCE
+
+
+async def test_calculation_method_question_routes_to_provenance() -> None:
+    u = await _rules().understand(
+        "How did you calculate the environmental assessment for Mangalore?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.requested_output is RequestedOutput.PROVENANCE
+
+
+async def test_data_gaps_question_routes_to_provenance() -> None:
+    u = await _rules().understand(
+        "What environmental data is missing for Mangalore right now, and how "
+        "does that affect the analysis?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.requested_output is RequestedOutput.PROVENANCE
+
+
+async def test_satellite_reliability_question_routes_to_provenance() -> None:
+    u = await _rules().understand(
+        "How reliable are the satellite-derived environmental observations "
+        "near the Mangalore coast?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.requested_output is RequestedOutput.PROVENANCE
+
+
+async def test_what_data_sources_used_question_is_environmental_provenance() -> None:
+    # "What data/sources did/were used to determine THIS result" is a
+    # result-specific provenance question - it already routed to the
+    # Environmental Evidence Engine's provenance framing before this fix (via
+    # the pre-existing `_is_environmental_evidence_query`) and still does;
+    # kept here as a regression check, since this exact wording is the task's
+    # own literal example for the PROVENANCE researcher-intent category.
+    u = await _rules().understand(
+        "What datasets and sources were used to determine the environmental "
+        "conditions at Mangalore?"
+    )
+    assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS
+    assert u.requested_output is RequestedOutput.PROVENANCE
+
+
+async def test_which_datasets_are_used_question_gives_full_registry() -> None:
+    # A general "which datasets ARE USED / are available" capability/registry
+    # question (no personal "you", asking about ORCA's configured sources in
+    # general, not one already-computed result) is a DIFFERENT question from
+    # the one above - it keeps routing to the GENERAL_ENVIRONMENTAL /
+    # DATASET_COMPARISON research-domain path, which lists every configured
+    # dataset and distinguishes LIVE / HISTORICAL / NOT CONFIGURED (see
+    # app.research.capability.configured_datasets_summary) - the FULL
+    # registry a researcher needs, not just what one query happened to fetch.
+    u = await _rules().understand(
+        "Which datasets are being used for the environmental analysis at Mangalore?"
+    )
+    assert u.intent is QueryIntent.RESEARCH_QUERY
+    assert u.research_domain is ResearchDomain.GENERAL_ENVIRONMENTAL
+    assert u.analysis_type is AnalysisType.DATASET_COMPARISON
+
+
+async def test_dispersion_override_does_not_steal_chlorophyll_anomaly_question() -> None:
+    # A genuine chlorophyll-anomaly research question that ALSO contains a
+    # comparison word ("changed") must keep its own anomaly/HAB framing - the
+    # new dispersion override is checked only after research-domain detection
+    # finds nothing more specific.
+    u = await _rules().understand(
+        "Has chlorophyll-a changed to an unusually high level near Ullal?"
+    )
+    assert u.intent is QueryIntent.RESEARCH_QUERY
+    assert u.research_domain is ResearchDomain.CHLOROPHYLL_ANOMALY
+
+
+async def test_dispersion_evidence_neighbourhood_overrides_never_fire_for_fishing() -> None:
+    for message in (
+        "How variable has the weather been for fishing near Mangalore?",
+        "Is it safe to fish, and is that representative of the surrounding area?",
+        "Are the safety observations sufficient for fishing near Mangalore?",
+    ):
+        u = await _rules().understand(message)
+        assert u.intent is not QueryIntent.ENVIRONMENTAL_CONDITIONS, message
+
+
+async def test_multilingual_comparison_stability_provenance_sufficiency() -> None:
+    # A small, high-value Hindi/Kannada set (Part 6: not exhaustive coverage).
+    cases = (
+        # Hindi: comparison / stability
+        "मंगलुरु के पास पिछले 30 दिनों की तुलना में समुद्री सतह तापमान कैसा है?",
+        # Kannada: comparison / stability
+        "ಮಂಗಳೂರು ಬಳಿ ಕಳೆದ 30 ದಿನಗಳಲ್ಲಿ ಕ್ಲೋರೊಫಿಲ್-a ಎಷ್ಟು ಸ್ಥಿರವಾಗಿದೆ?",
+        # Hindi: provenance
+        "मंगलुरु में पर्यावरणीय स्थिति के लिए आपने कौन सा डेटा इस्तेमाल किया?",
+        # Kannada: provenance
+        "ಮಂಗಳೂರಿನಲ್ಲಿ ಪರಿಸರ ಪರಿಸ್ಥಿತಿಗಾಗಿ ನೀವು ಯಾವ ಡೇಟಾ ಬಳಸಿದ್ದೀರಿ?",
+        # Hindi: data sufficiency
+        "क्या मंगलुरु में पर्यावरणीय डेटा विश्वसनीय विश्लेषण के लिए पर्याप्त है?",
+        # Kannada: data sufficiency
+        "ಮಂಗಳೂರಿನಲ್ಲಿ ಪರಿಸರ ಡೇಟಾ ವಿಶ್ವಾಸಾರ್ಹ ವಿಶ್ಲೇಷಣೆಗೆ ಸಾಕಷ್ಟಿದೆಯೇ?",
+    )
+    for message in cases:
+        u = await _rules().understand(message)
+        assert u.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS, message
+
+
+# ---------------------------------------------------------------------------
+# Regressions: the four fisherman/ocean question shapes from the task brief
+# ---------------------------------------------------------------------------
+async def test_regression_can_i_fish_tomorrow() -> None:
+    u = await _rules().understand("Can I fish tomorrow near Mangalore?")
+    assert u.intent is QueryIntent.FISHING_SAFETY
+
+
+async def test_regression_where_is_suitable_fishing_zone() -> None:
+    u = await _rules().understand("Where is the suitable fishing zone near Mangalore?")
+    assert u.intent is QueryIntent.PFZ_REFERENCE
+
+
+async def test_regression_route_me_to_selected_pfz() -> None:
+    u = await _rules().understand("Route me to the selected PFZ.")
+    assert u.intent is QueryIntent.PFZ_REFERENCE
+    assert u.requests_route is True
+
+
+async def test_regression_show_me_sea_conditions() -> None:
+    u = await _rules().understand("Show me the sea conditions near Mangalore.")
+    assert u.intent is QueryIntent.OCEAN_CONDITIONS
+
+
+# ---------------------------------------------------------------------------
 # Multi-turn research context
 # ---------------------------------------------------------------------------
 async def test_multiturn_research_follow_up_retains_domain_and_location() -> None:
@@ -420,6 +624,183 @@ async def test_multiturn_research_follow_up_retains_domain_and_location() -> Non
         session_id="mt-1", now=NOW,
     )
     assert r4.intent == "research_query"
+
+
+# ---------------------------------------------------------------------------
+# Generalized semantic requested-output handling: correlation, methodology,
+# dataset inventory, prediction (hard capability gate), source conflict, and
+# the HAB-confirmation follow-up.
+# ---------------------------------------------------------------------------
+async def test_correlation_paraphrases_converge_on_fisheries_correlation() -> None:
+    for msg in (
+        "Over several months, does sea-surface temperature appear to be "
+        "related to pelagic fish activity around Mangalore?",
+        "Is chlorophyll linked to fish activity near Mangalore?",
+        "Is there a relationship over time between SST and fishing activity?",
+    ):
+        u = await _rules().understand(msg)
+        assert u.intent is QueryIntent.RESEARCH_QUERY, msg
+        assert u.research_domain is ResearchDomain.FISHERIES_CORRELATION, msg
+        assert u.analysis_type is AnalysisType.CORRELATION, msg
+        assert u.capability_status is CapabilityStatus.PARTIAL, msg
+
+
+async def test_correlation_render_refuses_to_calculate_relationship() -> None:
+    pipe = make_pipeline(environment=FakeEnvironmentalAgent(chlorophyll=2.0))
+    r = await pipe.run(
+        message=(
+            "Over several months, does sea-surface temperature appear to be "
+            "related to pelagic fish activity around Mangalore?"
+        ),
+        session_id="corr-a", now=NOW,
+    )
+    assert r.intent == "research_query"
+    text_low = r.answer.lower()
+    finding_section = text_low.split("finding:")[1].split("interpretation:")[0]
+    assert "cannot determine" in finding_section
+    assert "fish-landings" in finding_section or "fisheries time series" in finding_section
+    # never invents/implies an actual correlation number
+    assert "correlation coefficient" not in text_low
+    assert "correlation:" not in finding_section
+
+
+async def test_methodology_followup_paraphrases_explain_actual_method() -> None:
+    pipe = make_pipeline(
+        environment=FakeEnvironmentalAgent(chlorophyll=3.0),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(chl=1.0),
+    )
+    r1 = await pipe.run(message=_R2_MESSAGE, session_id="method-a", now=NOW)
+    assert r1.intent == "research_query"
+
+    for followup in (
+        "How did you determine whether it was unusual?",
+        "What methodology did you use?",
+        "What baseline did you use?",
+        "How was this classified?",
+    ):
+        r2 = await pipe.run(message=followup, session_id="method-a", now=NOW)
+        assert r2.intent == "research_query", followup
+        text_low = r2.answer.lower()
+        assert "validity/freshness gate" in text_low, followup
+        assert "historical/reference distribution" in text_low, followup
+        # never claims an anomaly without explaining the actual comparison it
+        # is based on - the underlying basis text must still be present
+        assert "orca-computed reference" in text_low or "elevated" in text_low, followup
+
+
+async def test_dataset_inventory_paraphrases_converge() -> None:
+    for msg in (
+        "What historical ocean-colour observations does ORCA actually have "
+        "for the Mangalore region?",
+        "Which sensors are available for this region?",
+        "What data exists for this region?",
+        "What ocean-colour datasets are configured?",
+    ):
+        u = await _rules().understand(msg)
+        assert u.intent is QueryIntent.RESEARCH_QUERY, msg
+        assert u.research_domain is ResearchDomain.GENERAL_ENVIRONMENTAL, msg
+        assert u.requested_output is RequestedOutput.DATASET_INVENTORY, msg
+
+
+async def test_dataset_inventory_render_lists_truthful_sources() -> None:
+    pipe = make_pipeline()
+    r = await pipe.run(
+        message=(
+            "What historical ocean-colour observations does ORCA actually "
+            "have for the Mangalore region?"
+        ),
+        session_id="inv-a", now=NOW,
+    )
+    assert r.intent == "research_query"
+    text_low = r.answer.lower()
+    assert "noaa coastwatch" in text_low
+    assert "oceansat-2 ocm" in text_low
+    assert "2015-01-01" in text_low and "2019-12-31" in text_low
+    assert "sentinel3_olci: not configured" in text_low
+    assert "modis_aqua: not configured" in text_low
+    # historical Oceansat-2 must never be described as live/current
+    assert "historical local netcdf archive" in text_low
+
+
+async def test_prediction_paraphrases_are_a_hard_capability_gate() -> None:
+    for msg in (
+        "Which fishing ground will have the highest fish catch tomorrow "
+        "based on your research data?",
+        "Can you predict tomorrow's catch?",
+        "What is the forecast for fish landings this week?",
+    ):
+        u = await _rules().understand(msg)
+        assert u.intent is QueryIntent.RESEARCH_QUERY, msg
+        assert u.requested_output is RequestedOutput.PREDICTION, msg
+        assert u.capability_status is CapabilityStatus.UNSUPPORTED, msg
+        assert "fish_landings" in u.datasets_required, msg
+
+
+async def test_prediction_render_refuses_and_never_substitutes_sst_chl() -> None:
+    pipe = make_pipeline(environment=FakeEnvironmentalAgent(chlorophyll=2.0))
+    r = await pipe.run(
+        message=(
+            "Which fishing ground will have the highest fish catch tomorrow "
+            "based on your research data?"
+        ),
+        session_id="pred-a", now=NOW,
+    )
+    assert r.intent == "research_query"
+    text_low = r.answer.lower()
+    assert "cannot predict" in text_low
+    assert "never substituted as a catch-prediction model" in text_low
+    data_section = text_low.split("data used:")[1].split("finding:")[0]
+    assert "no orca dataset could be used" in data_section
+
+
+async def test_source_conflict_paraphrases_converge() -> None:
+    for msg in (
+        "Which sources disagree for this location?",
+        "Are the datasets conflicting?",
+        "Do the observations contradict each other?",
+        "Is there conflicting evidence?",
+    ):
+        u = await _rules().understand(msg)
+        assert u.intent is QueryIntent.RESEARCH_QUERY, msg
+        assert u.requested_output is RequestedOutput.SOURCE_CONFLICT, msg
+        assert u.capability_status is CapabilityStatus.SUPPORTED, msg
+
+
+async def test_source_conflict_render_explains_non_comparability_not_invented() -> None:
+    pipe = make_pipeline(environment=FakeEnvironmentalAgent(chlorophyll=2.0))
+    r = await pipe.run(
+        message="Which sources disagree for this location?", session_id="conf-a", now=NOW,
+    )
+    assert r.intent == "research_query"
+    text_low = r.answer.lower()
+    finding_section = text_low.split("finding:")[1].split("interpretation:")[0]
+    assert (
+        "no confirmed disagreement" in finding_section
+        or "no source-disagreement check could be made" in finding_section
+    )
+    assert "source disagreement on" not in finding_section
+
+
+async def test_hab_followup_paraphrases_lead_with_explicit_non_confirmation() -> None:
+    pipe = make_pipeline(
+        environment=FakeEnvironmentalAgent(chlorophyll=3.0),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(chl=1.0),
+    )
+    r1 = await pipe.run(message=_R2_MESSAGE, session_id="hab-a", now=NOW)
+    assert r1.intent == "research_query"
+
+    for followup in (
+        "Does that mean there is a harmful algal bloom?",
+        "Is this a bloom?",
+        "Does this indicate a red tide?",
+    ):
+        r2 = await pipe.run(message=followup, session_id="hab-a", now=NOW)
+        assert r2.intent == "research_query", followup
+        text_low = r2.answer.lower()
+        finding_section = text_low.split("finding:")[1].split("interpretation:")[0]
+        assert finding_section.strip().startswith(
+            "no. orca cannot conclude that there is a harmful algal bloom"
+        ), followup
 
 
 # ---------------------------------------------------------------------------
@@ -463,3 +844,70 @@ async def test_regression_fishing_query_with_landings_word_not_stolen() -> None:
         "Is it safe to fish near Mangalore today for the landings?"
     )
     assert u.intent is not QueryIntent.RESEARCH_QUERY
+
+
+# ---------------------------------------------------------------------------
+# Research-first presentation: a researcher answer must never lead with (or
+# contain, anywhere) the operational PROCEED / CAUTION / DO_NOT_PROCEED /
+# NO_SAFE_RECOMMENDATION safety-decision vocabulary, even though the safety
+# chain still computes upstream unaffected (see `r.decision` below) - the
+# task's own "does not begin with 'The system decision is PROCEED...'"
+# requirement. Covers both the RESEARCH_QUERY path (_render_research_intent)
+# and the plain ENVIRONMENTAL_CONDITIONS path (_render_environmental_intent),
+# since a demo question such as "How does the current sea-surface temperature
+# near Mangalore compare with the last 30 days?" resolves to the latter.
+# ---------------------------------------------------------------------------
+_DECISION_LEAD_PHRASES = (
+    "the system decision is",
+    "decision: proceed",
+    "decision: caution",
+    "decision: do_not_proceed",
+    "system decision",
+)
+
+
+def _assert_research_first(answer: str) -> None:
+    text_low = answer.strip().lower()
+    for phrase in _DECISION_LEAD_PHRASES:
+        assert phrase not in text_low, answer
+    # DECISION_STATUS values must never appear as the leading word(s) of the
+    # answer - a research answer may still mention risk/decision context deep
+    # in Limitations, but it must never OPEN with it.
+    first_line = text_low.splitlines()[0].strip()
+    for status_word in ("proceed", "caution", "do_not_proceed", "no_safe_recommendation"):
+        assert not first_line.startswith(status_word), answer
+
+
+async def test_sst_comparison_question_does_not_lead_with_safety_decision() -> None:
+    pipe = make_pipeline(
+        ocean=FakeOceanAgent(
+            observations=(obs("sea_surface_temperature", 29.0, "°C", "open-meteo-marine", when=NOW),)
+        ),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(sst=29.1, chl=None),
+    )
+    r = await pipe.run(
+        message=(
+            "How does the current sea-surface temperature near Mangalore "
+            "compare with the last 30 days?"
+        ),
+        session_id="researchfirst-1", now=NOW,
+    )
+    assert r.intent == "environmental_conditions"
+    _assert_research_first(r.answer)
+    # the answer must lead with the research question/finding, not a decision
+    assert r.answer.strip().lower().startswith("research question")
+    # the safety chain still computed a decision upstream - it is simply never
+    # the leading content of the researcher's answer.
+    assert r.decision is not None
+
+
+async def test_chlorophyll_anomaly_research_query_does_not_lead_with_safety_decision() -> None:
+    pipe = make_pipeline(
+        environment=FakeEnvironmentalAgent(chlorophyll=3.0),
+        historical_environment_agent=FakeHistoricalEnvironmentalAgent(chl=1.0),
+    )
+    r = await pipe.run(message=_R2_MESSAGE, session_id="researchfirst-2", now=NOW)
+    assert r.intent == "research_query"
+    _assert_research_first(r.answer)
+    assert r.answer.strip().lower().startswith("research question")
+    assert r.decision is not None

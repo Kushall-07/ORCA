@@ -77,14 +77,34 @@ async def test_non_comparative_area_questions_stay_supported(message: str) -> No
 
 # ---------------------------------------------------------------------------
 # Open-ended fishing-location recommendation requests.
+#
+# Demo-readiness fix: "where should I fish" / "which area/location is
+# better/suitable for fishing" now surface ORCA's EXISTING official INCOIS PFZ
+# reference (see QueryIntent.PFZ_REFERENCE / _render_pfz_intent, which frames
+# it strictly as a reference, never a recommendation) instead of an honest
+# refusal - these paraphrasings clearly have a PFZ angle, so answering with
+# the real reference data is more useful than refusing outright. Only a
+# genuinely open-ended superlative ask with NO PFZ angle at all ("what is the
+# best place to fish near here?") still gets the honest capability-limitation
+# refusal, since ORCA has no location-optimization capability at all.
 # ---------------------------------------------------------------------------
-OPEN_LOCATION_PARAPHRASES = [
+PFZ_ANGLE_LOCATION_PARAPHRASES = [
     "Where should I fish?",
     "Where should I fish today?",
     "Which area is better for fishing?",
     "Which location should I fish at?",
+]
+
+OPEN_LOCATION_PARAPHRASES = [
     "What is the best place to fish near here?",
 ]
+
+
+@pytest.mark.parametrize("message", PFZ_ANGLE_LOCATION_PARAPHRASES)
+async def test_pfz_angle_location_paraphrases_surface_pfz_reference(message: str) -> None:
+    u = await AGENT.understand(message)
+    assert u.intent is QueryIntent.PFZ_REFERENCE
+    assert u.capability_status is CapabilityStatus.SUPPORTED
 
 
 @pytest.mark.parametrize("message", OPEN_LOCATION_PARAPHRASES)
@@ -107,12 +127,22 @@ async def test_open_location_recommendation_does_not_fire_for_plain_pfz_or_gis_q
 async def test_open_location_recommendation_end_to_end_never_invents_a_place() -> None:
     pipe = make_pipeline()
     r = await pipe.run(
-        message="Where should I fish?", session_id="s-openloc-1", coordinate=MANGALORE, now=NOW,
+        message="What is the best place to fish near here?",
+        session_id="s-openloc-1", coordinate=MANGALORE, now=NOW,
     )
     assert r.status == "CAPABILITY_UNSUPPORTED"
     assert r.location is None or r.decision is None
     low = r.answer.lower()
     assert "does not currently support" in low or "does not support" in low
+
+
+async def test_pfz_angle_location_end_to_end_surfaces_pfz_reference() -> None:
+    pipe = make_pipeline()
+    r = await pipe.run(
+        message="Where should I fish?", session_id="s-openloc-pfz-1",
+        coordinate=MANGALORE, now=NOW,
+    )
+    assert r.intent == "pfz_reference"
 
 
 # ---------------------------------------------------------------------------

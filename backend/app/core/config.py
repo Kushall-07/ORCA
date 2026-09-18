@@ -151,7 +151,17 @@ class Settings(BaseSettings):
     oceancolor_incois_chl_variable: str = Field(default="chlor_a")
     # Optional PEM file completing the INCOIS TLS chain. Empty -> plain verify=True.
     oceancolor_incois_ca_bundle: str = Field(default="")
-    oceancolor_timeout_seconds: float = Field(default=15.0, gt=0)
+    # Kept in the same 8-10s interactive-demo band as openmeteo_timeout_seconds
+    # / imd_timeout_seconds. The NOAA CHL chain issues up to two sequential
+    # ERDDAP calls (axis discovery + data) per dataset and tries two datasets
+    # (primary + optional NOAA secondary), so a 15s timeout with a retry each
+    # could multiply an unreachable NOAA host into ~60s of blocking wait before
+    # collect_environment could report the honest MISSING result. oceancolor_retries
+    # defaults to 0 (no retry) so that worst case stays bounded (~2 x timeout for
+    # a fully unreachable host), never removing the primary/secondary/INCOIS
+    # fallback chain itself.
+    oceancolor_timeout_seconds: float = Field(default=10.0, gt=0)
+    oceancolor_retries: int = Field(default=0, ge=0, le=3)
     oceancolor_cache_ttl_seconds: int = Field(default=32400, gt=0)      # 9 h
     oceancolor_cache_max_age_seconds: int = Field(default=86400, gt=0)  # 24 h
     # A chlorophyll composite older than this (relative to the decision time) is

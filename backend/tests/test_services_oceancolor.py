@@ -271,6 +271,76 @@ async def test_both_sources_fail_raises_no_data_with_combined_context() -> None:
     assert "noaa" in str(ei.value).lower() and "incois" in str(ei.value).lower()
 
 
+# ==========================================================================
+# Timeout-bound regression - a ~64s /query stall was traced to NOAA CHL
+# collection: an unreachable NOAA ERDDAP host let a get_json(retries=1) inside
+# BOTH the axis-discovery call AND the two-dataset (primary + NOAA secondary)
+# fallback chain multiply into ~60s of blocking wait before collect_environment
+# could report the honest MISSING result. The fix threads a configurable
+# ``oceancolor_retries`` (default 0) through every oceancolor.py get_json call
+# and shortens ``oceancolor_timeout_seconds`` to the same 8-10s interactive-demo
+# band already used by OPENMETEO_TIMEOUT_SECONDS / IMD_TIMEOUT_SECONDS.
+# ==========================================================================
+def test_default_timeout_and_retries_are_bounded_for_interactive_use() -> None:
+    s = _settings()
+    assert 0 < s.oceancolor_timeout_seconds <= 10.0
+    assert s.oceancolor_retries == 0
+
+
+@respx.mock
+async def test_noaa_success_still_returns_chl_with_new_defaults() -> None:
+    respx.get(NOAA_INFO).respond(json=_info())
+    respx.get(NOAA_DATA).respond(json=_table([_row(1.0, 0.6)]))
+    s = _settings()
+    assert s.oceancolor_retries == 0 and s.oceancolor_timeout_seconds == 10.0
+    r = await oc.fetch_chlorophyll(LAT, LON, WHEN, settings=s)
+    assert r.value == pytest.approx(0.6)
+
+
+@respx.mock
+async def test_timeout_on_primary_axis_order_is_not_retried() -> None:
+    """A hanging/unreachable NOAA host must fail after exactly ONE attempt
+    (default oceancolor_retries=0), not the two attempts a hardcoded
+    retries=1 used to cost every single ERDDAP call."""
+    info = respx.get(NOAA_INFO).mock(side_effect=httpx.TimeoutException("noaa unreachable"))
+    with pytest.raises(oc.OceanColorUnavailable):
+        await oc.fetch_chlorophyll(LAT, LON, WHEN, settings=_settings())
+    assert info.call_count == 1
+
+
+@respx.mock
+async def test_timeout_falls_through_to_secondary_dataset_without_multiplying() -> None:
+    """Both the primary and NOAA-secondary datasets are still tried (chlorophyll
+    functionality preserved) but each is attempted exactly once, so a fully
+    unreachable NOAA host now costs ~2 x oceancolor_timeout_seconds worst case,
+    not the ~4x that produced the observed ~60s stall."""
+    noaa_sq_info = "https://coastwatch.noaa.gov/erddap/info/noaacwNPPVIIRSSQchlaDaily/index.json"
+    primary = respx.get(NOAA_INFO).mock(side_effect=httpx.TimeoutException("noaa unreachable"))
+    secondary = respx.get(noaa_sq_info).mock(side_effect=httpx.TimeoutException("noaa unreachable"))
+    with pytest.raises(oc.OceanColorUnavailable):
+        await oc.fetch_chlorophyll(
+            LAT, LON, WHEN,
+            settings=_settings(oceancolor_noaa_chl_fallback_dataset="noaacwNPPVIIRSSQchlaDaily"),
+        )
+    assert primary.call_count == 1
+    assert secondary.call_count == 1
+
+
+@respx.mock
+async def test_transient_failure_can_still_be_retried_when_configured() -> None:
+    """oceancolor_retries stays a real, working retry knob (just defaulted to 0
+    for the interactive path) - raising it must still recover a one-off
+    transient timeout on the SAME call."""
+    info = respx.get(NOAA_INFO)
+    info.side_effect = [httpx.TimeoutException("blip"), httpx.Response(200, json=_info())]
+    respx.get(NOAA_DATA).respond(json=_table([_row(1.0, 0.6)]))
+    r = await oc.fetch_chlorophyll(
+        LAT, LON, WHEN, settings=_settings(oceancolor_retries=1)
+    )
+    assert r.value == pytest.approx(0.6)
+    assert info.call_count == 2
+
+
 async def test_disabled_raises_not_configured() -> None:
     with pytest.raises(oc.OceanColorNotConfigured):
         await oc.fetch_chlorophyll(LAT, LON, WHEN, settings=_settings(oceancolor_enabled=False))

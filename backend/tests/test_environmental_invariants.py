@@ -12,9 +12,14 @@ from __future__ import annotations
 import subprocess
 import sys
 
+import httpx
 import pytest
+import respx
 
+from app.agents.environmental import EnvironmentalAgent
+from app.core.config import Settings
 from app.risk.engine import RiskEngineInput
+from app.services.cache import InMemoryCache, JsonCache
 from tests.orchestration_fakes import (
     NOW,
     FakeEnvironmentalAgent,
@@ -96,6 +101,50 @@ async def test_environmental_agent_failure_does_not_fail_the_graph() -> None:
     assert r.status == "OK"
     assert r.decision is not None
     assert "environment:skip" in r.agent_trace
+
+
+@respx.mock
+async def test_noaa_timeout_stays_bounded_sst_and_decision_unaffected() -> None:
+    """Regression for the ~64s /query stall traced to collect_environment: NOAA
+    CoastWatch ERDDAP unreachable (both the primary and NOAA-secondary chlorophyll
+    datasets time out). Runs the REAL EnvironmentalAgent -> app.services.oceancolor
+    chain (not a fake) through the full pipeline to prove the bounded-timeout fix
+    (oceancolor_retries=0, oceancolor_timeout_seconds<=10) end to end: chlorophyll
+    is honestly MISSING, Open-Meteo SST is untouched, and the safety chain is
+    byte-identical to a run with no environmental agent at all."""
+    primary = respx.get(
+        "https://coastwatch.noaa.gov/erddap/info/noaacwNPPVIIRSchlaDaily/index.json"
+    ).mock(side_effect=httpx.TimeoutException("noaa unreachable"))
+    secondary = respx.get(
+        "https://coastwatch.noaa.gov/erddap/info/noaacwNPPVIIRSSQchlaDaily/index.json"
+    ).mock(side_effect=httpx.TimeoutException("noaa unreachable"))
+
+    real_env_agent = EnvironmentalAgent(
+        cache=JsonCache(InMemoryCache()), settings=Settings(oceancolor_enabled=True)
+    )
+
+    r = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(29.5),
+        environment=real_env_agent,
+    ).run(message=FISHING_Q, session_id="env-noaa-timeout", now=NOW)
+
+    # no retry multiplication: each dataset's axis-order call is attempted once
+    assert primary.call_count == 1
+    assert secondary.call_count == 1
+
+    assert r.status == "OK"
+    assert r.decision is not None
+    assert "environment:skip" in r.agent_trace   # honest MISSING, non-blocking
+
+    ev = {e.variable: e for e in r.evidence}
+    assert "sea_surface_temperature" in ev            # Open-Meteo SST unaffected
+    assert ev["sea_surface_temperature"].value == pytest.approx(29.5)
+    assert "chlorophyll_a" not in ev                  # never fabricated
+
+    baseline = await make_pipeline(
+        weather=FakeWeatherAgent(), ocean=_ocean_with_sst(29.5), environment=None,
+    ).run(message=FISHING_Q, session_id="env-noaa-timeout-baseline", now=NOW)
+    assert _decision_snapshot(r) == _decision_snapshot(baseline)
 
 
 # --------------------------------------------------------------------------

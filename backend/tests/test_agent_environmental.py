@@ -103,6 +103,26 @@ async def test_demo_tier_only_when_enabled(monkeypatch) -> None:
     assert on.observations[0].value > 0.0
 
 
+async def test_noaa_timeout_degrades_to_missing_without_raising(monkeypatch) -> None:
+    """Regression for the ~64s /query stall: a bounded NOAA timeout (surfaced by
+    app.services.oceancolor as OceanColorUnavailable, exactly like a real
+    httpx timeout would be) must degrade to an honest MISSING result quickly,
+    never raise into collect_environment / the pipeline."""
+    monkeypatch.setattr(
+        oceancolor, "fetch_chlorophyll",
+        lambda *a, **k: _async_raise(
+            oceancolor.OceanColorUnavailable(
+                "noaa-coastwatch-erddap: timeout calling erddap"
+            )
+        ),
+    )
+    r = await _agent().fetch(COORD, WHEN)   # must not raise
+    assert r.source_status.tier is DataTier.MISSING
+    assert r.has_data is False
+    assert r.observations == ()
+    assert r.errors and "unavailable" in r.errors[0].lower()
+
+
 async def test_missing_when_nothing_available(monkeypatch) -> None:
     monkeypatch.setattr(
         oceancolor, "fetch_chlorophyll",
