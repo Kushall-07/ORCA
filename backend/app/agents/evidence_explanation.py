@@ -21,7 +21,7 @@ from app.i18n.messages import (
     productivity_label,
     suitability_label,
 )
-from app.models.conflict import Conflict
+from app.models.conflict import Conflict, ConflictType
 from app.models.decision import DecisionResult, DecisionStatus
 from app.models.environmental import (
     ComparisonDirection,
@@ -37,10 +37,12 @@ from app.models.fabric import MarineDataFabric
 from app.models.pfz import PfzReferenceResult
 from app.models.provenance import ProvenanceGraph
 from app.models.query import (
+    AnalysisType,
     CapabilityStatus,
     Language,
     QueryIntent,
     QueryUnderstanding,
+    RequestedOutput,
     ResearchDomain,
 )
 from app.models.research import ResearchResult
@@ -343,7 +345,7 @@ def render_template(
     # limitation (see `_render_research_intent`), never the generic
     # fishing/PFZ-flavoured capability message.
     if understanding is not None and understanding.intent is QueryIntent.RESEARCH_QUERY:
-        return _render_research_intent(language, understanding, research, notes)
+        return _render_research_intent(language, understanding, research, notes, conflicts)
     if understanding is not None and understanding.capability_status is CapabilityStatus.UNSUPPORTED:
         return _render_capability_limitation(language, understanding, notes)
 
@@ -356,6 +358,19 @@ def render_template(
         )
     if understanding is not None and understanding.intent is QueryIntent.GIS_REFERENCE:
         return _render_gis_intent(language, gis, geofence_clear, notes)
+    # A researcher's plain environmental_conditions question (current SST/
+    # chlorophyll-a, a 30-day comparison, bounded-window stability, a
+    # chlorophyll-a neighbourhood-representativeness check, or an
+    # evidence/provenance question) is answered as its own research finding -
+    # the SAME "never displaced by an unrelated safety-decision" posture as
+    # ocean_conditions/pfz_reference above, so the operational fishing-safety
+    # decision (which still computes upstream, unaffected) never leads, and is
+    # never described as caused by or equivalent to the environmental finding.
+    if understanding is not None and understanding.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS:
+        return _render_environmental_intent(
+            language, understanding, productivity, comparison,
+            environmental_evidence, stability, neighbourhood, notes,
+        )
 
     _render_simple_core(parts, language, decision, risk, fabric, advisory_clear, geofence_clear)
 
@@ -833,7 +848,86 @@ def _render_gis_intent(language, gis, geofence_clear, notes) -> Explanation:  # 
 _UNRESOLVED_LOCATION = "an unresolved location"
 
 
-def _render_research_intent(language, understanding, research, notes) -> Explanation:  # type: ignore[no-untyped-def]
+def _render_environmental_intent(  # type: ignore[no-untyped-def]
+    language, understanding, productivity, comparison, environmental_evidence,
+    stability, neighbourhood, notes,
+) -> Explanation:
+    """A researcher's plain ``environmental_conditions`` question - current
+    SST/chlorophyll-a, a 30-day comparison, bounded-window stability, a
+    chlorophyll-a neighbourhood-representativeness check, or an
+    evidence/provenance question about how a result was produced.
+
+    Leads with the research question and its finding, exactly like
+    `_render_ocean_conditions` / `_render_pfz_intent` above: the operational
+    fishing-safety decision (computed upstream, unaffected) is NEVER shown
+    here and never described as caused by or equivalent to the environmental
+    finding - see the task's "safety decision must not lead" requirement.
+    Reuses the SAME deterministic per-capability renderers the main flow uses
+    for a fisherman's query that also happens to carry environmental context,
+    just without the leading `_render_simple_core` safety block.
+    """
+    origin_name = understanding.origin.name if understanding.origin is not None else None
+    location = origin_name or _UNRESOLVED_LOCATION
+    is_provenance = understanding.requested_output is RequestedOutput.PROVENANCE
+    has_stability = stability is not None and (
+        stability.sst is not None or stability.chlorophyll_a is not None
+    )
+    has_comparison = comparison is not None and (
+        comparison.sst is not None or comparison.chlorophyll_a is not None
+    )
+
+    if is_provenance:
+        topic = frag(language, "research_topic_evidence")
+    elif has_stability:
+        topic = frag(language, "research_topic_stability")
+    elif has_comparison:
+        topic = frag(language, "research_topic_comparison")
+    elif neighbourhood is not None:
+        topic = frag(language, "research_topic_neighbourhood")
+    else:
+        topic = frag(language, "research_topic_current")
+
+    parts: list[str] = [
+        frag(language, "research_question_environmental", topic=topic, location=location)
+    ]
+
+    # Evidence/provenance question: lead the finding with an explicit
+    # SOURCE-OBSERVATION vs ORCA-DETERMINISTIC-PROCESSING explanation, never
+    # a vague "capability registry" restatement - see the task's Part 3/E.
+    if is_provenance:
+        parts.append(frag(language, "env_ev_provenance_explanation"))
+
+    any_data = False
+    if productivity is not None:
+        _render_simple_environmental(parts, language, productivity)
+        any_data = True
+    if has_comparison:
+        _render_comparison(parts, language, comparison)
+        any_data = True
+    if environmental_evidence is not None and environmental_evidence.items:
+        _render_evidence(parts, language, environmental_evidence)
+        any_data = True
+    if has_stability:
+        _render_stability(parts, language, stability)
+        any_data = True
+    if neighbourhood is not None:
+        _render_neighbourhood(parts, language, neighbourhood)
+        any_data = True
+    if not any_data:
+        parts.append(frag(language, "research_env_no_data", location=location))
+
+    parts.append(frag(language, "env_disclaimer"))
+
+    return Explanation(
+        text="\n\n".join(parts),
+        language=language,
+        reasoning_summary="environmental_conditions: informational research report",
+        evidence_refs=notes["evidence_refs"], data_quality_note=notes["data_quality_note"],
+        generated_via="template", grounded=True,
+    )
+
+
+def _render_research_intent(language, understanding, research, notes, conflicts=()) -> Explanation:  # type: ignore[no-untyped-def]
     """Marine Researcher / Oceanographer research-formatted answer.
 
     Template-only, deterministic (see ExplanationAgent.explain - research_query
@@ -901,6 +995,87 @@ def _render_research_intent(language, understanding, research, notes) -> Explana
     # ---- Finding (OBSERVATION -> deterministic result) ---------------
     finding_lines = [frag(language, "research_finding_header")]
     finding_added = False
+    # A HAB-confirmation follow-up ("Does that mean there is a harmful algal
+    # bloom?") must directly LEAD with an explicit non-confirmation - never
+    # let the chlorophyll-a anomaly restatement below stand in as if it alone
+    # answered the yes/no question (see the "hab_confirmation_followup"
+    # marker set in app.agents.query_understanding._merge_session). This is a
+    # prefix, not a replacement: the existing anomaly/HAB-caution finding
+    # below still follows for full context.
+    if "hab_confirmation_followup" in understanding.notes:
+        finding_lines.append(frag(language, "research_hab_direct_refusal"))
+    # A hard capability gate: a future fisheries-outcome prediction request
+    # (see app.research.domains._PREDICTION_RE) is ALWAYS unsupported - built
+    # purely from `understanding` since `research` is None whenever this made
+    # capability_status fully UNSUPPORTED (see STATUS_UNSUPPORTED). SST/
+    # chlorophyll-a are never silently substituted as a catch predictor.
+    if understanding.requested_output is RequestedOutput.PREDICTION:
+        finding_lines.append(frag(
+            language, "research_finding_prediction_unsupported",
+            reason=research_capability.reason_for("fish_landings"),
+        ))
+        finding_added = True
+    # "Which sources disagree?" - reuses the EXISTING Evidence Arbitration /
+    # Conflict Detection output (`conflicts`, already computed upstream by
+    # app.reasoning.conflicts); never invents a disagreement, and explains
+    # WHY when the in-scope variables are each served by only one configured
+    # source rather than pretending they disagree.
+    if understanding.requested_output is RequestedOutput.SOURCE_CONFLICT:
+        scope_vars = tuple(dict.fromkeys(
+            list(understanding.datasets_available) + list(understanding.datasets_required)
+        )) or ("sea_surface_temperature", "chlorophyll_a")
+        relevant = [
+            c for c in conflicts
+            if c.conflict_type is ConflictType.SOURCE_DISAGREEMENT
+            and (c.variable is None or c.variable in scope_vars)
+        ]
+        if relevant:
+            for c in relevant:
+                finding_lines.append(frag(
+                    language, "research_finding_source_conflict_found",
+                    variable=(c.variable or "this request").replace("_", " "),
+                    detail=c.detail or "the sources disagree",
+                ))
+        else:
+            single_source = [v for v in scope_vars if research_capability.source_for(v) is not None]
+            if single_source:
+                finding_lines.append(frag(
+                    language, "research_finding_source_conflict_not_comparable",
+                    variables=", ".join(v.replace("_", " ") for v in single_source),
+                ))
+            else:
+                finding_lines.append(frag(language, "research_finding_no_source_conflict"))
+        finding_added = True
+    # Methodology follow-up ("How did you determine whether it was
+    # unusual?") - explains the ACTUAL deterministic method (reusing the
+    # existing anomaly classifier's own `basis` text when applicable), never
+    # a fabricated statistical method and never just the finding restated.
+    if understanding.requested_output is RequestedOutput.METHODOLOGY:
+        if (
+            domain is ResearchDomain.CHLOROPHYLL_ANOMALY
+            and research is not None and research.anomaly is not None
+        ):
+            finding_lines.append(frag(
+                language, "research_finding_methodology_anomaly", basis=research.anomaly.basis,
+            ))
+        else:
+            finding_lines.append(frag(language, "research_finding_methodology_generic"))
+        finding_added = True
+    # R1 fisheries correlation - "fish_landings" has no configured source, so
+    # a correlation is never calculated or implied; states plainly what IS
+    # available and what is still required to compute a real correlation.
+    if research is not None and analysis is AnalysisType.CORRELATION:
+        available = research.capability.available
+        missing = research.capability.unavailable
+        avail_label = " and ".join(v.replace("_", " ") for v in available) or "the requested variable(s)"
+        if missing:
+            finding_lines.append(frag(
+                language, "research_finding_correlation_unsupported",
+                available=avail_label, reason=research_capability.reason_for(missing[0]),
+            ))
+        else:
+            finding_lines.append(frag(language, "research_finding_correlation_supported", available=avail_label))
+        finding_added = True
     if research is not None and research.anomaly is not None:
         finding_lines.append(frag(
             language, "research_finding_anomaly",

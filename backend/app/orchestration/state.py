@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Annotated, TypedDict
 
 from app.agents.base import AgentResult
-from app.agents.route import RouteAgentResult
+from app.agents.route import MultiRouteAgentResult, RouteAgentResult
 from app.models.common import Coordinate
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
@@ -73,6 +73,16 @@ class OrcaGraphState(TypedDict, total=False):
     # deterministic (no LLM in the loop) and reuses the existing Risk / Safety
     # / Decision / RouteAgent chain unchanged.
     destination_override: Coordinate | None
+    # Multiple explicit destination coordinates (e.g. several map-selected
+    # INCOIS PFZ references), ordered exactly as the frontend recorded the
+    # user's selection. A single-element tuple behaves identically to
+    # `destination_override` above (single-PFZ routing is unchanged); a
+    # tuple of more than one element switches `route_node` to plan a chained
+    # origin -> dest[0] -> dest[1] -> ... route via
+    # `app.agents.route.RouteAgent.plan_multi` - never a second routing
+    # algorithm, just repeated calls to the existing one. `None` for every
+    # ordinary query.
+    destination_overrides: tuple[Coordinate, ...] | None
     # Deterministic nearest-official-PFZ-zone destination, resolved by
     # `normalize` ONLY for an explicit compound "PFZ + route" natural-language
     # request that names no distinct second place (e.g. "Show me the nearest
@@ -122,6 +132,14 @@ class OrcaGraphState(TypedDict, total=False):
     # ---- routing ----
     route_agent_result: RouteAgentResult | None
     route_result: RouteResult | None
+    # Populated only when `destination_overrides` has more than one entry -
+    # see app.agents.route.RouteAgent.plan_multi. `None` for every ordinary
+    # single-destination route. When set, `route_result` above is still
+    # populated too (via `combine_multi_route_legs`), folding every leg into
+    # one RouteResult so existing single-route consumers (RouteInfo
+    # projection, explanation, provenance) need no change; this field carries
+    # the additive per-leg detail on top of that.
+    multi_route_agent_result: MultiRouteAgentResult | None
     # Verified maritime routing origin (see app.gis.pfz_reference), resolved
     # only when routing is requested. Never affects `resolved_origin` (the
     # ordinary safety-query coordinate) - it only substitutes the coordinate

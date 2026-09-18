@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.agents.base import AgentResult
+from app.models.advisory import AdvisoryAvailability, AdvisorySeverity
 from app.models.query import GeoRef, Language, QueryIntent, QueryUnderstanding
 from app.risk.engine import RiskEngineInput
 
@@ -32,6 +34,26 @@ class SessionTurn(BaseModel):
     # on this turn (it did not only when an unresolved safety-critical conflict
     # was surfaced). Re-used verbatim when re-scoring so the what-if is faithful.
     required_evidence_present: bool | None = None
+
+    # ---- Decision Replay Engine baseline (additive, read-only) ----
+    # The realised Weather / Oceanographic agent results for this turn,
+    # carrying the full hourly forecast series (see
+    # app.agents.base.AgentResult.hourly_series) a follow-up ``POST /replay``
+    # walks across time. Empty/``None`` exactly when the live turn did not run
+    # that agent or its data did not come from a genuine LIVE fetch - app.replay
+    # never fabricates a series when this is empty.
+    weather_result: AgentResult | None = None
+    ocean_result: AgentResult | None = None
+    # The already-classified official-advisory inputs the Safety Guard used on
+    # this turn (see app.orchestration.nodes._advisory_safety_inputs). An
+    # advisory bulletin has no hourly forecast of its own, so replay applies
+    # this SAME classification at every replayed timestamp rather than
+    # silently dropping Rule 2 (DO_NOT_VENTURE) coverage - see
+    # app.policy.safety_guard for the rule this must not bypass.
+    advisory_severity: AdvisorySeverity | None = None
+    advisory_availability: AdvisoryAvailability | None = None
+    advisory_applicable: bool = False
+    advisory_area: str | None = None
 
 
 class SessionContext(BaseModel):

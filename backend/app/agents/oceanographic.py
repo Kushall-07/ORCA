@@ -15,7 +15,9 @@ import httpx
 
 from app.agents.base import (
     AgentResult,
+    HourlyPoint,
     build_observations,
+    extract_hourly_series,
     missing_result,
     normalise_openmeteo,
     utcnow,
@@ -87,12 +89,14 @@ class OceanographicAgent:
             fetched_at = utcnow()
             payload["fetched_at"] = fetched_at.isoformat()
             await self.cache.set_json(key, payload, self.settings.marine_cache_ttl_seconds)
+            hourly_series = extract_hourly_series(response, openmeteo.MARINE_HOURLY)
             return self._result_from_payload(
                 coordinate,
                 when,
                 payload,
                 SourceStatus(tier=DataTier.LIVE, source=_SOURCE_LIVE, retrieved_at=fetched_at),
                 SourceTier.MODEL,
+                hourly_series=hourly_series,
             )
         except (HttpClientError, openmeteo.SchemaValidationError) as exc:
             live_error = f"live marine unavailable: {exc}"
@@ -139,6 +143,8 @@ class OceanographicAgent:
         payload: dict,
         status: SourceStatus,
         tier: SourceTier,
+        *,
+        hourly_series: tuple[HourlyPoint, ...] = (),
     ) -> AgentResult:
         observations = build_observations(
             coordinate=coordinate,
@@ -157,6 +163,7 @@ class OceanographicAgent:
             observations=observations,
             source_status=status,
             errors=(status.note,) if status.note else (),
+            hourly_series=hourly_series,
         )
 
     def _load_demo(self, coordinate: Coordinate, when: datetime) -> AgentResult | None:

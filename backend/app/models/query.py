@@ -111,6 +111,20 @@ class AnalysisType(str, Enum):
     SEDIMENT_SHORELINE_ANALYSIS = "sediment_shoreline_analysis"
     DATASET_COMPARISON = "dataset_comparison"
     SCIENTIFIC_SUMMARY = "scientific_summary"
+    # A request to predict a future fisheries outcome (e.g. tomorrow's catch,
+    # the highest-catch fishing ground) - always paired with a fish/catch/
+    # landings/abundance target variable ORCA has no validated prediction
+    # dataset or model for, so it is a hard capability gate (see
+    # app.research.domains.detect / app.research.capability), never answered
+    # by silently substituting an unrelated proxy (SST/chlorophyll-a).
+    PREDICTION = "prediction"
+    # A request asking whether ORCA's own sources disagree with each other -
+    # reuses the EXISTING Evidence Arbitration / Conflict Detection output
+    # (app.reasoning.conflicts / app.models.conflict), never invents a
+    # disagreement and never fabricates one when the compared variables are
+    # each served by only a single configured source (see
+    # app.agents.evidence_explanation._render_research_intent).
+    SOURCE_CONFLICT_CHECK = "source_conflict_check"
 
 
 class RequestedOutput(str, Enum):
@@ -135,6 +149,17 @@ class RequestedOutput(str, Enum):
     RESTRICTION_INFORMATION = "restriction_information"
     PFZ_INFORMATION = "pfz_information"
     CLARIFICATION = "clarification"
+    # ---- researcher-specific requested-output categories -------------
+    # A generalized SEMANTIC CATEGORY of researcher request needing its own
+    # answer shape distinct from a plain research REPORT (see
+    # app.agents.query_understanding's research-domain override and
+    # app.agents.evidence_explanation._render_research_intent). Never set by
+    # the LLM - deterministic detection only, same posture as every other
+    # override in this module.
+    METHODOLOGY = "methodology"              # "how did you calculate/classify this?"
+    DATASET_INVENTORY = "dataset_inventory"  # "what datasets/observations do you actually have?"
+    SOURCE_CONFLICT = "source_conflict"      # "which sources disagree?"
+    PREDICTION = "prediction"                # a future fisheries-outcome prediction request
 
 
 class CapabilityStatus(str, Enum):

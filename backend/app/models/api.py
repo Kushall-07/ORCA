@@ -9,6 +9,16 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class DestinationPoint(BaseModel):
+    """One explicit destination coordinate in an ordered multi-destination
+    request (e.g. several selected INCOIS PFZ references). Carries only a
+    plain coordinate - the same posture as `destination_latitude`/
+    `destination_longitude` below - never PFZ geometry itself."""
+
+    latitude: float
+    longitude: float
+
+
 class QueryRequest(BaseModel):
     session_id: str | None = None
     message: str = Field(min_length=1, max_length=2000)
@@ -22,6 +32,14 @@ class QueryRequest(BaseModel):
     # indistinguishable from a manually supplied destination.
     destination_latitude: float | None = None
     destination_longitude: float | None = None
+    # Multiple explicit destination coordinates, in the order the user
+    # selected them on the map (additive; only used when more than one PFZ
+    # reference is selected - a single-element list is equivalent to
+    # `destination_latitude`/`destination_longitude` above). When present with
+    # more than one entry, ORCA plans a chained route visiting every
+    # destination in order, reusing the same deterministic A* engine and hard
+    # geofence checks once per leg.
+    destinations: list[DestinationPoint] | None = None
     date_hint: str | None = None
     # UX context only - echoed back, never changes reasoning.
     stakeholder: str | None = None
@@ -109,6 +127,21 @@ class AlertItem(BaseModel):
     signal_kind: str
 
 
+class RouteLegInfo(BaseModel):
+    """One origin -> destination leg of a multi-destination route. Additive -
+    populated only on `RouteInfo.legs` for a route through more than one
+    selected PFZ reference; see app.agents.route.RouteAgent.plan_multi."""
+
+    leg_index: int
+    origin: list[float]
+    destination: list[float]
+    status: str
+    waypoint_count: int | None = None
+    total_distance_m: float | None = None
+    hard_geofence_violations: int | None = None
+    reasons: list[str] = Field(default_factory=list)
+
+
 class RouteInfo(BaseModel):
     status: str
     waypoint_count: int | None = None
@@ -152,6 +185,27 @@ class RouteInfo(BaseModel):
     total_route_cost: float | None = None
     omitted_cost_factors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # ---- multi-destination extension (additive) ---------------------------
+    # True only when more than one PFZ reference was selected - see
+    # app.agents.route.RouteAgent.plan_multi. `False` (the default) for every
+    # ordinary single-destination route, which is completely unchanged above.
+    is_multi_destination: bool = False
+    destination_count: int = 1
+    # Every requested destination, in the selected/planned order (for map
+    # markers) - always `[destination]` for a single-destination route.
+    destinations: list[list[float]] = Field(default_factory=list)
+    # Deterministic ordering rule used to sequence multi-destination legs -
+    # see MultiRouteAgentResult's docstring. Always "selection_order": the
+    # frontend's PFZ map-selection order is preserved verbatim, never
+    # re-ordered by ORCA.
+    ordering: str = "selection_order"
+    # Per-leg breakdown; empty for a single-destination route.
+    legs: list[RouteLegInfo] = Field(default_factory=list)
+    # Destinations that were never attempted because an earlier leg could not
+    # be safely routed (see MultiRouteAgentResult.unattempted_destinations) -
+    # reported explicitly, never silently dropped.
+    unattempted_destinations: list[list[float]] = Field(default_factory=list)
+    all_destinations_reached: bool = True
 
 
 class DecisionInfo(BaseModel):

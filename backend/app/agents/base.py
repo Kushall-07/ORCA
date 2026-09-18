@@ -52,6 +52,23 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class HourlyPoint(BaseModel):
+    """One hourly forecast bucket's flat variable values, preserved verbatim
+    from an already-fetched Open-Meteo response.
+
+    Used only by the Decision Replay Engine (see ``app.replay``) to walk the
+    SAME live forecast response across time without a second HTTP request per
+    timestamp. Never fed to the live Risk / Safety / Decision chain - that
+    path still uses only the single bucket ``normalise_openmeteo`` extracts
+    for ``query_time``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    time: datetime
+    values: dict[str, float]
+
+
 class AgentResult(BaseModel):
     """One agent's answer for one coordinate + time."""
 
@@ -68,6 +85,12 @@ class AgentResult(BaseModel):
     # ``advisory_level`` observation that actually feeds the Risk Engine.
     # Every other agent leaves it ``None``.
     advisory: MarineAdvisory | None = None
+    # Every hourly bucket from the SAME already-fetched Open-Meteo response,
+    # preserved verbatim for the Decision Replay Engine (see ``app.replay``).
+    # Populated ONLY on a genuine LIVE fetch - empty on CACHE/DEMO/MISSING, so
+    # replay only ever runs against a real forecast response, never a single
+    # cached bucket stretched into a fake series.
+    hourly_series: tuple[HourlyPoint, ...] = ()
 
     @property
     def has_data(self) -> bool:
@@ -148,6 +171,33 @@ def normalise_openmeteo(response, when: datetime, hourly_keys: tuple[str, ...]) 
         "values": values,
         "units": units,
     }
+
+
+def extract_hourly_series(response, hourly_keys: tuple[str, ...]) -> tuple[HourlyPoint, ...]:
+    """Every hourly bucket of an already-fetched, already-validated Open-Meteo
+    response, translated to ORCA variable names via ``VARIABLE_MAP`` - the
+    same translation ``normalise_openmeteo`` applies to the single bucket it
+    keeps. No network call, no filtering: the caller (the Decision Replay
+    Engine) decides which timestamps within this series it actually wants.
+    """
+    points: list[HourlyPoint] = []
+    for idx, iso in enumerate(response.hourly.time):
+        ts = datetime.fromisoformat(iso)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        values: dict[str, float] = {}
+        for key in hourly_keys:
+            series = response.hourly.series(key)
+            if series is None:
+                continue
+            raw = series[idx]
+            if raw is None:
+                continue
+            orca_name, _unit = VARIABLE_MAP[key]
+            values[orca_name] = float(raw)
+        if values:
+            points.append(HourlyPoint(time=ts, values=values))
+    return tuple(points)
 
 
 def missing_result(kind: str, coordinate: Coordinate, query_time: datetime, note: str) -> AgentResult:

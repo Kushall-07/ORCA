@@ -93,3 +93,30 @@ def lookup(name: str | None) -> Coordinate | None:
 
 def known_names() -> tuple[str, ...]:
     return tuple(sorted(_PLACES))
+
+
+def canonical_name(candidate: str | None) -> str | None:
+    """The known place name actually contained in ``candidate``, preferring
+    the longest match (so a genuine two-word place like "port blair" or
+    "gulf of mannar" is kept whole rather than truncated to its first word).
+
+    Query Understanding's `near|from|off|around|at <place>` extraction regex
+    optionally swallows one trailing word to capture such two-word names
+    (see ``_extract_places``), which also means it can just as easily swallow
+    an unrelated word that follows the place name in the sentence (e.g. "near
+    Mangalore compare" from "...near Mangalore compare with the last 30
+    days?"). ``lookup`` above already resolves that to the right coordinate
+    via its own substring match, so ONLY the display name is wrong - this
+    trims it back to the real place name for anything shown to the user
+    (e.g. a rendered "Research question: ... for {location}." sentence).
+    Returns ``None`` when no known place is contained in ``candidate`` at all.
+    """
+    if not candidate:
+        return None
+    key = candidate.strip().lower()
+    if key in _PLACES:
+        return key
+    matches = [p for p in _PLACES if p in key]
+    if not matches:
+        return None
+    return max(matches, key=len)

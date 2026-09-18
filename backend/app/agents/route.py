@@ -23,7 +23,7 @@ from app.models.decision import DecisionResult
 from app.models.geo import Geofence, GeofenceHit, GeofenceResult
 from app.models.query import QueryUnderstanding
 from app.models.risk import RiskResult
-from app.models.routing import GridSpec, RouteRequest, RouteResult, RouteStatus
+from app.models.routing import GridSpec, RoutePoint, RouteRequest, RouteResult, RouteStatus
 from app.models.safety import SafetyGuardInput, SafetyGuardResult
 from app.policy.safety_guard import evaluate_safety
 from app.routing.planner import plan_route
@@ -40,6 +40,50 @@ class RouteAgentResult(BaseModel):
     route_geofence: GeofenceResult | None = None
     safety_after_route: SafetyGuardResult | None = None
     downgraded: bool = False
+
+
+class MultiRouteLeg(BaseModel):
+    """One origin -> destination leg of a multi-destination route. Planned
+    by calling :meth:`RouteAgent.plan` unchanged - the SAME A*, hard-geofence
+    and Safety Guard re-check chain a single-destination route uses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    leg_index: int
+    origin: Coordinate
+    destination: Coordinate
+    result: RouteAgentResult
+
+
+class MultiRouteAgentResult(BaseModel):
+    """Result of routing through an ORDERED sequence of selected destination
+    points: origin -> dest[0] -> dest[1] -> ... Each leg reuses
+    :meth:`RouteAgent.plan` (and therefore the existing A* engine and hard
+    geofence checks) exactly once - this is never a second routing algorithm.
+    Destinations are plain coordinates here - this module has no notion of
+    what a destination represents; that meaning lives entirely upstream.
+
+    Destination order is always the caller-supplied order. The frontend
+    records map-selections in an ordered list (the order the user clicked
+    them), so that explicit order is preserved verbatim - there is no
+    nearest-neighbour re-ordering, keeping the route trivially explainable as
+    "the order you selected them in".
+
+    Planning stops at the first leg that is not ``ROUTE_FOUND``: the vessel's
+    position beyond a destination it never reached is unknown, so no further
+    leg is ever planned from it. That destination, and every destination after
+    it, is reported in ``unattempted_destinations`` - never silently dropped.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    ran: bool
+    skip_reason: str | None = None
+    legs: tuple[MultiRouteLeg, ...] = ()
+    ordering: str = "selection_order"
+    all_found: bool = False
+    failed_leg_index: int | None = None
+    unattempted_destinations: tuple[Coordinate, ...] = ()
 
 
 class RouteAgent:
@@ -140,6 +184,129 @@ class RouteAgent:
             safety_after_route=safety_after,
             downgraded=downgraded,
         )
+
+    def plan_multi(
+        self,
+        *,
+        understanding: QueryUnderstanding,
+        decision: DecisionResult,
+        origin: Coordinate | None,
+        destinations: Sequence[Coordinate],
+        hard_geofences: Sequence[Geofence] = (),
+        soft_geofences: Sequence[Geofence] = (),
+        risk: RiskResult | None = None,
+        first_destination_geofence: GeofenceResult | None = None,
+        allow_blocked_origin_cell: bool = False,
+    ) -> MultiRouteAgentResult:
+        """Route through an ORDERED sequence of destinations by calling
+        :meth:`plan` once per leg (origin -> destinations[0] -> destinations[1]
+        -> ...). See :class:`MultiRouteAgentResult` for the ordering and
+        failure-stop semantics. ``first_destination_geofence`` is the already-
+        computed geofence check for ``destinations[0]`` (the same value a
+        single-destination request would pass to :meth:`plan`); legs beyond
+        the first have no pre-computed destination geofence, so their Safety
+        Guard re-check relies on the route-geofence sampling :meth:`plan`
+        already performs on every waypoint of that leg."""
+        if not understanding.requests_route:
+            return MultiRouteAgentResult(ran=False, skip_reason="no route was requested")
+        if not decision.routing_allowed:
+            return MultiRouteAgentResult(
+                ran=False,
+                skip_reason=f"routing not permitted (decision {decision.status.value})",
+            )
+        if origin is None or not destinations:
+            return MultiRouteAgentResult(
+                ran=False, skip_reason="origin or destination(s) could not be resolved"
+            )
+
+        legs: list[MultiRouteLeg] = []
+        current_origin = origin
+        failed_leg_index: int | None = None
+        for index, dest in enumerate(destinations):
+            leg_result = self.plan(
+                understanding=understanding,
+                decision=decision,
+                origin=current_origin,
+                destination=dest,
+                hard_geofences=hard_geofences,
+                soft_geofences=soft_geofences,
+                risk=risk,
+                destination_geofence=first_destination_geofence if index == 0 else None,
+                allow_blocked_origin_cell=allow_blocked_origin_cell if index == 0 else False,
+            )
+            legs.append(
+                MultiRouteLeg(leg_index=index, origin=current_origin, destination=dest, result=leg_result)
+            )
+            route = leg_result.route
+            if route is None or not route.found:
+                failed_leg_index = index
+                break
+            current_origin = dest
+
+        unattempted = tuple(destinations[len(legs):]) if failed_leg_index is not None else ()
+        return MultiRouteAgentResult(
+            ran=True,
+            legs=tuple(legs),
+            all_found=failed_leg_index is None,
+            failed_leg_index=failed_leg_index,
+            unattempted_destinations=unattempted,
+        )
+
+
+def combine_multi_route_legs(legs: Sequence[MultiRouteLeg]) -> RouteResult | None:
+    """Fold a sequence of already-planned per-leg :class:`RouteResult`s into
+    ONE :class:`RouteResult`, purely by concatenation - nothing is recomputed.
+
+    This lets every existing single-route consumer (the ``RouteInfo``
+    projection, the deterministic explanation templates, provenance) keep
+    working unchanged for a multi-destination request: the combined result
+    reports the full trip (origin through the last attempted destination),
+    while the per-leg detail stays available separately via
+    :class:`MultiRouteAgentResult` for the additive multi-destination API
+    fields (map markers, per-leg breakdown).
+    """
+    if not legs:
+        return None
+    first, last = legs[0], legs[-1]
+    overall_found = all(leg.result.route is not None and leg.result.route.found for leg in legs)
+    last_route = last.result.route
+    status = RouteStatus.ROUTE_FOUND if overall_found else (
+        last_route.status if last_route is not None else RouteStatus.NO_ROUTE
+    )
+
+    path: list[RoutePoint] = []
+    node_count = 0
+    total_distance_m = 0.0
+    have_distance = True
+    reasons: list[str] = []
+    warnings: list[str] = []
+    for leg in legs:
+        route = leg.result.route
+        if route is None:
+            continue
+        path.extend(route.path)
+        node_count += route.node_count or len(route.path)
+        if route.total_distance_m is not None:
+            total_distance_m += route.total_distance_m
+        else:
+            have_distance = False
+        reasons.extend(
+            f"leg {leg.leg_index + 1} ({route.destination.latitude:.4f}, "
+            f"{route.destination.longitude:.4f}): {reason}"
+            for reason in route.reasons
+        )
+        warnings.extend(route.warnings)
+
+    return RouteResult(
+        status=status,
+        origin=first.origin,
+        destination=last.destination,
+        path=tuple(path),
+        node_count=node_count or None,
+        total_distance_m=total_distance_m if have_distance else None,
+        reasons=tuple(reasons),
+        warnings=tuple(warnings),
+    )
 
 
 # ---------------------------------------------------------------------------

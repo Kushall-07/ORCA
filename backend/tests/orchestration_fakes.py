@@ -46,10 +46,28 @@ def obs(variable: str, value: float, unit: str, source: str, *, when: datetime =
 
 
 class FakeWeatherAgent:
-    def __init__(self, observations=None, tier: DataTier = DataTier.LIVE, missing: bool = False):
+    def __init__(
+        self, observations=None, tier: DataTier = DataTier.LIVE, missing: bool = False,
+        hourly_offsets=None,
+    ):
         self._obs = observations
         self._tier = tier
         self._missing = missing
+        # Decision Replay Engine input (see app.agents.base.HourlyPoint) - opt-in
+        # only; every other test's AgentResult keeps the default empty series.
+        # A list of (hour_offset_from_when, values_dict) pairs, built relative
+        # to the REAL `when` this fetch() receives (never a fixed wall-clock
+        # constant, which would drift against whatever `decision_time` the
+        # pipeline actually resolves to).
+        self._hourly_offsets = list(hourly_offsets) if hourly_offsets is not None else []
+
+    def _hourly_series(self, when):
+        from app.agents.base import HourlyPoint
+
+        return tuple(
+            HourlyPoint(time=when + timedelta(hours=offset), values=values)
+            for offset, values in self._hourly_offsets
+        )
 
     async def fetch(self, coordinate, when, **_):
         if self._missing:
@@ -70,14 +88,27 @@ class FakeWeatherAgent:
             kind="weather", coordinate=coordinate, query_time=when,
             observations=tuple(self._obs) if self._obs is not None else default,
             source_status=SourceStatus(tier=self._tier, source="open-meteo-forecast", retrieved_at=when),
+            hourly_series=self._hourly_series(when),
         )
 
 
 class FakeOceanAgent:
-    def __init__(self, observations=None, tier: DataTier = DataTier.LIVE, missing: bool = False):
+    def __init__(
+        self, observations=None, tier: DataTier = DataTier.LIVE, missing: bool = False,
+        hourly_offsets=None,
+    ):
         self._obs = observations
         self._tier = tier
         self._missing = missing
+        self._hourly_offsets = list(hourly_offsets) if hourly_offsets is not None else []
+
+    def _hourly_series(self, when):
+        from app.agents.base import HourlyPoint
+
+        return tuple(
+            HourlyPoint(time=when + timedelta(hours=offset), values=values)
+            for offset, values in self._hourly_offsets
+        )
 
     async def fetch(self, coordinate, when, **_):
         if self._missing:
@@ -91,6 +122,7 @@ class FakeOceanAgent:
             kind="oceanographic", coordinate=coordinate, query_time=when,
             observations=tuple(self._obs) if self._obs is not None else default,
             source_status=SourceStatus(tier=self._tier, source="open-meteo-marine", retrieved_at=when),
+            hourly_series=self._hourly_series(when),
         )
 
 

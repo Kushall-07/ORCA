@@ -128,18 +128,36 @@ _CORRECTION_SUFFIX = (
 _DEVANAGARI = re.compile("[ऀ-ॿ]")
 _KANNADA = re.compile("[ಀ-೿]")
 
-_ROUTE_WORDS = ("route", "navigate", "navigation", "path to", "way to", "sail to", "go to", "मार्ग", "रास्ता", "ಮಾರ್ಗ")
+# "go to" is handled separately (see _GO_TO_RE below): a plain substring match
+# on "go to" also fires inside the common fishing idiom "go to sea" (e.g. "is
+# it safe for fishermen to go to sea tomorrow?"), which is a fishing-safety
+# question, not a route request - so "go to sea" is excluded, while "go to
+# <a place>" (a real route request) still matches.
+_ROUTE_WORDS = ("route", "navigate", "navigation", "path to", "way to", "sail to", "मार्ग", "रास्ता", "ಮಾರ್ಗ")
+_GO_TO_RE = re.compile(r"\bgo to\b(?!\s*sea\b)")
 _WEATHER_WORDS = ("weather", "wind", "rain", "storm", "मौसम", "हवा", "बारिश", "ಹವಾಮಾನ", "ಗಾಳಿ", "ಮಳೆ")
-_OCEAN_WORDS = ("wave", "swell", "sea state", "rough sea", "rough", "current", "tide", "ocean", "लहर", "समुद्र", "ಅಲೆ", "ಸಮುದ್ರ")
+_OCEAN_WORDS = ("wave", "swell", "sea state", "sea condition", "rough sea", "rough", "current", "tide", "ocean", "लहर", "समुद्र", "ಅಲೆ", "ಸಮುದ್ರ")
 # Phase 9 Step 3: researcher environmental queries (SST / chlorophyll / productivity)
+# Includes generic "environmental conditions/data/state/result" phrasing (a
+# researcher very often says "environmental conditions" without ever naming
+# SST/chlorophyll directly) and a word-boundary-checked bare "chl" - see
+# app.research.domains._CHL_SHORT_WORDS for the same generalisation.
 _ENV_WORDS = (
     "chlorophyll", "chlorophyll-a", "chl-a", "chl a",
     "sea surface temperature", "sea-surface temperature", "sst",
     "phytoplankton", "primary production", "primary productivity",
     "environmental productivity", "productivity potential", "ocean colour", "ocean color",
-    "समुद्री सतह तापमान", "क्लोरोफिल", "पादपप्लवक", "उत्पादकता",
-    "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ", "ಕ್ಲೋರೊಫಿಲ್", "ಉತ್ಪಾದಕತೆ",
+    "environmental",
+    "समुद्री सतह तापमान", "क्लोरोफिल", "पादपप्लवक", "उत्पादकता", "पर्यावरणीय स्थिति",
+    # bare "पर्यावरणीय" (environmental) mirrors the bare English "environmental"
+    # above - a researcher just as often says "पर्यावरणीय डेटा"/"पर्यावरणीय आकलन"
+    # (environmental data/assessment) as "पर्यावरणीय स्थिति" (environmental state).
+    "पर्यावरणीय",
+    "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ", "ಕ್ಲೋರೊಫಿಲ್", "ಉತ್ಪಾದಕತೆ", "ಪರಿಸರ ಪರಿಸ್ಥಿತಿ",
+    # bare "ಪರಿಸರ" (environmental) - same symmetry as "पर्यावरणीय" above.
+    "ಪರಿಸರ",
 )
+_ENV_SHORT_WORDS = ("chl",)
 # Phase 9 Step 4: comparative phrasing for a researcher temporal comparison.
 # Only acted on when the intent resolves to environmental_conditions.
 _COMPARE_WORDS = (
@@ -154,7 +172,11 @@ _COMPARE_WORDS = (
     # of the recent window is routed through the temporal-comparison node.
     "dispersion", "dispersed", "spread", "variability", "how variable",
     "how consistent", "distribution", "range of values", "coverage", "how stable",
-    "stability", "sampling",
+    "stability", "sampling", "stable", "variable",
+    # A bare "last 30 days" / "changed" without an explicit "compare"/"vs" word
+    # (e.g. "how has the environmental state near Mangalore changed over the
+    # last 30 days?") still names the same bounded-window comparison window.
+    "30 days", "last 30 days", "changed",
     # Hindi
     "तुलना", "पिछले", "पिछला", "पहले की तुलना", "बदलाव", "ऐतिहासिक",
     "पिछले महीने", "एक महीने पहले", "सामान्य से",
@@ -226,6 +248,34 @@ _RESEARCH_FOLLOWUP_WORDS = (
     "is this a bloom", "is that a bloom", "is this an anomaly", "is that an anomaly",
     "how did you calculate", "how was this calculated", "how was that calculated",
     "can i reproduce", "show me the evidence",
+    # Methodology sub-category (see _METHODOLOGY_FOLLOWUP_WORDS below) - also
+    # counts as a research follow-up generally, so it is included here too.
+    "how did you determine", "what baseline did you use", "how was this classified",
+    "how was that classified", "what methodology did you use", "what method did you use",
+    "how do you compute", "how was this computed", "how was that computed",
+)
+# A methodology-specific SUBSET of _RESEARCH_FOLLOWUP_WORDS above - a
+# follow-up asking HOW/WHY a prior research finding was produced (not merely
+# "what does this mean") gets its own requested_output=METHODOLOGY so the
+# render explains the actual deterministic method used (see
+# app.agents.evidence_explanation._render_research_intent), instead of just
+# restating the finding again.
+_METHODOLOGY_FOLLOWUP_WORDS = (
+    "how did you determine", "how did you calculate", "how was this calculated",
+    "how was that calculated", "how was this classified", "how was that classified",
+    "what baseline did you use", "what methodology did you use",
+    "what method did you use", "how do you compute", "how was this computed",
+    "how was that computed",
+)
+# A HAB-confirmation follow-up ("Does that mean there is a harmful algal
+# bloom?") is a SPECIAL CASE of the generic research follow-up above that must
+# directly lead with an explicit non-confirmation (see
+# app.agents.evidence_explanation._render_research_intent's
+# "hab_confirmation_followup" marker) - never just restate the anomaly finding
+# as if that alone answered the yes/no question.
+_HAB_CONFIRMATION_PHRASES = (
+    "algal bloom", "harmful algal bloom", "red tide",
+    "is this a bloom", "is that a bloom", "is this hab", "is that hab",
 )
 
 _EXPLANATION_META_PHRASES = (
@@ -286,6 +336,18 @@ _INTENT_TO_OUTPUT: dict[QueryIntent, RequestedOutput] = {
     QueryIntent.CLARIFICATION_NEEDED: RequestedOutput.CLARIFICATION,
 }
 
+# A researcher-specific `requested_output` for the few (domain, analysis_type)
+# combinations that need a finer distinction than a plain research REPORT -
+# see app.research.domains.detect (each combination here is produced by
+# EXACTLY one of its branches) and
+# app.agents.evidence_explanation._render_research_intent, which dispatches
+# on this field first. Anything not listed here keeps the default REPORT.
+_RESEARCH_OUTPUT_OVERRIDES: dict[tuple[ResearchDomain, AnalysisType], RequestedOutput] = {
+    (ResearchDomain.GENERAL_ENVIRONMENTAL, AnalysisType.DATASET_COMPARISON): RequestedOutput.DATASET_INVENTORY,
+    (ResearchDomain.GENERAL_ENVIRONMENTAL, AnalysisType.SOURCE_CONFLICT_CHECK): RequestedOutput.SOURCE_CONFLICT,
+    (ResearchDomain.FISHERIES_CORRELATION, AnalysisType.PREDICTION): RequestedOutput.PREDICTION,
+}
+
 # ---- generalized capability-limitation detection --------------------------
 # A SEMANTIC CATEGORY of request ORCA's existing deterministic pipelines
 # genuinely cannot answer - never a rule keyed to one exact sentence. Each
@@ -336,11 +398,196 @@ def _detect_open_location_recommendation(message: str) -> bool:
     low = message.lower()
     if _any(low, _PFZ_WORDS) or _detect_gis_question(message):
         return False
+    if _FISHING_LOCATION_RE.search(low):
+        return False
     return bool(
         _WHERE_FISH_RE.search(low)
         or _WHICH_AREA_FISH_RE.search(low)
         or _BEST_PLACE_FISH_RE.search(low)
     )
+
+
+# ---- Deterministic fisherman intent priority (demo-readiness fix) ---------
+# Reliable lexical classification for the two most common natural-language
+# fisherman question shapes, checked BEFORE the LLM/rules guess is trusted -
+# see the priority order in the task brief: an explicit safety/decision
+# question always wins over a mere fishing-suitability/location question when
+# both could apply.
+_FISHING_SAFETY_DECISION_WORDS = (
+    "can i fish", "can we fish", "safe to fish", "fishing safe",
+    "go fishing", "safe for fishermen", "safe for fisherman",
+    "safe for fishing", "should i go fishing", "should we go fishing",
+)
+# "Where should I fish" / "which area/location/zone/place/spot ... fish" /
+# "suitable (for) fishing" all ask ORCA to surface its EXISTING official PFZ
+# reference data (see QueryIntent.PFZ_REFERENCE / _render_pfz_intent, which
+# frames it strictly as a reference, never a recommendation) rather than being
+# refused as an open-ended location-recommendation request (see
+# _detect_open_location_recommendation above, which this pattern is checked
+# before and takes priority over). Only a genuinely open-ended superlative ask
+# with no PFZ angle at all (e.g. "what is the best place to fish near here?")
+# still falls through to that honest capability-limitation refusal.
+_FISHING_LOCATION_RE = re.compile(
+    r"\bwhere\b[^.?!]{0,40}\bfish|"
+    r"\bsuitable\b[^.?!]{0,40}\bfish|"
+    r"\bfish\w*\b[^.?!]{0,40}\bsuitable\b|"
+    r"\bwhich\s+(?:area|location|zone|place|spot)\b[^.?!]{0,40}\bfish",
+    re.IGNORECASE,
+)
+
+
+def _detect_fishing_priority_intent(message: str) -> QueryIntent | None:
+    """Deterministic priority classifier for the two most common natural-
+    language fisherman question shapes: an explicit safety/decision phrase
+    ("can I fish", "is it safe to go fishing", "is it safe for fishermen to go
+    to sea", ...) always wins over an explicit fishing-suitability/location
+    phrase ("where should I fish", "suitable fishing area", "which area is
+    suitable for fishing", ...) when both could apply. Returns ``None`` when
+    the message names no such fishing subject at all, leaving the LLM/rules
+    classification (and any research-domain override already applied above)
+    untouched."""
+    low = message.lower()
+    if _any(low, _FISHING_SAFETY_DECISION_WORDS):
+        return QueryIntent.FISHING_SAFETY
+    if _any(low, _PFZ_WORDS) or _FISHING_LOCATION_RE.search(low):
+        return QueryIntent.PFZ_REFERENCE
+    return None
+
+
+# ---- Deterministic environmental evidence/provenance detection ------------
+# "what" is allowed up to a short distance before "data/evidence/sources" so
+# an intervening adjective ("what ENVIRONMENTAL data did you use?") still
+# counts - not just the bare "what data".
+_ENV_EVIDENCE_TRIGGER_RE = re.compile(
+    r"\bwhat\b[^.?!]{0,20}\b(?:data|evidence|sources?)\b|\bdata\s+sources?\b|"
+    r"\bwhere\s+did\b|\bhow\s+(?:did|was|do)\s+you\b|\bhow\s+was\b",
+    re.IGNORECASE,
+)
+# A small, high-value Hindi/Kannada set for the same "what data/which source
+# did you use" provenance question shape - deliberately not an exhaustive
+# translation of the English regex above (see Part 6 "do not attempt
+# exhaustive language expansion").
+_ENV_EVIDENCE_TRIGGER_WORDS_HI_KN = (
+    "कौन सा डेटा", "किस स्रोत", "क्या डेटा इस्तेमाल", "आपने कैसे गणना",
+    "ಯಾವ ಡೇಟಾ", "ಯಾವ ಮೂಲ", "ಹೇಗೆ ಲೆಕ್ಕ",
+)
+
+
+def _is_environmental_evidence_query(message: str) -> bool:
+    """True for a researcher's evidence/provenance question about an
+    ENVIRONMENTAL result - e.g. "what data did you use to determine the
+    environmental conditions near Mangalore?", "how was this environmental
+    result calculated?", "where did the environmental values come from?".
+    Requires BOTH an evidence/calculation question shape AND an explicit
+    environmental subject (see _ENV_WORDS), and never fires when the message
+    also names a fishing/safety subject - that keeps its own fishing_safety
+    "why is it safe" explanation handling (see _detect_explanation_request),
+    so a genuine fishing-safety meta-question is never stolen by this more
+    specific, environment-only override."""
+    low = message.lower()
+    if not (
+        _ENV_EVIDENCE_TRIGGER_RE.search(low)
+        or _any(low, _ENV_EVIDENCE_TRIGGER_WORDS_HI_KN)
+    ):
+        return False
+    if _any(low, _FISH_WORDS) or _any(low, _SAFE_WORDS):
+        return False
+    return _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
+
+
+# ---- Deterministic environmental dispersion (comparison/stability) --------
+# The LLM's own `wants_comparison` field (see SYSTEM_PROMPT) is described only
+# as "compare the current SST/chlorophyll-a with an earlier/historical/
+# previous value" - it never mentions variability/stability wording, so a
+# Groq-classified "how variable has SST been over the last 30 days?" question
+# can keep intent=environmental_conditions yet silently leave wants_comparison
+# False, which starves the bounded-window Stability Engine of the reference
+# series it needs (see app.orchestration.nodes.environmental_stability_node,
+# which only runs downstream of environmental_comparison_node). This
+# deterministic override reuses the SAME `_COMPARE_WORDS` vocabulary the
+# rules-based fallback already uses for `wants_comparison` (Phase 9 Step 6:
+# "reuses the SAME comparison pathway, no new intent, no new flag") and simply
+# also forces it via the LLM path - never a new engine, never a new flag.
+def _wants_environmental_dispersion_analysis(message: str) -> bool:
+    """True for a researcher's temporal comparison OR bounded-window
+    stability/dispersion question about SST/chlorophyll-a - e.g. "compare ...
+    with the last 30 days", "how variable has SST been", "how stable has
+    chlorophyll-a been". Requires an explicit environmental subject and never
+    fires when a fishing/safety word is also present - the same posture as
+    `_is_environmental_evidence_query` above."""
+    low = message.lower()
+    if _any(low, _FISH_WORDS) or _any(low, _SAFE_WORDS):
+        return False
+    if not (_any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)):
+        return False
+    return _any(low, _COMPARE_WORDS)
+
+
+# ---- Deterministic chlorophyll-a neighbourhood/representativeness ---------
+_NEIGHBOURHOOD_WORDS = (
+    "representative", "representativeness", "surrounding area", "surrounding pixels",
+    "nearby pixel", "nearby pixels", "spatial neighbourhood", "spatial neighborhood",
+    "local representativeness", "typical pixel", "typical of the area",
+    "typical of the surrounding", "compared with nearby", "compared to nearby",
+    "neighbourhood", "neighborhood",
+)
+
+
+def _is_environmental_neighbourhood_query(message: str) -> bool:
+    """True for a researcher's chlorophyll-a pixel-representativeness question
+    - e.g. "is the chlorophyll-a measurement at Mangalore representative of
+    the surrounding area?", "how representative is this chlorophyll value
+    compared with nearby pixels?". Routes to environmental_conditions so the
+    ALREADY-UNGATED `environmental_neighbourhood_node` (it needs no flag; it
+    runs for any environmental_conditions/research_query intent with a usable
+    current chlorophyll-a observation) gets a chance to run and its result to
+    be rendered by `_render_environmental_intent` - see the module docstring
+    pattern used by `_is_environmental_evidence_query` above."""
+    low = message.lower()
+    if _any(low, _FISH_WORDS) or _any(low, _SAFE_WORDS):
+        return False
+    if not _any(low, _NEIGHBOURHOOD_WORDS):
+        return False
+    return _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
+
+
+# ---- Deterministic environmental evidence-quality / sufficiency -----------
+# A SEPARATE trigger vocabulary from `_is_environmental_evidence_query` above
+# (which only catches "what data/evidence/sources did you use" / "how was
+# this calculated" phrasing) - this catches the sufficiency/reliability/
+# data-gap framing a researcher just as often uses ("are the observations
+# sufficient for reliable analysis?", "what data is missing?", "how reliable
+# are the satellite-derived observations?"). Both feed the SAME
+# PROVENANCE-shaped render branch backed by the SAME Environmental Evidence
+# Engine (see `_render_environmental_intent` / app.environmental.evidence) -
+# never a new engine, never a new requested_output value.
+_ENV_EVIDENCE_QUALITY_WORDS = (
+    "sufficient", "insufficient", "enough observations", "enough data",
+    "reliable analysis", "evidence quality", "data quality", "reproducible",
+    "reproducibility", "reproduce", "confidence in", "data gaps", "missing data",
+    "unavailable observations", "cloud gap", "cloud gaps", "limitations",
+    "how reliable", "satellite reliability", "coastal retrieval",
+    "observation quality", "satellite-derived", "satellite derived",
+    "what is missing", "data is missing", "unavailable",
+    # A small, high-value Hindi/Kannada set for the same data-sufficiency /
+    # evidence-quality question shape (see Part 6 "do not attempt exhaustive
+    # language expansion").
+    "पर्याप्त", "विश्वसनीय", "डेटा गुणवत्ता",
+    "ಸಾಕಷ್ಟು", "ವಿಶ್ವಾಸಾರ್ಹ", "ಡೇಟಾ ಗುಣಮಟ್ಟ",
+)
+
+
+def _is_environmental_evidence_quality_query(message: str) -> bool:
+    """True for a researcher's data-sufficiency / evidence-quality / data-gap
+    / satellite-reliability question about an ENVIRONMENTAL result - see the
+    module comment above. Requires an explicit environmental subject and
+    never fires when a fishing/safety word is also present."""
+    low = message.lower()
+    if _any(low, _FISH_WORDS) or _any(low, _SAFE_WORDS):
+        return False
+    if not _any(low, _ENV_EVIDENCE_QUALITY_WORDS):
+        return False
+    return _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
 
 
 def _detect_gis_question(message: str) -> bool:
@@ -477,6 +724,33 @@ class QueryUnderstandingAgent:
                         + ("deterministic gis/restricted-area-question override",),
                     }
                 )
+            # Deterministic override: a researcher's evidence/provenance
+            # question about an ENVIRONMENTAL result ("what data did you use
+            # to determine the environmental conditions...", "how was this
+            # environmental result calculated?", "where did the environmental
+            # values come from?") always routes to the environmental_conditions
+            # pathway with a provenance-shaped answer about THAT result -
+            # never the generic capability/dataset-registry research question
+            # ("what datasets do you actually have" - see
+            # app.research.domains._DATASET_WORDS, which overlaps in wording
+            # but asks a different, broader question) and never the generic
+            # fishing-safety "why is it safe" explanation, even though all
+            # three ask a "what/how" meta-question. Checked before the
+            # research-domain override below so this more specific, on-topic
+            # interpretation about an already-computed environmental result
+            # always wins.
+            elif _is_environmental_evidence_query(message):
+                understanding = understanding.model_copy(
+                    update={
+                        "intent": QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                        "requested_output": RequestedOutput.PROVENANCE,
+                        "requests_risk": False,
+                        "needs_clarification": False,
+                        "clarification_question": None,
+                        "notes": understanding.notes
+                        + ("deterministic environmental-evidence override",),
+                    }
+                )
             # Deterministic override: a Marine Researcher/Oceanographer
             # analytical question (see app.research.domains.detect) always
             # routes to RESEARCH_QUERY with its capability status resolved
@@ -512,6 +786,9 @@ class QueryUnderstandingAgent:
                         None if assessment.status is CapabilityStatus.SUPPORTED
                         else "research_data_unavailable"
                     ),
+                    "requested_output": _RESEARCH_OUTPUT_OVERRIDES.get(
+                        (research.domain, research.analysis_type), RequestedOutput.REPORT
+                    ),
                     "requests_route": False,
                     "requests_risk": False,
                     "requests_pfz": False,
@@ -535,6 +812,99 @@ class QueryUnderstandingAgent:
                 if d_name:
                     research_updates["destination"] = _georef(d_name)
                 understanding = understanding.model_copy(update=research_updates)
+            # Deterministic override: a chlorophyll-a pixel-representativeness
+            # question ("is the chlorophyll-a measurement representative of
+            # the surrounding area?", "...compared with nearby pixels?")
+            # always routes to environmental_conditions so the already-ungated
+            # neighbourhood node gets a chance to run. Checked BEFORE the
+            # dispersion override just below: "compared with nearby pixels"
+            # also contains a bare comparison word ("compared"), but its
+            # meaning is spatial representativeness, not a 30-day temporal
+            # comparison, so the more specific neighbourhood vocabulary wins.
+            elif _is_environmental_neighbourhood_query(message):
+                understanding = understanding.model_copy(
+                    update={
+                        "intent": QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                        "requested_output": RequestedOutput.ENVIRONMENTAL_INFORMATION,
+                        "requests_risk": False,
+                        "needs_clarification": False,
+                        "clarification_question": None,
+                        "notes": understanding.notes
+                        + ("deterministic environmental-neighbourhood override",),
+                    }
+                )
+            # Deterministic override: a researcher's bounded-window temporal
+            # comparison OR stability/dispersion question about SST/
+            # chlorophyll-a ("how variable has SST been over the last 30
+            # days?", "how stable has chlorophyll-a been?") always routes to
+            # environmental_conditions with wants_comparison forced True -
+            # the LLM's own wants_comparison field never mentions variability
+            # wording (see SYSTEM_PROMPT), so this is a safety net, same
+            # "LLM interprets, deterministic code decides" posture as the
+            # overrides above. Checked only after research-domain detection
+            # found nothing more specific (e.g. a genuine chlorophyll-anomaly
+            # research question that also happens to say "changed" keeps its
+            # own anomaly/HAB framing, never this generic dispersion one) and
+            # after the neighbourhood override just above.
+            elif _wants_environmental_dispersion_analysis(message):
+                understanding = understanding.model_copy(
+                    update={
+                        "intent": QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                        "requested_output": RequestedOutput.ENVIRONMENTAL_INFORMATION,
+                        "wants_comparison": True,
+                        "requests_risk": False,
+                        "needs_clarification": False,
+                        "clarification_question": None,
+                        "notes": understanding.notes
+                        + ("deterministic environmental-dispersion override",),
+                    }
+                )
+            # Deterministic override: a data-sufficiency / evidence-quality /
+            # data-gap / satellite-reliability question about an environmental
+            # result always routes to environmental_conditions with a
+            # provenance-shaped answer, backed by the same Environmental
+            # Evidence Engine `_is_environmental_evidence_query` above already
+            # uses for "what data did you use" phrasing.
+            elif _is_environmental_evidence_quality_query(message):
+                understanding = understanding.model_copy(
+                    update={
+                        "intent": QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                        "requested_output": RequestedOutput.PROVENANCE,
+                        "requests_risk": False,
+                        "needs_clarification": False,
+                        "clarification_question": None,
+                        "notes": understanding.notes
+                        + ("deterministic environmental-evidence-quality override",),
+                    }
+                )
+            # Deterministic override: an explicit fisherman safety/decision
+            # question ("can I fish", "is it safe to go fishing", "is fishing
+            # safe", "is it safe for fishermen to go to sea", ...) or an
+            # explicit fishing-suitability/location question ("where should I
+            # fish", "suitable fishing area", "which area is suitable for
+            # fishing", ...) always routes deterministically - the safety
+            # phrasing wins when both could apply (see the priority order in
+            # the task brief), so the LLM/rules guess (which can otherwise
+            # mistake "go to sea" for a route request, or "where should I
+            # fish" for a plain safety question) is never trusted alone for
+            # these two intents. Checked after research-domain detection so a
+            # genuine fisheries-correlation research question (e.g. "is catch
+            # correlated with chlorophyll?") keeps its own handling.
+            elif (fishing_intent := _detect_fishing_priority_intent(message)) is not None:
+                fishing_updates: dict = {
+                    "intent": fishing_intent,
+                    "needs_clarification": False,
+                    "clarification_question": None,
+                    "notes": understanding.notes
+                    + ("deterministic fishing-intent-priority override",),
+                }
+                if fishing_intent is QueryIntent.FISHING_SAFETY:
+                    fishing_updates["requests_risk"] = True
+                    fishing_updates["requests_pfz"] = False
+                else:
+                    fishing_updates["requests_pfz"] = True
+                    fishing_updates["requested_output"] = RequestedOutput.PFZ_INFORMATION
+                understanding = understanding.model_copy(update=fishing_updates)
             # Deterministic override: a meta-question asking ORCA to justify a
             # safety decision it already made ("what information did you use",
             # "why is it safe", "how did you decide" ...) always routes to the
@@ -612,11 +982,25 @@ class QueryUnderstandingAgent:
             except (LlmError, ValidationError, ValueError) as exc:
                 logger.warning("query understanding LLM attempt %d failed: %s", attempts, exc)
                 system = SYSTEM_PROMPT + _CORRECTION_SUFFIX
-        # Deterministic structured failure after retries exhausted.
+        # LLM structured output failed validation on every attempt - fall back
+        # to the deterministic rules parser instead of the LLM. This is NOT
+        # itself a query-understanding failure: the rules parser can fully
+        # resolve a great many requests entirely on its own (see
+        # test_demo_readiness_fix.py), exactly as it does when no LLM is
+        # configured at all (`self.llm is None` in `understand` above uses
+        # this same parser with `failed` left at its default False). So
+        # `failed` is deliberately NOT set here - the rules-parsed result
+        # flows through the same deterministic override chain and
+        # `_finalise` clarification check every rules-based understanding
+        # already goes through, which decides for itself whether the request
+        # is actually missing something (e.g. no resolvable location for a
+        # location-needing intent) and only THEN asks for clarification.
+        # Discarding an already-resolvable rules classification just because
+        # the LLM's structured output happened to fail would turn a
+        # transient LLM hiccup into a hard, unnecessary refusal.
         rule = self._understand_with_rules(message)
         return rule.model_copy(
             update={
-                "failed": True,
                 "understood_via": "rules",
                 "notes": rule.notes + ("LLM structured output failed; used deterministic parser",),
             }
@@ -666,13 +1050,13 @@ class QueryUnderstandingAgent:
         low = message.lower()
         language = _detect_language(message)
 
-        requests_route = _any(low, _ROUTE_WORDS)
+        requests_route = _any(low, _ROUTE_WORDS) or bool(_GO_TO_RE.search(low))
         requests_pfz = _any(low, _PFZ_WORDS)
         is_fish = _any(low, _FISH_WORDS)
         is_weather = _any(low, _WEATHER_WORDS)
         is_ocean = _any(low, _OCEAN_WORDS)
         is_safe = _any(low, _SAFE_WORDS)
-        is_env = _any(low, _ENV_WORDS)
+        is_env = _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
         wants_comparison = is_env and not is_fish and not is_safe and _any(low, _COMPARE_WORDS)
 
         if requests_route:
@@ -788,6 +1172,21 @@ class QueryUnderstandingAgent:
         # a plain weather/ocean_conditions request instead of a continuation
         # of the research conversation.
         is_comparison_followup = _any(low_message, _COMPARE_WORDS)
+        # A methodology follow-up ("How did you determine whether it was
+        # unusual?") asks HOW a prior finding was produced - it must explain
+        # the actual deterministic method, never just restate the finding
+        # again (see requested_output=METHODOLOGY in
+        # app.agents.evidence_explanation._render_research_intent).
+        is_methodology_followup = _any(low_message, _METHODOLOGY_FOLLOWUP_WORDS)
+        # A HAB-confirmation follow-up ("Does that mean there is a harmful
+        # algal bloom?") must directly lead with an explicit non-confirmation,
+        # never just restate the chlorophyll-a anomaly finding as if that
+        # alone answered the yes/no question (see "hab_confirmation_followup"
+        # in app.agents.evidence_explanation._render_research_intent).
+        is_hab_confirmation_followup = _any(
+            low_message, _HAB_CONFIRMATION_PHRASES
+        ) or _word_present(low_message, "hab")
+        extra_notes: tuple[str, ...] = ()
         if (
             session.last_intent is QueryIntent.RESEARCH_QUERY
             and u.intent in (
@@ -798,6 +1197,7 @@ class QueryUnderstandingAgent:
             and not u.failed
             and (
                 "deterministic explanation-intent override" in u.notes
+                or "deterministic environmental-evidence override" in u.notes
                 or is_research_followup
                 or is_comparison_followup
             )
@@ -818,11 +1218,15 @@ class QueryUnderstandingAgent:
             updates["clarification_question"] = None
             if is_comparison_followup:
                 updates["wants_comparison"] = True
+            if is_methodology_followup:
+                updates["requested_output"] = RequestedOutput.METHODOLOGY
+            if is_hab_confirmation_followup:
+                extra_notes += ("hab_confirmation_followup",)
         if u.requests_route and (u.destination is None or not u.destination.name):
             # "give me a route from there" - destination unknown, origin inherited
             pass
         if updates:
-            updates["notes"] = u.notes + ("merged with prior session context",)
+            updates["notes"] = u.notes + extra_notes + ("merged with prior session context",)
             updates["understood_via"] = (
                 u.understood_via if u.understood_via != "rules" else "session"
             )
@@ -896,6 +1300,17 @@ def _extract_places(message: str, *, is_route: bool) -> tuple[str | None, str | 
         origin = m.group(1).strip().rstrip(" .")
         # drop trailing filler words the regex may have swallowed
         origin = re.sub(r"\s+(now|today|tomorrow|the|please|harbour|harbor|port|coast|area)$", "", origin).strip()
+        # The optional trailing-word group above exists to capture genuine
+        # two-word places ("port blair", "gulf of mannar") but just as
+        # readily swallows an unrelated word that happens to follow the
+        # place name (e.g. "near Mangalore compare" from "...near Mangalore
+        # compare with the last 30 days?" - a comparison/stability/
+        # neighbourhood research question). The filler-word strip above only
+        # covers a fixed small list; this canonicalises against the actual
+        # gazetteer so any other trailing word is trimmed too, without ever
+        # discarding a candidate that names no known place at all (e.g. an
+        # LLM-only place the rules fallback cannot resolve anyway).
+        origin = gazetteer.canonical_name(origin) or origin
     # For a route request phrased only as a destination ("route to Kochi",
     # "navigate to Goa"), take the "to X" place as the destination so a prior
     # turn's origin can be inherited from the session.
@@ -908,6 +1323,7 @@ def _extract_places(message: str, *, is_route: bool) -> tuple[str | None, str | 
                 r"\s+(now|today|tomorrow|the|please|safe|safely|harbour|harbor|port|coast|area)$",
                 "", m.group(1).strip(),
             ).strip()
+            candidate = gazetteer.canonical_name(candidate) or candidate
             if candidate and candidate != origin:
                 destination = candidate
     # any gazetteer name mentioned

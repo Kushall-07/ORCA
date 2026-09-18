@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 from app.core.logging import get_logger
@@ -35,6 +36,7 @@ from app.models.api import (
     ReferenceInfo,
     RiskInfo,
     RouteInfo,
+    RouteLegInfo,
     SuitabilityInfo,
     WhatIfInfo,
 )
@@ -67,6 +69,7 @@ class OrcaPipeline:
         request_id: str | None = None,
         coordinate: Coordinate | None = None,
         destination: Coordinate | None = None,
+        destinations: Sequence[Coordinate] | None = None,
         date_hint: str | None = None,
         stakeholder: str | None = None,
         language: str | None = None,
@@ -81,6 +84,7 @@ class OrcaPipeline:
             "now": now or datetime.now(timezone.utc),
             "coordinate_override": coordinate,
             "destination_override": destination,
+            "destination_overrides": tuple(destinations) if destinations else None,
             "date_hint_override": date_hint,
             "stakeholder": stakeholder,
             "language_hint": language,
@@ -465,6 +469,44 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                 origin_note += f" ({maritime_origin.distance_km:.1f} km from the query location)"
         pfz_route_destination = state.get("pfz_route_destination")
         pfz_auto_destination = bool(pfz_route_destination and pfz_route_destination.available)
+
+        multi = state.get("multi_route_agent_result")
+        is_multi = bool(multi is not None and multi.ran and len(multi.legs) + len(multi.unattempted_destinations) > 1)
+        legs_info: list[RouteLegInfo] = []
+        destinations_out: list[list[float]] = [[route.destination.latitude, route.destination.longitude]]
+        unattempted_out: list[list[float]] = []
+        ordering = "selection_order"
+        all_reached = True
+        destination_count = 1
+        if is_multi:
+            destinations_out = []
+            for leg in multi.legs:
+                leg_route = leg.result.route
+                leg_violations = None
+                if leg_route is not None and leg_route.validation is not None:
+                    leg_violations = sum(
+                        1 for v in leg_route.validation.violations if "hard geofence" in v.lower()
+                    )
+                legs_info.append(
+                    RouteLegInfo(
+                        leg_index=leg.leg_index,
+                        origin=[leg.origin.latitude, leg.origin.longitude],
+                        destination=[leg.destination.latitude, leg.destination.longitude],
+                        status=leg_route.status.value if leg_route else "NO_ROUTE",
+                        waypoint_count=leg_route.node_count if leg_route else None,
+                        total_distance_m=leg_route.total_distance_m if leg_route else None,
+                        hard_geofence_violations=leg_violations,
+                        reasons=list(leg_route.reasons) if leg_route else [],
+                    )
+                )
+                destinations_out.append([leg.destination.latitude, leg.destination.longitude])
+            unattempted_out = [[c.latitude, c.longitude] for c in multi.unattempted_destinations]
+            destinations_out.extend(unattempted_out)
+            ordering = multi.ordering
+            all_reached = multi.all_found
+            destination_count = len(destinations_out)
+            violations = sum(leg.hard_geofence_violations or 0 for leg in legs_info) or violations
+
         route_info = RouteInfo(
             status=route.status.value,
             waypoint_count=route.node_count,
@@ -489,6 +531,13 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             pfz_zone_distance_km=(
                 pfz_route_destination.distance_km if pfz_auto_destination else None
             ),
+            is_multi_destination=is_multi,
+            destination_count=destination_count,
+            destinations=destinations_out,
+            ordering=ordering,
+            legs=legs_info,
+            unattempted_destinations=unattempted_out,
+            all_destinations_reached=all_reached,
         )
 
     origin_coord = state.get("resolved_origin")

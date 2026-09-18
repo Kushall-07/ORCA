@@ -80,7 +80,7 @@ def _apply_explicit_destination_override(u, state: OrcaGraphState):  # type: ign
     unchanged."""
     if u.failed or not u.needs_clarification:
         return u
-    if state.get("destination_override") is None:
+    if state.get("destination_override") is None and not state.get("destination_overrides"):
         return u
     return u.model_copy(
         update={
@@ -215,7 +215,16 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
         origin = session.last_origin.coordinate or gazetteer.lookup(session.last_origin.name)
 
     destination_override = state.get("destination_override")
+    # Multiple explicit destinations (several selected PFZ references) -
+    # see OrcaGraphState.destination_overrides. Only the FIRST one feeds the
+    # ordinary single-destination fields below (resolved_destination,
+    # dest_geofence, the Decision Engine's routing_allowed gate) - exactly
+    # like a single PFZ selection would. `route_node` separately reads the
+    # full ordered tuple to plan every leg when there is more than one.
+    destination_overrides = state.get("destination_overrides") or ()
     destination = destination_override
+    if destination is None and destination_overrides:
+        destination = destination_overrides[0]
     if destination is None and u.destination is not None:
         destination = u.destination.coordinate or gazetteer.lookup(u.destination.name)
 
@@ -231,6 +240,7 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
     pfz_route_destination = None
     if (
         destination_override is None
+        and not destination_overrides
         and origin is not None
         and u.requests_route
         and u.requests_pfz
@@ -248,9 +258,10 @@ async def normalize(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unt
     decision_time = _resolve_decision_time(_now(state), date_hint, u.time_window)
 
     # An explicit destination override (e.g. a selected INCOIS PFZ reference
-    # point) always implies a route request, deterministically - never relies
-    # on the LLM having parsed "route" intent from free text.
-    if destination_override is not None and not u.requests_route:
+    # point, or multiple selected PFZ references) always implies a route
+    # request, deterministically - never relies on the LLM having parsed
+    # "route" intent from free text.
+    if (destination_override is not None or destination_overrides) and not u.requests_route:
         u = u.model_copy(update={"requests_route": True})
 
     updates: dict = {
@@ -721,6 +732,37 @@ async def route_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-un
                 maritime_origin = assumption
         if maritime_origin is not None and not maritime_origin.unavailable:
             origin = maritime_origin.coordinate
+
+    destination_overrides = state.get("destination_overrides") or ()
+    if len(destination_overrides) > 1:
+        from app.agents.route import combine_multi_route_legs
+
+        mra = deps.route_agent.plan_multi(
+            understanding=u,
+            decision=decision,
+            origin=origin,
+            destinations=destination_overrides,
+            hard_geofences=deps.hard_geofences,
+            soft_geofences=deps.soft_geofences,
+            risk=state.get("risk_result"),
+            first_destination_geofence=state.get("dest_geofence"),
+            allow_blocked_origin_cell=bool(maritime_origin is not None and maritime_origin.assumed),
+        )
+        combined_route = combine_multi_route_legs(mra.legs)
+        updates: dict = {
+            "multi_route_agent_result": mra,
+            "route_agent_result": mra.legs[0].result if mra.legs else None,
+            "route_result": combined_route,
+            "maritime_origin": maritime_origin,
+            "agent_trace": ["route" if mra.ran else "route:skip"],
+        }
+        downgraded_leg = next((leg for leg in mra.legs if leg.result.downgraded), None)
+        if downgraded_leg is not None and downgraded_leg.result.safety_after_route is not None:
+            updates["safety_result"] = downgraded_leg.result.safety_after_route
+            updates["decision"] = decide(
+                downgraded_leg.result.safety_after_route, risk=state.get("risk_result")
+            )
+        return updates
 
     ra = deps.route_agent.plan(
         understanding=u,
@@ -1648,6 +1690,7 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         gis=state.get("gis_result"),
     )
     expl = _append_pfz_auto_route_note(state, expl, language)
+    expl = _append_multi_route_note(state, expl, language)
     expl = _apply_whatif_answer(state, expl)
     return {"explanation": expl, "agent_trace": ["explain"]}
 
@@ -1708,6 +1751,40 @@ def _append_pfz_auto_route_note(state: OrcaGraphState, expl, language):  # type:
     return expl.model_copy(update={"text": f"{note} {expl.text}".strip()})
 
 
+def _append_multi_route_note(state: OrcaGraphState, expl, language):  # type: ignore[no-untyped-def]
+    """Deterministic, always-on notice for a multi-destination PFZ route (more
+    than one selected PFZ reference) - see `destination_overrides` /
+    `route_node`'s `plan_multi` branch. Added the same way
+    `_append_pfz_auto_route_note` is: after the (template or Groq) explanation
+    text, never through the LLM grounding path. No-op for every ordinary
+    single-destination request."""
+    from app.i18n.messages import frag
+
+    mra = state.get("multi_route_agent_result")
+    if mra is None or not mra.ran:
+        return expl
+    total = len(mra.legs) + len(mra.unattempted_destinations)
+    if mra.all_found:
+        note = frag(language, "multi_route_summary", n=total)
+    else:
+        failed_leg = mra.legs[-1] if mra.legs else None
+        failed_route = failed_leg.result.route if failed_leg is not None else None
+        reason = (
+            failed_route.reasons[0] if failed_route is not None and failed_route.reasons
+            else (failed_route.status.value if failed_route is not None else "NO_ROUTE")
+        )
+        status = failed_route.status.value if failed_route is not None else "NO_ROUTE"
+        note = frag(
+            language, "multi_route_partial",
+            reached=mra.failed_leg_index or 0,
+            total=total,
+            failed_number=(mra.failed_leg_index or 0) + 1,
+            status=status,
+            reason=reason,
+        )
+    return expl.model_copy(update={"text": f"{note} {expl.text}".strip()})
+
+
 async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     u = state.get("understanding")
     decision = state.get("decision")
@@ -1721,6 +1798,9 @@ async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
             safety is not None
             and "required_evidence_missing" in safety.triggered_rules
         )
+        advisory_severity, _advisory_availability, advisory_applicable, advisory_area = (
+            _advisory_safety_inputs(state)
+        )
         deps.session_store.append(
             state["session_id"],
             SessionTurn(
@@ -1733,6 +1813,12 @@ async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
                     if state.get("risk_input") is not None
                     else None
                 ),
+                weather_result=state.get("weather_result"),
+                ocean_result=state.get("ocean_result"),
+                advisory_severity=advisory_severity,
+                advisory_availability=_advisory_availability,
+                advisory_applicable=advisory_applicable,
+                advisory_area=advisory_area,
             ),
         )
     return {"pipeline_status": status, "agent_trace": ["assemble"]}

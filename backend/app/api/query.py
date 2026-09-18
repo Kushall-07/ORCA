@@ -82,6 +82,31 @@ async def query(request: QueryRequest, http_request: Request) -> QueryResponse:
                 errors=["invalid destination coordinate"],
             )
 
+    destinations = None
+    if request.destinations:
+        try:
+            coords = [
+                Coordinate(latitude=d.latitude, longitude=d.longitude) for d in request.destinations
+            ]
+        except ValueError:
+            return QueryResponse(
+                session_id=request.session_id or "sess-unknown",
+                request_id=request_id,
+                turn=0,
+                status="ERROR",
+                language="en",
+                intent="general",
+                answer="The supplied destination coordinates are invalid.",
+                errors=["invalid destination coordinate"],
+            )
+        # A single-entry list is equivalent to `destination_latitude`/
+        # `destination_longitude` - reuse the exact same singular code path
+        # (RouteAgent.plan) rather than the multi-leg one.
+        if len(coords) == 1 and destination is None:
+            destination = coords[0]
+        elif len(coords) > 1:
+            destinations = coords
+
     try:
         return await get_pipeline().run(
             message=request.message,
@@ -89,6 +114,7 @@ async def query(request: QueryRequest, http_request: Request) -> QueryResponse:
             request_id=request_id,
             coordinate=coordinate,
             destination=destination,
+            destinations=destinations,
             date_hint=request.date_hint,
             stakeholder=request.stakeholder,
             language=request.language,

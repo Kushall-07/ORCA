@@ -42,10 +42,38 @@ def _word_present(text: str, word: str) -> bool:
     return re.search(rf"(?<![A-Za-z]){re.escape(word)}(?![A-Za-z])", text) is not None
 
 # ---- R1: fisheries correlation --------------------------------------------
-_LANDINGS_WORDS = ("landings", "landing data", "catch data", "catch records")
+# Generalized fisheries-outcome vocabulary - "landings" is the formal term but
+# a researcher just as often says "fish activity", "catch" or "abundance"; all
+# converge on the SAME missing dataset (see app.research.capability's
+# "fish_landings" entry), never one regex per exact phrasing.
+_LANDINGS_WORDS = (
+    "landings", "landing data", "catch data", "catch records", "catch",
+    "fish activity", "fishing activity", "pelagic fish activity",
+    "fish abundance", "fish population", "abundance of fish", "fish catch",
+)
 _CORRELATION_WORDS = (
-    "correlation", "correlate", "correlated", "relationship between",
-    "related to", "appear related", "associated with", "show me the relationship",
+    "correlation", "correlate", "correlated", "correlates",
+    "relationship between", "relationship over time", "relationship with",
+    "related to", "appear related", "appear to be related",
+    "associated with", "linked to", "linked with", "show me the relationship",
+)
+
+# ---- prediction requests: a hard capability gate ---------------------------
+# A request to predict a FUTURE fisheries outcome (tomorrow's catch, the
+# highest-catch fishing ground, ...). Generalized over phrasing via a small
+# regex (predict/forecast, or "will ... highest/catch/landings/abundance")
+# combined with an explicit catch/landings/abundance target, so SST/
+# chlorophyll-a can never be silently substituted as a catch-prediction model
+# - see app.research.capability ("fish_landings" is never available) and
+# app.agents.evidence_explanation._render_research_intent.
+_PREDICTION_RE = re.compile(
+    r"\b(?:predict|prediction|forecast)\b|"
+    r"\bwill\b[^.?!]{0,40}\b(?:highest|catch|landings|abundance)\b",
+    re.IGNORECASE,
+)
+_CATCH_TARGET_WORDS = (
+    "catch", "fish catch", "landings", "fish landings", "abundance",
+    "fish abundance", "fishing ground",
 )
 
 # ---- R2: chlorophyll anomaly / HAB / hypoxia -------------------------------
@@ -110,6 +138,33 @@ _DATASET_WORDS = (
     "ocean color datasets", "datasets do you have", "data do you have",
     "data do you actually have",
 )
+# Generalized "what data/observations/sensors/sources do you actually have"
+# shape - covers paraphrasings _DATASET_WORDS' fixed phrases miss (e.g. "what
+# historical ocean-colour OBSERVATIONS does ORCA actually HAVE", "which
+# SENSORS are available", "what data EXISTS for this region") without adding
+# a regex per exact sentence: a "what/which" question word, a data-noun, and
+# an availability/existence verb, in that order within one short clause.
+_DATASET_INVENTORY_RE = re.compile(
+    r"\b(?:what|which)\b[^.?!]{0,40}"
+    r"\b(?:datasets?|data|observations?|sensors?|sources?)\b[^.?!]{0,40}"
+    r"\b(?:have|has|exist|exists|configured|available|actually)\b",
+    re.IGNORECASE,
+)
+
+# ---- source disagreement / evidence conflict -------------------------------
+# Reuses the EXISTING Evidence Arbitration / Conflict Detection output
+# (app.reasoning.conflicts / app.models.conflict) at render time - this only
+# detects that the question IS about source disagreement, generalized over
+# phrasing; it never itself decides whether a disagreement exists (see
+# app.agents.evidence_explanation._render_research_intent).
+_SOURCE_CONFLICT_PHRASES = (
+    "which sources disagree", "do the sources disagree", "sources disagree",
+    "which source should i trust", "which source do you trust",
+    "are the datasets conflicting", "is there conflicting evidence",
+    "do the observations contradict", "does the data conflict",
+    "conflicting data", "data conflict", "source disagreement",
+    "which data source is correct", "which dataset is correct",
+)
 
 
 def _any(low: str, words: tuple[str, ...]) -> bool:
@@ -139,6 +194,20 @@ def detect(message: str) -> ResearchDetection | None:
             domain=ResearchDomain.FISHERIES_CORRELATION,
             analysis_type=AnalysisType.CORRELATION,
             variables=variables + ("fish_landings",),
+        )
+
+    # Prediction request: a future fisheries outcome (tomorrow's catch, the
+    # highest-catch fishing ground, ...) - checked BEFORE R2/R3/etc. so a
+    # prediction question that also happens to name SST/chlorophyll never
+    # falls through to an ordinary (always-supported) environmental reading.
+    # Always UNSUPPORTED: "fish_landings" is the sole required variable and
+    # has no configured source (see app.research.capability), so SST/
+    # chlorophyll-a can never be silently substituted as a catch predictor.
+    if _PREDICTION_RE.search(low) and _any(low, _CATCH_TARGET_WORDS):
+        return ResearchDetection(
+            domain=ResearchDomain.FISHERIES_CORRELATION,
+            analysis_type=AnalysisType.PREDICTION,
+            variables=("fish_landings",),
         )
 
     # R2: chlorophyll anomaly, optionally naming HAB and/or hypoxia concerns.
@@ -253,9 +322,19 @@ def detect(message: str) -> ResearchDetection | None:
             variables=variables,
         )
 
+    # Source disagreement / evidence conflict - checked before the general
+    # dataset-inventory branch below (distinct question: "do your sources
+    # agree" vs. "what datasets do you have").
+    if _any(low, _SOURCE_CONFLICT_PHRASES):
+        return ResearchDetection(
+            domain=ResearchDomain.GENERAL_ENVIRONMENTAL,
+            analysis_type=AnalysisType.SOURCE_CONFLICT_CHECK,
+            variables=(),
+        )
+
     # General researcher: dataset / capability questions, not tied to any one
     # domain above.
-    if _any(low, _DATASET_WORDS):
+    if _any(low, _DATASET_WORDS) or _DATASET_INVENTORY_RE.search(low):
         return ResearchDetection(
             domain=ResearchDomain.GENERAL_ENVIRONMENTAL,
             analysis_type=AnalysisType.DATASET_COMPARISON,
