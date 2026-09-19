@@ -11,6 +11,7 @@ from app.api.gis import router as gis_router
 from app.api.health import router as health_router
 from app.api.query import router as query_router
 from app.api.replay import router as replay_router
+from app.api.route_compare import router as route_compare_router
 from app.api.whatif import router as whatif_router
 
 api_router = APIRouter()
@@ -19,5 +20,6 @@ api_router.include_router(query_router)
 api_router.include_router(gis_router)
 api_router.include_router(whatif_router)
 api_router.include_router(replay_router)
+api_router.include_router(route_compare_router)
 
 __all__ = ["api_router"]

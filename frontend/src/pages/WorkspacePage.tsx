@@ -7,8 +7,13 @@ import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useTour } from "../hooks/useTour";
 import { getStakeholder, type StakeholderId } from "../stakeholders";
-import type { GeoJsonFeatureCollection } from "../types/api";
-import { fetchEnvironmentalSuitabilityLayer, fetchPfzLayer } from "../services/apiClient";
+import type { BaselineRouteResult, GeoJsonFeatureCollection } from "../types/api";
+import {
+  ApiError,
+  fetchEnvironmentalSuitabilityLayer,
+  fetchPfzLayer,
+  postRouteBaseline,
+} from "../services/apiClient";
 import { nearestPointOnFeature } from "../maps/pfzGeometry";
 import MarineMap, { type LayerId } from "../maps/MarineMap";
 import { GpsControl, PfzSelectionCard, type SelectedPfz } from "../components/map/LocationControls";
@@ -37,6 +42,9 @@ import { WhatIfPanel } from "../components/whatif/WhatIfPanel";
 import { ReplayPanel } from "../components/replay/ReplayPanel";
 import { ProvenanceViewer } from "../components/provenance/ProvenanceViewer";
 import { RoutePanel } from "../components/route/RoutePanel";
+import { RouteComparisonPanel } from "../components/route/RouteComparisonPanel";
+import { TripPlannerPanel } from "../components/trip/TripPlannerPanel";
+import { ExportEvidenceButton } from "../components/evidence/ExportEvidenceButton";
 import { ReportView } from "../components/report/ReportView";
 import {
   buildLayerToggles,
@@ -148,6 +156,49 @@ export default function WorkspacePage() {
     if (!isPfzIntentResponse(latest) || !isPfzLayerAvailable(latest)) return;
     setActiveLayers((prev) => (prev.has("pfz") ? prev : new Set(prev).add("pfz")));
   }, [latest]);
+
+  // ---- Milestone 4: Fisher Operations Suite - the straight-line baseline
+  // route, fetched once per distinct origin/destination pair whenever a real
+  // ORCA route exists (regardless of which page/layer is active, so Route
+  // Comparison and the map baseline overlay share one fetch - never
+  // refetched for the same pair, per REQUIRED BEHAVIOR #47). `undefined`
+  // means "not requested yet"; `null` means "requested and failed" - kept
+  // distinct the same way suitabilityData is.
+  const [baselineRoute, setBaselineRoute] = useState<BaselineRouteResult | null>(null);
+  const [baselineLoading, setBaselineLoading] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
+  const baselineRequestedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const route = latest?.route;
+    if (!route || route.status !== "ROUTE_FOUND" || !route.origin || !route.destination) {
+      return;
+    }
+    const key = `${route.origin[0].toFixed(4)},${route.origin[1].toFixed(4)}->${route.destination[0].toFixed(4)},${route.destination[1].toFixed(4)}`;
+    if (baselineRequestedFor.current === key) return;
+    baselineRequestedFor.current = key;
+    setBaselineLoading(true);
+    setBaselineError(null);
+    const controller = new AbortController();
+    postRouteBaseline(
+      {
+        origin_latitude: route.origin[0],
+        origin_longitude: route.origin[1],
+        destination_latitude: route.destination[0],
+        destination_longitude: route.destination[1],
+      },
+      controller.signal,
+    )
+      .then((result) => {
+        setBaselineRoute(result);
+        setBaselineLoading(false);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setBaselineError(err instanceof ApiError ? err.message : "baseline route unavailable");
+        setBaselineLoading(false);
+      });
+    return () => controller.abort();
+  }, [latest?.route]);
 
   const layerData = useMemo(() => {
     const extra: Record<string, GeoJsonFeatureCollection> = {};
@@ -349,6 +400,7 @@ export default function WorkspacePage() {
                 }
                 selectedPfzs={selectedPfzs.map((p) => [p.lat, p.lon] as [number, number])}
                 onSelectPfz={onSelectPfz}
+                baselineRoute={baselineRoute}
               />
               <div className="workspace__map-overlay">
                 <LayerControl toggles={toggles} active={activeLayers} onToggle={onToggleLayer} />
@@ -445,6 +497,23 @@ export default function WorkspacePage() {
                     <Disclose title={t("verdict.whatIf")}>
                       <WhatIfPanel resp={latest} />
                     </Disclose>
+                  )}
+                </>
+              ) : page === "trip" ? (
+                <>
+                  <TripPlannerPanel resp={latest} />
+                  <RouteComparisonPanel
+                    resp={latest}
+                    baseline={baselineRoute}
+                    baselineLoading={baselineLoading}
+                    baselineError={baselineError}
+                  />
+                  {latest.route && (
+                    <ExportEvidenceButton
+                      resp={latest}
+                      query={lastUserQuery}
+                      extra={{ baseline: baselineRoute }}
+                    />
                   )}
                 </>
               ) : page === "evidence" ? (

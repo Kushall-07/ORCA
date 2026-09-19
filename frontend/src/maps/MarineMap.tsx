@@ -11,7 +11,12 @@ import {
   useMap,
 } from "react-leaflet";
 import { useI18n } from "../i18n";
-import type { GeoJsonFeatureCollection, QueryResponse, RiskLevel } from "../types/api";
+import type {
+  BaselineRouteResult,
+  GeoJsonFeatureCollection,
+  QueryResponse,
+  RiskLevel,
+} from "../types/api";
 
 const DEFAULT_CENTER: [number, number] = [12.9, 74.8];
 const DEFAULT_ZOOM = 8;
@@ -170,6 +175,11 @@ export interface MarineMapProps {
   selectedPfzs?: [number, number][] | null;
   /** Fired when a PFZ feature is clicked. */
   onSelectPfz?: (feature: Feature<Geometry, Record<string, unknown>>, clickLatLng: [number, number]) => void;
+  /** Milestone 4 - Fisher Operations Suite: the straight-line comparison
+   * reference for the current route, when fetched. Rendered as a clearly
+   * distinct muted/neutral (or extreme, if it crosses a hard geofence) line
+   * next to the ORCA route - never styled to look like a safe alternative. */
+  baselineRoute?: BaselineRouteResult | null;
 }
 
 export default function MarineMap({
@@ -180,6 +190,7 @@ export default function MarineMap({
   selectedPfz = null,
   selectedPfzs = null,
   onSelectPfz,
+  baselineRoute = null,
 }: MarineMapProps) {
   const { t } = useI18n();
 
@@ -238,10 +249,32 @@ export default function MarineMap({
           pathOptions={{ color: "#18b6d9", weight: 4, opacity: 0.9 }}
         >
           <Tooltip sticky>
-            {t("map.route")}
+            {t("map.orcaRoute")}
             {resp?.route?.total_distance_m != null
               ? ` — ${(resp.route.total_distance_m / 1000).toFixed(1)} km`
               : ""}
+          </Tooltip>
+        </Polyline>
+      )}
+
+      {/* Milestone 4 - straight-line baseline, muted/neutral unless it crosses
+       * a hard geofence (extreme), so it never visually reads as a safe
+       * alternative to the ORCA route above. */}
+      {activeLayers.has("route") && baselineRoute && (
+        <Polyline
+          positions={[baselineRoute.origin, baselineRoute.destination] as [number, number][]}
+          pathOptions={{
+            color: baselineRoute.hard_geofence_violations > 0 ? "#e05252" : "#6f8d99",
+            weight: 3,
+            opacity: 0.85,
+            dashArray: "8 6",
+          }}
+        >
+          <Tooltip sticky>
+            {baselineRoute.hard_geofence_violations > 0
+              ? t("route.compare.baselineBlocked")
+              : t("route.compare.baseline")}
+            {` — ${(baselineRoute.distance_m / 1000).toFixed(1)} km`}
           </Tooltip>
         </Polyline>
       )}

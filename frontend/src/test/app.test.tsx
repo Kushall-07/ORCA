@@ -19,6 +19,11 @@ const fetchGisLayerManifest = vi.fn();
 const fetchGisLayer = vi.fn();
 const fetchReferenceRegistry = vi.fn();
 const fetchPfzLayer = vi.fn();
+// Milestone 4 - Fisher Operations Suite: WorkspacePage fetches the
+// straight-line baseline whenever a response carries a found route (see its
+// baselineRoute effect). Mocked like every other apiClient call below so
+// tests never attempt a real network request.
+const postRouteBaseline = vi.fn();
 
 // Leaflet needs a real layout/SVG engine that jsdom lacks; the map is purely
 // visual, so stub it. All assertions target panels and controls.
@@ -36,6 +41,7 @@ vi.mock("../services/apiClient", async () => {
     fetchGisLayer: (...a: unknown[]) => fetchGisLayer(...a),
     fetchReferenceRegistry: (...a: unknown[]) => fetchReferenceRegistry(...a),
     fetchPfzLayer: (...a: unknown[]) => fetchPfzLayer(...a),
+    postRouteBaseline: (...a: unknown[]) => postRouteBaseline(...a),
   };
 });
 
@@ -74,6 +80,7 @@ beforeEach(() => {
   fetchGisLayer.mockResolvedValue({ type: "FeatureCollection", features: [] });
   fetchReferenceRegistry.mockResolvedValue([]);
   fetchPfzLayer.mockResolvedValue(null);
+  postRouteBaseline.mockResolvedValue(null);
 });
 
 afterEach(() => cleanup());

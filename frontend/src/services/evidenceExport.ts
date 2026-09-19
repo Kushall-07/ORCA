@@ -7,9 +7,17 @@
 // chain-of-thought, or server filesystem/infra details - none of those exist
 // on QueryResponse to begin with, so there is nothing to accidentally leak.
 
-import type { QueryResponse } from "../types/api";
+import type { BaselineRouteResult, QueryResponse } from "../types/api";
 
 export const EVIDENCE_EXPORT_VERSION = "1.0";
+
+// Milestone 4 (Fisher Operations Suite) - optional, additive extra data. Only
+// ever the straight-line baseline already fetched and shown in Route
+// Comparison; never a second export system (see the master spec's "Evidence
+// Export Integration" section).
+export interface EvidenceExportExtra {
+  baseline?: BaselineRouteResult | null;
+}
 
 export interface EvidenceExportDocument {
   export_version: string;
@@ -38,10 +46,15 @@ export interface EvidenceExportDocument {
   grounded: boolean;
   answer: string;
   disclaimer: string;
+  route_baseline?: BaselineRouteResult | null;
 }
 
 /** Builds the export document. Pure - no I/O, easy to unit-test and reuse. */
-export function buildEvidenceExport(resp: QueryResponse, query: string): EvidenceExportDocument {
+export function buildEvidenceExport(
+  resp: QueryResponse,
+  query: string,
+  extra?: EvidenceExportExtra,
+): EvidenceExportDocument {
   return {
     export_version: EVIDENCE_EXPORT_VERSION,
     generated_at: new Date().toISOString(),
@@ -70,6 +83,7 @@ export function buildEvidenceExport(resp: QueryResponse, query: string): Evidenc
     answer: resp.answer,
     disclaimer:
       "Generated client-side from the same ORCA response already shown in this session. A decision-support export, not a legal, regulatory or navigational certification.",
+    route_baseline: extra?.baseline ?? undefined,
   };
 }
 
@@ -88,9 +102,13 @@ export function evidenceExportFilename(resp: QueryResponse, when: Date = new Dat
 /** Triggers a browser download of the export JSON. Returns false (never
  * throws) if the browser download APIs are unavailable, so callers can show
  * an honest failure state instead of a silent no-op. */
-export function downloadEvidenceExport(resp: QueryResponse, query: string): boolean {
+export function downloadEvidenceExport(
+  resp: QueryResponse,
+  query: string,
+  extra?: EvidenceExportExtra,
+): boolean {
   try {
-    const json = JSON.stringify(buildEvidenceExport(resp, query), null, 2);
+    const json = JSON.stringify(buildEvidenceExport(resp, query, extra), null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

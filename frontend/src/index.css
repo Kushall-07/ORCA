@@ -1365,6 +1365,53 @@ summary:focus-visible {
 .route__marine-title { margin: 0; font-size: 0.72rem; color: var(--orca-faint); }
 .route__origin-assumption { margin: 0.3rem 0 0; padding: 0.3rem 0.5rem; font-size: 0.76rem; color: var(--orca-caution); background: rgba(255, 212, 59, 0.1); border-radius: 4px; }
 
+/* ---------- Milestone 4: Fisher Trip Planner ---------- */
+.trip-planner { display: flex; flex-direction: column; gap: 0.75rem; }
+.trip-planner__inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+}
+.trip-planner__field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.76rem; color: var(--orca-muted); min-width: 0; }
+.trip-planner__field input {
+  background: var(--orca-panel-2, var(--orca-surface-2));
+  border: 1px solid var(--orca-border);
+  border-radius: 6px;
+  color: var(--orca-text);
+  padding: 0.4rem 0.5rem;
+  font-size: 0.84rem;
+  width: 100%;
+  min-width: 0;
+}
+.trip-planner__result { border-top: 1px solid var(--orca-border); padding-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.trip-planner__status { margin: 0; font-weight: 700; letter-spacing: 0.04em; }
+.trip-planner__result.is-ok .trip-planner__status { color: var(--orca-safe); }
+.trip-planner__result.is-alert .trip-planner__status { color: var(--orca-extreme); }
+.trip-planner__caution { margin: 0; font-size: 0.8rem; color: var(--orca-caution); }
+.trip-planner__reasons { margin: 0; padding-left: 1.1rem; font-size: 0.8rem; color: var(--orca-muted); }
+.trip-planner__accounting { display: flex; flex-direction: column; gap: 0.2rem; }
+.trip-planner__safety-note, .trip-planner__pfz-note { margin: 0; font-size: 0.72rem; color: var(--orca-faint); }
+
+/* ---------- Milestone 4: Route Comparison + Analytics ---------- */
+.route-compare__note { margin: 0; font-size: 0.72rem; color: var(--orca-faint); }
+.route-compare__table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow-x: auto;
+}
+.route-compare__row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1.2fr) 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  min-width: 320px;
+}
+.route-compare__row--head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orca-faint); border-bottom: 1px solid var(--orca-border); padding-bottom: 0.3rem; }
+.route-compare__diff { color: var(--orca-muted); font-size: 0.76rem; }
+.route-compare__explanation { margin: 0; font-size: 0.8rem; color: var(--orca-text); background: var(--orca-panel-2, var(--orca-surface-2)); border-radius: 6px; padding: 0.5rem 0.6rem; }
+.route-analytics { display: flex; flex-direction: column; gap: 0.2rem; }
+
 /* ---------- map controls ---------- */
 .layer-control, .tier-legend {
   background: rgba(11, 18, 32, 0.94);

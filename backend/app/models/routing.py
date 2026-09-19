@@ -153,3 +153,25 @@ class RouteResult(BaseModel):
     @property
     def found(self) -> bool:
         return self.status is RouteStatus.ROUTE_FOUND
+
+
+class BaselineRouteResult(BaseModel):
+    """The straight-line geodesic comparison reference for Route Comparison
+    (Milestone 4 - Fisher Operations Suite). Deliberately NOT a second routing
+    algorithm: it never searches for a path and never avoids anything - it
+    reports the distance and hard-geofence crossings of the direct line
+    between origin and destination, using the exact same geofence data and
+    geometry primitives (``app.gis.operations.segment_intersects_geometry``)
+    the live A* planner's independent validator uses. See
+    ``app.routing.baseline.compute_baseline_route``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    # [lat, lon] pairs - the same convention as RouteInfo.origin/destination.
+    origin: tuple[float, float]
+    destination: tuple[float, float]
+    distance_m: float
+    hard_geofence_violations: int = Field(ge=0)
+    violated_geofence_ids: tuple[str, ...] = ()
+    violated_geofence_names: tuple[str, ...] = ()

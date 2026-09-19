@@ -4,6 +4,7 @@
 
 import { API_BASE_URL, QUERY_TIMEOUT_MS } from "./config";
 import type {
+  BaselineRouteResult,
   GeoJsonFeatureCollection,
   GisLayerMeta,
   QueryRequestBody,
@@ -281,6 +282,31 @@ export async function fetchEnvironmentalSuitabilityLayer(
     }
     throw err;
   }
+}
+
+export interface BaselineRouteRequestBody {
+  origin_latitude: number;
+  origin_longitude: number;
+  destination_latitude: number;
+  destination_longitude: number;
+}
+
+/**
+ * POST /route/baseline (Milestone 4 - Fisher Operations Suite) - the
+ * straight-line comparison reference for Route Comparison. Deterministic;
+ * never a second routing algorithm (see backend app.routing.baseline). Used
+ * only alongside an already-computed ORCA route (`QueryResponse.route`), so
+ * this is the one new network call Route Comparison needs.
+ */
+export async function postRouteBaseline(
+  body: BaselineRouteRequestBody,
+  signal?: AbortSignal,
+): Promise<BaselineRouteResult> {
+  return request<BaselineRouteResult>("/route/baseline", {
+    method: "POST",
+    body: JSON.stringify(body),
+    signal,
+  });
 }
 
 export function pfzSnapshotUrl(): string {

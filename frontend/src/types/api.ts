@@ -390,6 +390,21 @@ export interface RouteLegInfo {
   reasons: string[];
 }
 
+// POST /route/baseline (Milestone 4 - Fisher Operations Suite) - the
+// straight-line geodesic comparison reference. Never a second routing
+// algorithm: no waypoints, no path-finding - only a factual distance and
+// hard-geofence-crossing check for the direct line, computed with the same
+// geometry primitives the real A* planner's validator uses. See
+// backend app.routing.baseline.
+export interface BaselineRouteResult {
+  origin: [number, number];
+  destination: [number, number];
+  distance_m: number;
+  hard_geofence_violations: number;
+  violated_geofence_ids: string[];
+  violated_geofence_names: string[];
+}
+
 export interface ProtectedAreaInfo {
   name: string;
   designation: string | null;
