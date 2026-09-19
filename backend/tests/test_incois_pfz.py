@@ -161,7 +161,15 @@ async def test_fetch_matched_lines_returns_feature_collection_with_provenance(mo
     async def _lines(*a, **k):
         return _LINES_FC
 
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    # _fetch_pfz_feature_collections fetches lines AND landing centres together
+    # (shared fallback decision) even though fetch_matched_lines only uses the
+    # lines - both external boundaries must be mocked or the landing-centre
+    # call falls through to the live INCOIS WFS/Text Data channels.
     monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
     fc = await fetch_matched_lines(MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache()))
     assert fc["type"] == "FeatureCollection"
     assert fc["orca_meta"]["authority"] == "INCOIS"

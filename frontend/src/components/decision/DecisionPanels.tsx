@@ -1,4 +1,5 @@
 import { useI18n } from "../../i18n";
+import { humanizeRiskWarnings } from "../../i18n/warnings";
 import type { ProvNode, QueryResponse } from "../../types/api";
 import { Chips, EmptyNote, Panel } from "../common";
 import { ExportEvidenceButton } from "../evidence/ExportEvidenceButton";
@@ -189,7 +190,9 @@ export function DecisionCard({ resp, query = "" }: { resp: QueryResponse; query?
         )}
 
         {d.warnings.length > 0 && (
-          <p className="decision__warnings">{d.warnings.join(" · ")}</p>
+          <p className="decision__warnings">
+            {humanizeRiskWarnings(d.warnings, t).join(" · ")}
+          </p>
         )}
 
         <p className="verdict__confidence">

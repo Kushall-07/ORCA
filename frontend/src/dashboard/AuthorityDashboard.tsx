@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
+import { humanizeRiskWarnings } from "../i18n/warnings";
 import { ApiError, fetchAuthorityOverview } from "../services/apiClient";
 import { AuthorityMap } from "../maps/AuthorityMap";
 import { DataTierBadge, Disclaimer, EmptyNote, SeverityBadge, Spinner } from "../components/common";
@@ -245,7 +246,11 @@ export function AuthorityDashboard({
                       <td>
                         <SeverityBadge severity={loc.status} label={statusLabel(loc.status)} />
                       </td>
-                      <td>{loc.warnings.length > 0 ? loc.warnings.join("; ") : t("common.na")}</td>
+                      <td>
+                        {loc.warnings.length > 0
+                          ? humanizeRiskWarnings(loc.warnings, t).join("; ")
+                          : t("common.na")}
+                      </td>
                       <td>
                         {loc.weather_tier ? (
                           <DataTierBadge tier={loc.weather_tier} label={tierLabel(loc.weather_tier)} />

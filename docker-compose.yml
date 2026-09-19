@@ -49,7 +49,7 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-'["http://localhost:3000","http://127.0.0.1:3000"]'}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       MOSDAC_USERNAME: ${MOSDAC_USERNAME:-}
       MOSDAC_PASSWORD: ${MOSDAC_PASSWORD:-}

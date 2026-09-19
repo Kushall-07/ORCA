@@ -6,6 +6,50 @@ import type { LanguageCode } from "../types/api";
 
 export type StringKey =
   | "app.subtitle"
+  | "landing.brand.tagline"
+  | "landing.hero.headline"
+  | "landing.hero.subtext"
+  | "landing.hero.ctaPrimary"
+  | "landing.hero.ctaSecondary"
+  | "landing.hero.disclaimer"
+  | "landing.pipeline.title"
+  | "landing.pipeline.step.query"
+  | "landing.pipeline.step.agents"
+  | "landing.pipeline.step.fabric"
+  | "landing.pipeline.step.arbitration"
+  | "landing.pipeline.step.risk"
+  | "landing.pipeline.step.decision"
+  | "landing.pipeline.step.output"
+  | "landing.pipeline.note"
+  | "landing.sources.title"
+  | "landing.sources.note"
+  | "landing.sources.weather"
+  | "landing.sources.ocean"
+  | "landing.sources.sst"
+  | "landing.sources.chl"
+  | "landing.sources.pfz"
+  | "landing.sources.gis"
+  | "landing.sources.safety"
+  | "landing.sources.evidence"
+  | "landing.why.title"
+  | "landing.why.item1"
+  | "landing.why.item2"
+  | "landing.why.item3"
+  | "landing.why.item4"
+  | "landing.why.item5"
+  | "landing.why.item6"
+  | "landing.why.item7"
+  | "landing.why.item8"
+  | "landing.preview.title"
+  | "landing.preview.decision"
+  | "landing.preview.safety"
+  | "landing.preview.suitability"
+  | "landing.preview.route"
+  | "landing.preview.evidence"
+  | "landing.preview.cta"
+  | "landing.footer.tagline"
+  | "landing.footer.problem"
+  | "landing.footer.sponsor"
   | "header.stakeholder"
   | "header.language"
   | "header.connection"
@@ -122,6 +166,14 @@ export type StringKey =
   | "decision.noSafeTitle"
   | "decision.noSafeBody"
   | "decision.missingConflicting"
+  | "decision.warning.advisoryUnavailable"
+  | "decision.warning.geofenceUnavailable"
+  | "decision.warning.factorUnavailable"
+  | "decision.warning.factorUnavailableCritical"
+  | "riskFactor.wave"
+  | "riskFactor.wind"
+  | "riskFactor.lightningProxy"
+  | "riskFactor.cycloneProxy"
   | "risk.overall"
   | "risk.contributing"
   | "risk.missingCritical"
@@ -637,6 +689,54 @@ type Table = Record<StringKey, string>;
 
 const en: Table = {
   "app.subtitle": "Marine Intelligence",
+  "landing.brand.tagline": "Oceanic Reasoning & Collaborative Agents",
+  "landing.hero.headline": "Ocean Intelligence. Reasoned Decisions. Safer Marine Operations.",
+  "landing.hero.subtext":
+    "ORCA brings weather, ocean, environmental, advisory and geospatial evidence together through collaborative AI agents and deterministic safety rules to support marine decisions.",
+  "landing.hero.ctaPrimary": "Launch ORCA",
+  "landing.hero.ctaSecondary": "How ORCA Reasons",
+  "landing.hero.disclaimer":
+    "A decision-support system for the human decision-maker — not a replacement for official warnings, autonomous navigation, or guaranteed catch prediction.",
+  "landing.pipeline.title": "How ORCA Reasons",
+  "landing.pipeline.step.query": "User Query",
+  "landing.pipeline.step.agents": "Collaborative AI Agents",
+  "landing.pipeline.step.fabric": "Marine Data Fabric",
+  "landing.pipeline.step.arbitration": "Evidence Arbitration",
+  "landing.pipeline.step.risk": "Deterministic Risk & Safety",
+  "landing.pipeline.step.decision": "Decision",
+  "landing.pipeline.step.output": "Evidence + Route + Explanation",
+  "landing.pipeline.note":
+    "AI reasons about the query. Deterministic code computes and enforces safety. Evidence supports the decision. The human makes the final call.",
+  "landing.sources.title": "What ORCA Reasons Over",
+  "landing.sources.note":
+    "Not every source is live at all times. ORCA always discloses whether a value is live, reference, demo, or unavailable.",
+  "landing.sources.weather": "Weather",
+  "landing.sources.ocean": "Oceanographic Conditions",
+  "landing.sources.sst": "Sea Surface Temperature",
+  "landing.sources.chl": "Chlorophyll-a",
+  "landing.sources.pfz": "PFZ / Advisory References",
+  "landing.sources.gis": "GIS & Geofencing",
+  "landing.sources.safety": "Marine Safety Constraints",
+  "landing.sources.evidence": "Environmental Evidence",
+  "landing.why.title": "Why ORCA",
+  "landing.why.item1": "Collaborative marine AI agents",
+  "landing.why.item2": "Deterministic safety enforcement",
+  "landing.why.item3": "Evidence-backed decisions",
+  "landing.why.item4": "Conflict-aware reasoning",
+  "landing.why.item5": "Constraint-aware routing",
+  "landing.why.item6": "Decision provenance",
+  "landing.why.item7": "Replayable decisions",
+  "landing.why.item8": "Human remains the final decision maker",
+  "landing.preview.title": "Inside a Decision",
+  "landing.preview.decision": "Decision",
+  "landing.preview.safety": "Safety",
+  "landing.preview.suitability": "Fishing Suitability",
+  "landing.preview.route": "Route",
+  "landing.preview.evidence": "Evidence",
+  "landing.preview.cta": "Enter ORCA",
+  "landing.footer.tagline": "Marine Ecosystem Reasoning with Collaborative Agents",
+  "landing.footer.problem": "SIH26176",
+  "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "Context",
   "header.language": "Language",
   "header.connection": "Backend",
@@ -755,6 +855,18 @@ const en: Table = {
   "decision.noSafeBody":
     "Critical evidence required for a reliable safety decision is unavailable or unresolved. ORCA will not fabricate a recommendation.",
   "decision.missingConflicting": "Missing / conflicting evidence",
+  "decision.warning.advisoryUnavailable":
+    "No active official advisory is currently available for this location. ORCA is using the latest available weather, ocean and safety data.",
+  "decision.warning.geofenceUnavailable":
+    "Some geofence data is unavailable; the assessment is based only on verified available constraints.",
+  "decision.warning.factorUnavailable":
+    "No {factor} data is currently available; the overall score reflects only the factors ORCA could verify.",
+  "decision.warning.factorUnavailableCritical":
+    "Safety-critical {factor} data is unavailable; ORCA applies a conservative safety margin until it can be verified.",
+  "riskFactor.wave": "wave height",
+  "riskFactor.wind": "wind speed",
+  "riskFactor.lightningProxy": "lightning/thunderstorm",
+  "riskFactor.cycloneProxy": "cyclone",
   "risk.overall": "Overall risk",
   "risk.contributing": "Contributing factors",
   "risk.missingCritical": "Missing safety-critical data",
@@ -1313,6 +1425,54 @@ const en: Table = {
 const hi: Table = {
   ...en,
   "app.subtitle": "समुद्री बुद्धिमत्ता",
+  "landing.brand.tagline": "महासागरीय तर्क एवं सहयोगी एजेंट",
+  "landing.hero.headline": "समुद्री बुद्धिमत्ता। तर्कसंगत निर्णय। सुरक्षित समुद्री संचालन।",
+  "landing.hero.subtext":
+    "ORCA मौसम, समुद्र, पर्यावरण, परामर्श और भू-स्थानिक साक्ष्य को सहयोगी AI एजेंटों और निश्चयात्मक सुरक्षा नियमों के माध्यम से एक साथ लाकर समुद्री निर्णयों में सहायता करता है।",
+  "landing.hero.ctaPrimary": "ORCA लॉन्च करें",
+  "landing.hero.ctaSecondary": "ORCA कैसे तर्क करता है",
+  "landing.hero.disclaimer":
+    "यह मानव निर्णयकर्ता के लिए एक निर्णय-सहायता प्रणाली है — आधिकारिक चेतावनियों, स्वायत्त नेविगेशन, या गारंटीकृत मछली पकड़ने की भविष्यवाणी का विकल्प नहीं।",
+  "landing.pipeline.title": "ORCA कैसे तर्क करता है",
+  "landing.pipeline.step.query": "उपयोगकर्ता प्रश्न",
+  "landing.pipeline.step.agents": "सहयोगी AI एजेंट",
+  "landing.pipeline.step.fabric": "समुद्री डेटा फैब्रिक",
+  "landing.pipeline.step.arbitration": "साक्ष्य मध्यस्थता",
+  "landing.pipeline.step.risk": "निश्चयात्मक जोखिम और सुरक्षा",
+  "landing.pipeline.step.decision": "निर्णय",
+  "landing.pipeline.step.output": "साक्ष्य + मार्ग + स्पष्टीकरण",
+  "landing.pipeline.note":
+    "AI प्रश्न पर तर्क करता है। निश्चयात्मक कोड सुरक्षा की गणना और प्रवर्तन करता है। साक्ष्य निर्णय का समर्थन करता है। अंतिम निर्णय मनुष्य लेता है।",
+  "landing.sources.title": "ORCA किन आंकड़ों पर तर्क करता है",
+  "landing.sources.note":
+    "हर स्रोत हर समय लाइव नहीं होता। ORCA हमेशा बताता है कि कोई मान लाइव, संदर्भ, डेमो, या अनुपलब्ध है।",
+  "landing.sources.weather": "मौसम",
+  "landing.sources.ocean": "समुद्री स्थितियाँ",
+  "landing.sources.sst": "समुद्र सतह तापमान",
+  "landing.sources.chl": "क्लोरोफिल-a",
+  "landing.sources.pfz": "PFZ / परामर्श संदर्भ",
+  "landing.sources.gis": "GIS और जियोफेंसिंग",
+  "landing.sources.safety": "समुद्री सुरक्षा बाधाएँ",
+  "landing.sources.evidence": "पर्यावरणीय साक्ष्य",
+  "landing.why.title": "ORCA क्यों",
+  "landing.why.item1": "सहयोगी समुद्री AI एजेंट",
+  "landing.why.item2": "निश्चयात्मक सुरक्षा प्रवर्तन",
+  "landing.why.item3": "साक्ष्य-समर्थित निर्णय",
+  "landing.why.item4": "विरोधाभास-जागरूक तर्क",
+  "landing.why.item5": "बाधा-जागरूक मार्ग निर्धारण",
+  "landing.why.item6": "निर्णय उद्भव-श्रृंखला (प्रोवेनन्स)",
+  "landing.why.item7": "पुनः चलाने योग्य निर्णय",
+  "landing.why.item8": "अंतिम निर्णयकर्ता सदैव मनुष्य",
+  "landing.preview.title": "एक निर्णय के भीतर",
+  "landing.preview.decision": "निर्णय",
+  "landing.preview.safety": "सुरक्षा",
+  "landing.preview.suitability": "मछली पकड़ने की उपयुक्तता",
+  "landing.preview.route": "मार्ग",
+  "landing.preview.evidence": "साक्ष्य",
+  "landing.preview.cta": "ORCA में प्रवेश करें",
+  "landing.footer.tagline": "सहयोगी एजेंटों के साथ समुद्री पारिस्थितिकी तंत्र तर्क",
+  "landing.footer.problem": "SIH26176",
+  "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "संदर्भ",
   "header.language": "भाषा",
   "header.connection": "बैकएंड",
@@ -1431,6 +1591,18 @@ const hi: Table = {
   "decision.noSafeBody":
     "विश्वसनीय सुरक्षा निर्णय के लिए आवश्यक महत्वपूर्ण साक्ष्य उपलब्ध या हल नहीं हैं। ORCA अनुशंसा नहीं गढ़ेगा।",
   "decision.missingConflicting": "अनुपलब्ध / विरोधाभासी साक्ष्य",
+  "decision.warning.advisoryUnavailable":
+    "इस स्थान के लिए फ़िलहाल कोई सक्रिय आधिकारिक परामर्श उपलब्ध नहीं है। ORCA नवीनतम उपलब्ध मौसम, समुद्री और सुरक्षा डेटा का उपयोग कर रहा है।",
+  "decision.warning.geofenceUnavailable":
+    "कुछ जियोफेंस डेटा उपलब्ध नहीं है; आकलन केवल सत्यापित उपलब्ध बाधाओं पर आधारित है।",
+  "decision.warning.factorUnavailable":
+    "{factor} डेटा फ़िलहाल उपलब्ध नहीं है; समग्र स्कोर केवल उन कारकों को दर्शाता है जिन्हें ORCA सत्यापित कर सका।",
+  "decision.warning.factorUnavailableCritical":
+    "सुरक्षा-महत्वपूर्ण {factor} डेटा उपलब्ध नहीं है; जब तक इसे सत्यापित नहीं किया जा सकता, ORCA एक सतर्क सुरक्षा मार्जिन लागू करता है।",
+  "riskFactor.wave": "लहर की ऊँचाई",
+  "riskFactor.wind": "हवा की गति",
+  "riskFactor.lightningProxy": "बिजली/आंधी",
+  "riskFactor.cycloneProxy": "चक्रवात",
   "risk.overall": "कुल जोखिम",
   "risk.contributing": "योगदान करने वाले कारक",
   "risk.missingCritical": "अनुपलब्ध सुरक्षा-महत्वपूर्ण डेटा",
@@ -1987,6 +2159,54 @@ const hi: Table = {
 const kn: Table = {
   ...en,
   "app.subtitle": "ಸಮುದ್ರ ಗುಪ್ತಚರ್ಯೆ",
+  "landing.brand.tagline": "ಸಾಗರ ತಾರ್ಕಿಕತೆ ಮತ್ತು ಸಹಯೋಗಿ ಏಜೆಂಟ್‌ಗಳು",
+  "landing.hero.headline": "ಸಾಗರ ಬುದ್ಧಿಮತ್ತೆ. ತಾರ್ಕಿಕ ನಿರ್ಧಾರಗಳು. ಸುರಕ್ಷಿತ ಸಮುದ್ರ ಕಾರ್ಯಾಚರಣೆಗಳು.",
+  "landing.hero.subtext":
+    "ORCA ಹವಾಮಾನ, ಸಾಗರ, ಪರಿಸರ, ಸಲಹಾ ಮತ್ತು ಭೂ-ಪ್ರಾದೇಶಿಕ ಸಾಕ್ಷ್ಯಗಳನ್ನು ಸಹಯೋಗಿ AI ಏಜೆಂಟ್‌ಗಳು ಮತ್ತು ನಿಶ್ಚಿತ ಸುರಕ್ಷತಾ ನಿಯಮಗಳ ಮೂಲಕ ಒಟ್ಟುಗೂಡಿಸಿ ಸಮುದ್ರ ನಿರ್ಧಾರಗಳಿಗೆ ಸಹಾಯ ಮಾಡುತ್ತದೆ.",
+  "landing.hero.ctaPrimary": "ORCA ಪ್ರಾರಂಭಿಸಿ",
+  "landing.hero.ctaSecondary": "ORCA ಹೇಗೆ ತರ್ಕಿಸುತ್ತದೆ",
+  "landing.hero.disclaimer":
+    "ಇದು ಮಾನವ ನಿರ್ಧಾರ ತೆಗೆದುಕೊಳ್ಳುವವರಿಗಾಗಿ ಒಂದು ನಿರ್ಧಾರ-ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ — ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆಗಳು, ಸ್ವಾಯತ್ತ ಸಂಚರಣೆ, ಅಥವಾ ಖಾತರಿಪಡಿಸಿದ ಮೀನುಗಾರಿಕೆ ಮುನ್ಸೂಚನೆಗೆ ಪರ್ಯಾಯವಲ್ಲ.",
+  "landing.pipeline.title": "ORCA ಹೇಗೆ ತರ್ಕಿಸುತ್ತದೆ",
+  "landing.pipeline.step.query": "ಬಳಕೆದಾರರ ಪ್ರಶ್ನೆ",
+  "landing.pipeline.step.agents": "ಸಹಯೋಗಿ AI ಏಜೆಂಟ್‌ಗಳು",
+  "landing.pipeline.step.fabric": "ಸಮುದ್ರ ದತ್ತಾಂಶ ಫ್ಯಾಬ್ರಿಕ್",
+  "landing.pipeline.step.arbitration": "ಸಾಕ್ಷ್ಯ ಮಧ್ಯಸ್ಥಿಕೆ",
+  "landing.pipeline.step.risk": "ನಿಶ್ಚಿತ ಅಪಾಯ ಮತ್ತು ಸುರಕ್ಷತೆ",
+  "landing.pipeline.step.decision": "ನಿರ್ಧಾರ",
+  "landing.pipeline.step.output": "ಸಾಕ್ಷ್ಯ + ಮಾರ್ಗ + ವಿವರಣೆ",
+  "landing.pipeline.note":
+    "AI ಪ್ರಶ್ನೆಯ ಬಗ್ಗೆ ತರ್ಕಿಸುತ್ತದೆ. ನಿಶ್ಚಿತ ಕೋಡ್ ಸುರಕ್ಷತೆಯನ್ನು ಲೆಕ್ಕಹಾಕುತ್ತದೆ ಮತ್ತು ಜಾರಿಗೊಳಿಸುತ್ತದೆ. ಸಾಕ್ಷ್ಯ ನಿರ್ಧಾರವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ. ಅಂತಿಮ ನಿರ್ಧಾರವನ್ನು ಮಾನವ ತೆಗೆದುಕೊಳ್ಳುತ್ತಾನೆ.",
+  "landing.sources.title": "ORCA ಯಾವ ದತ್ತಾಂಶದ ಮೇಲೆ ತರ್ಕಿಸುತ್ತದೆ",
+  "landing.sources.note":
+    "ಪ್ರತಿ ಮೂಲವೂ ಯಾವಾಗಲೂ ಲೈವ್ ಆಗಿರುವುದಿಲ್ಲ. ಒಂದು ಮೌಲ್ಯ ಲೈವ್, ಉಲ್ಲೇಖ, ಡೆಮೊ, ಅಥವಾ ಲಭ್ಯವಿಲ್ಲ ಎಂಬುದನ್ನು ORCA ಯಾವಾಗಲೂ ಬಹಿರಂಗಪಡಿಸುತ್ತದೆ.",
+  "landing.sources.weather": "ಹವಾಮಾನ",
+  "landing.sources.ocean": "ಸಾಗರ ಪರಿಸ್ಥಿತಿಗಳು",
+  "landing.sources.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
+  "landing.sources.chl": "ಕ್ಲೋರೊಫಿಲ್-a",
+  "landing.sources.pfz": "PFZ / ಸಲಹಾ ಉಲ್ಲೇಖಗಳು",
+  "landing.sources.gis": "GIS ಮತ್ತು ಜಿಯೋಫೆನ್ಸಿಂಗ್",
+  "landing.sources.safety": "ಸಮುದ್ರ ಸುರಕ್ಷತಾ ನಿರ್ಬಂಧಗಳು",
+  "landing.sources.evidence": "ಪರಿಸರ ಸಾಕ್ಷ್ಯ",
+  "landing.why.title": "ORCA ಏಕೆ",
+  "landing.why.item1": "ಸಹಯೋಗಿ ಸಮುದ್ರ AI ಏಜೆಂಟ್‌ಗಳು",
+  "landing.why.item2": "ನಿಶ್ಚಿತ ಸುರಕ್ಷತಾ ಜಾರಿ",
+  "landing.why.item3": "ಸಾಕ್ಷ್ಯ-ಬೆಂಬಲಿತ ನಿರ್ಧಾರಗಳು",
+  "landing.why.item4": "ವಿರೋಧಾಭಾಸ-ಅರಿವಿನ ತಾರ್ಕಿಕತೆ",
+  "landing.why.item5": "ನಿರ್ಬಂಧ-ಅರಿವಿನ ಮಾರ್ಗ ನಿರ್ಧಾರಣೆ",
+  "landing.why.item6": "ನಿರ್ಧಾರ ಮೂಲದ ದಾಖಲೆ",
+  "landing.why.item7": "ಮರುಪ್ಲೇ ಮಾಡಬಹುದಾದ ನಿರ್ಧಾರಗಳು",
+  "landing.why.item8": "ಅಂತಿಮ ನಿರ್ಧಾರ ತೆಗೆದುಕೊಳ್ಳುವವನು ಯಾವಾಗಲೂ ಮಾನವ",
+  "landing.preview.title": "ಒಂದು ನಿರ್ಧಾರದ ಒಳಗೆ",
+  "landing.preview.decision": "ನಿರ್ಧಾರ",
+  "landing.preview.safety": "ಸುರಕ್ಷತೆ",
+  "landing.preview.suitability": "ಮೀನುಗಾರಿಕೆ ಸೂಕ್ತತೆ",
+  "landing.preview.route": "ಮಾರ್ಗ",
+  "landing.preview.evidence": "ಸಾಕ್ಷ್ಯ",
+  "landing.preview.cta": "ORCA ಪ್ರವೇಶಿಸಿ",
+  "landing.footer.tagline": "ಸಹಯೋಗಿ ಏಜೆಂಟ್‌ಗಳೊಂದಿಗೆ ಸಮುದ್ರ ಪರಿಸರ ವ್ಯವಸ್ಥೆ ತಾರ್ಕಿಕತೆ",
+  "landing.footer.problem": "SIH26176",
+  "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "ಸಂದರ್ಭ",
   "header.language": "ಭಾಷೆ",
   "header.connection": "ಬ್ಯಾಕೆಂಡ್",
@@ -2105,6 +2325,18 @@ const kn: Table = {
   "decision.noSafeBody":
     "ವಿಶ್ವಾಸಾರ್ಹ ಸುರಕ್ಷತಾ ನಿರ್ಣಯಕ್ಕೆ ಅಗತ್ಯವಿರುವ ನಿರ್ಣಾಯಕ ಸಾಕ್ಷ್ಯ ಲಭ್ಯವಿಲ್ಲ ಅಥವಾ ಪರಿಹರಿಸಲಾಗಿಲ್ಲ. ORCA ಶಿಫಾರಸನ್ನು ರಚಿಸುವುದಿಲ್ಲ.",
   "decision.missingConflicting": "ಲಭ್ಯವಿಲ್ಲದ / ವಿರೋಧಾತ್ಮಕ ಸಾಕ್ಷ್ಯ",
+  "decision.warning.advisoryUnavailable":
+    "ಈ ಸ್ಥಳಕ್ಕೆ ಪ್ರಸ್ತುತ ಯಾವುದೇ ಸಕ್ರಿಯ ಅಧಿಕೃತ ಸಲಹೆ ಲಭ್ಯವಿಲ್ಲ. ORCA ಇತ್ತೀಚಿನ ಲಭ್ಯವಿರುವ ಹವಾಮಾನ, ಸಾಗರ ಮತ್ತು ಸುರಕ್ಷತಾ ದತ್ತಾಂಶವನ್ನು ಬಳಸುತ್ತಿದೆ.",
+  "decision.warning.geofenceUnavailable":
+    "ಕೆಲವು ಜಿಯೋಫೆನ್ಸ್ ದತ್ತಾಂಶ ಲಭ್ಯವಿಲ್ಲ; ಮೌಲ್ಯಮಾಪನವು ಪರಿಶೀಲಿಸಲಾದ ಲಭ್ಯ ನಿರ್ಬಂಧಗಳನ್ನು ಮಾತ್ರ ಆಧರಿಸಿದೆ.",
+  "decision.warning.factorUnavailable":
+    "{factor} ದತ್ತಾಂಶ ಪ್ರಸ್ತುತ ಲಭ್ಯವಿಲ್ಲ; ಒಟ್ಟಾರೆ ಅಂಕವು ORCA ಪರಿಶೀಲಿಸಬಹುದಾದ ಅಂಶಗಳನ್ನು ಮಾತ್ರ ಪ್ರತಿಬಿಂಬಿಸುತ್ತದೆ.",
+  "decision.warning.factorUnavailableCritical":
+    "ಸುರಕ್ಷತಾ-ನಿರ್ಣಾಯಕ {factor} ದತ್ತಾಂಶ ಲಭ್ಯವಿಲ್ಲ; ಇದನ್ನು ಪರಿಶೀಲಿಸುವವರೆಗೆ ORCA ಒಂದು ಸಂಪ್ರದಾಯಶೀಲ ಸುರಕ್ಷತಾ ಅಂಚನ್ನು ಅನ್ವಯಿಸುತ್ತದೆ.",
+  "riskFactor.wave": "ಅಲೆಯ ಎತ್ತರ",
+  "riskFactor.wind": "ಗಾಳಿಯ ವೇಗ",
+  "riskFactor.lightningProxy": "ಮಿಂಚು/ಗುಡುಗು",
+  "riskFactor.cycloneProxy": "ಚಂಡಮಾರುತ",
   "risk.overall": "ಒಟ್ಟು ಅಪಾಯ",
   "risk.contributing": "ಕೊಡುಗೆ ನೀಡುವ ಅಂಶಗಳು",
   "risk.missingCritical": "ಲಭ್ಯವಿಲ್ಲದ ಸುರಕ್ಷತಾ-ನಿರ್ಣಾಯಕ ದತ್ತಾಂಶ",

@@ -18,6 +18,17 @@
   --orca-extreme: #e05252;
   --orca-info: #4da3d9;
 
+  /* ---- Competition palette (landing page + PFZ zone-rank accents only -
+     see index.css bottom section and PfzRanking; the in-app dark workspace
+     theme above stays as-is per M1-M6, this is additive, not a retheme). ---- */
+  --orca-teal: #31aaa9;
+  --orca-teal-dark: #1f7a79;
+  --orca-cream: #f6efdd;
+  --orca-sand: #ecdcb4;
+  --orca-red: #b32024;
+  --orca-burgundy: #6e1a1d;
+  --orca-ink: #1c2b2b;
+
   /* ---- legacy aliases: keep every existing component rule below working
      unchanged while this file is retheme, rather than rewriting ~1800 lines
      to the canonical names above. New rules should use the canonical names
@@ -2235,4 +2246,251 @@ summary:focus-visible {
 @media (max-width: 860px) {
   .authority__grid { grid-template-columns: 1fr; }
   .authority-map-frame { height: 320px; }
+}
+
+/* ---- Landing page: warm cream/teal "front door", separate from the dark
+   in-app workspace theme above (see competition palette tokens at the top of
+   this file). Judge-facing first screen; kept self-contained under .landing
+   so it never leaks into the workspace's dark styling. ---- */
+.landing {
+  min-height: 100%;
+  background: var(--orca-cream);
+  color: var(--orca-ink);
+  color-scheme: light;
+  display: flex;
+  flex-direction: column;
+}
+
+.landing__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem clamp(1rem, 4vw, 3rem);
+}
+
+.landing__brand { display: flex; align-items: center; gap: 0.5rem; }
+.landing__brand-mark { color: var(--orca-teal); font-size: 1.4rem; }
+.landing__brand-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--orca-teal-dark);
+}
+
+.landing__lang-select {
+  background: #fff;
+  border: 1px solid var(--orca-sand);
+  color: var(--orca-ink);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.landing__hero {
+  padding: clamp(2rem, 8vw, 5rem) clamp(1rem, 6vw, 3rem) clamp(2rem, 6vw, 3rem);
+  max-width: 880px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.landing__eyebrow {
+  color: var(--orca-teal-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.landing__headline {
+  font-size: clamp(1.6rem, 4.5vw, 2.6rem);
+  line-height: 1.2;
+  margin: 0 0 1rem;
+  color: var(--orca-ink);
+}
+
+.landing__subtext {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #3d4a49;
+  max-width: 640px;
+  margin: 0 auto 1.75rem;
+}
+
+.landing__cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.landing__cta-row--center { margin-bottom: 0; }
+
+.landing__cta {
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.landing__cta--primary {
+  background: var(--orca-teal);
+  color: #fff;
+  box-shadow: 0 6px 18px -6px rgba(49, 170, 169, 0.55);
+}
+.landing__cta--primary:hover { background: var(--orca-teal-dark); }
+.landing__cta--secondary {
+  background: transparent;
+  border-color: var(--orca-teal-dark);
+  color: var(--orca-teal-dark);
+}
+.landing__cta--secondary:hover { background: rgba(49, 170, 169, 0.1); }
+
+.landing__disclaimer {
+  font-size: 0.78rem;
+  color: #5b6867;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.landing__section {
+  padding: clamp(2rem, 6vw, 3.5rem) clamp(1rem, 6vw, 3rem);
+  max-width: 1040px;
+  margin: 0 auto;
+  width: 100%;
+}
+.landing__section--alt { background: var(--orca-sand); border-radius: 18px; }
+
+.landing__section-title {
+  font-size: 1.3rem;
+  text-align: center;
+  margin: 0 0 1.75rem;
+  color: var(--orca-teal-dark);
+}
+
+.landing__pipeline {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.landing__pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid var(--orca-sand);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem 0.4rem 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.landing__pipeline-step:not(:last-child)::after {
+  content: "→";
+  color: var(--orca-teal);
+  margin-left: 0.5rem;
+  font-weight: 700;
+}
+.landing__pipeline-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--orca-teal);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.landing__note {
+  text-align: center;
+  color: #4c5958;
+  font-size: 0.85rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.landing__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.landing__chip {
+  background: #fff;
+  border: 1px solid var(--orca-teal);
+  color: var(--orca-teal-dark);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.landing__why-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.landing__why-item {
+  background: #fff;
+  border: 1px solid var(--orca-sand);
+  border-left: 4px solid var(--orca-teal);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--orca-ink);
+}
+
+.landing__preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.landing__preview-pill {
+  background: #fff;
+  border: 1px solid var(--orca-sand);
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--orca-ink);
+}
+.landing__preview-pill--safe {
+  border-color: var(--orca-teal);
+  color: var(--orca-teal-dark);
+  background: rgba(49, 170, 169, 0.08);
+}
+
+.landing__footer {
+  margin-top: auto;
+  padding: 1.5rem clamp(1rem, 6vw, 3rem) 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  justify-content: center;
+  color: #5b6867;
+  font-size: 0.78rem;
+  border-top: 1px solid var(--orca-sand);
+}
+.landing__footer-brand {
+  font-weight: 700;
+  color: var(--orca-teal-dark);
+}
+
+@media (max-width: 480px) {
+  .landing__topbar { padding: 0.75rem 1rem; }
+  .landing__pipeline-step:not(:last-child)::after { display: none; }
 }

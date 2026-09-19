@@ -1,4 +1,5 @@
 import { useI18n } from "../i18n";
+import { humanizeRiskWarnings } from "../i18n/warnings";
 import { DataTierBadge, Disclaimer, KeyValue, SeverityBadge } from "../components/common";
 import { ExportEvidenceButton } from "../components/evidence/ExportEvidenceButton";
 import type { AssessmentSection } from "../components/nav/navItems";
@@ -69,7 +70,9 @@ export function AuthorityLocationDetail({
             </KeyValue>
           )}
           <KeyValue k={t("authority.detail.warnings")}>
-            {location.warnings.length > 0 ? location.warnings.join("; ") : t("common.na")}
+            {location.warnings.length > 0
+              ? humanizeRiskWarnings(location.warnings, t).join("; ")
+              : t("common.na")}
           </KeyValue>
           <KeyValue k={t("authority.detail.geofence")}>
             {location.geofence_status
