@@ -3,7 +3,15 @@ import type { EmphasisTab } from "../../stakeholders";
 
 // The assessment-mode section a user can land on. "report" is appended to the
 // stakeholder-driven EmphasisTab set since every stakeholder can reach it.
-export type AssessmentSection = EmphasisTab | "report";
+// "system" (the Engine Room) is a separate, always-enabled entry point - see
+// ENGINE_ROOM_ITEM below - deliberately kept out of ASSESSMENT_NAV_ITEMS so
+// it never inherits that list's "only once a response exists" gating.
+export type AssessmentSection = EmphasisTab | "report" | "system";
+
+export const ENGINE_ROOM_ITEM: { id: AssessmentSection; key: StringKey } = {
+  id: "system",
+  key: "nav.engineRoom",
+};
 
 // Shared between the horizontal WorkspaceNav (Workspace mode) and the vertical
 // OrcaSidebar (Assessment mode) so both navigations always list the same

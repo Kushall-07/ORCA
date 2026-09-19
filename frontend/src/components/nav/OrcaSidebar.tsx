@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import { ASSESSMENT_NAV_ITEMS, type AssessmentSection } from "./navItems";
+import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, type AssessmentSection } from "./navItems";
 
 export type { AssessmentSection } from "./navItems";
 
@@ -39,8 +39,20 @@ export function OrcaSidebar({
       </button>
 
       <ul className="sidebar__nav">
+        <li>
+          <button
+            type="button"
+            className={`sidebar__item ${page === ENGINE_ROOM_ITEM.id ? "is-active" : ""}`}
+            aria-current={page === ENGINE_ROOM_ITEM.id ? "page" : undefined}
+            onClick={() => onNavigate(ENGINE_ROOM_ITEM.id)}
+          >
+            {t(ENGINE_ROOM_ITEM.key)}
+          </button>
+        </li>
         {ASSESSMENT_NAV_ITEMS.map((item) => {
-          const disabled = item.id === "report" && !reportEnabled;
+          // Every per-query section needs a response - only the Engine Room
+          // above is reachable with none (see AssessmentSection's docs).
+          const disabled = !reportEnabled;
           const active = page === item.id;
           return (
             <li key={item.id}>

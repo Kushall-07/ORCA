@@ -807,6 +807,68 @@ unchanged; 21–22 are additive Step 5 cases. See
 
 ---
 
+## 6g. Engine Room & Agent Execution Trace (frontend-only, additive)
+
+Answers two questions a judge or operator asks: *"how is ORCA constructed?"*
+(Engine Room, a static architecture view) and *"what did ORCA just execute for
+my query?"* (Agent Execution Trace, upgraded). **Zero backend changes** — the
+Phase 7 `node_trace` / `agent_trace` plus existing response fields
+(`data_quality`, `evidence[].data_tier`, `advisory`, `pfz_reference`, `gis`,
+`decision`, `route`) already carried everything needed; this milestone is a
+frontend projection only.
+
+**Shared ground truth
+(`frontend/src/components/system/pipelineStages.ts`).** One module mirrors
+`build_orca_graph()` in `app/orchestration/graph.py` exactly — the same node
+names, the real 5-way parallel fan-out (`collect_weather | collect_ocean |
+collect_gis | collect_environment | collect_advisory`), and the true edge
+order — grouped into six phases (Understanding, Parallel Data Collection,
+Deterministic Reasoning Core, Routing, Environmental & Reference Intelligence,
+Output & Provenance). Both views import it, so they cannot silently disagree
+about the graph. Status derivation prefers the structured `node_trace`
+(`COMPLETED` / `SKIPPED` / `FAILED`) and falls back to the flat `agent_trace`
+token list; a node the graph bypassed entirely via a conditional edge (e.g.
+`route`, when routing was not requested) carries no trace entry at all and is
+rendered the same as a node that self-emitted a `:skip` token — both mean "did
+not run this turn." Every per-stage detail line (source name, record count,
+tier, evidence/conflict counts, decision/safety status) is read from existing
+`QueryResponse` fields; nothing is invented, and a field with nothing truthful
+to show renders no detail line rather than a placeholder.
+
+**Agent Execution Trace (`frontend/src/components/intel/AgentTrace.tsx`,
+replaces the former flat `AgentActivity`).** Groups stages by phase; the
+parallel-collection phase gets a visual bracket and a truthful "N of 5
+parallel branches ran" line; the optional Phase 9 intelligence phase (9
+query-gated stages) collapses to one honest "N ran · M not applicable" line
+when nothing in it ran, expandable via `<Disclose>`. Each stage row shows a
+kind badge (`LLM interpretation` / `Deterministic` / `Data intelligence`), an
+optional `DataTierBadge` (LIVE/CACHE/REFERENCE/DEMO/MISSING, reused from Phase
+6), real `duration_ms` when available, and a grounded one-line detail — never
+model reasoning, a prompt, or a hidden deliberation step.
+
+**Engine Room (`frontend/src/components/system/EngineRoom.tsx`, new).** A
+static 5-block diagram (Data Sources → Marine Data Fabric → the 7 real agents,
+LLM vs. deterministic vs. data-intelligence labelled → Deterministic
+Reasoning Core → Output) reachable with **no query in flight** — unlike every
+other assessment section it is not gated on a response existing, added as its
+own always-enabled nav entry (`AssessmentSection = "system"`) rather than the
+shared, response-gated `ASSESSMENT_NAV_ITEMS` list. With no response it shows
+the architecture only and no status badge (never a fabricated "LIVE"); once a
+turn exists it overlays that turn's real source tiers, evidence/conflict
+counts, per-agent ran/skipped marks, and the realised
+`safety_status → decision` on the same deterministic-precedence text already
+in this document (§5).
+
+**Invariant.** No safety-critical file was touched (`risk/`, `policy/`,
+`decision/`, `routing/`, `gis/geofencing.py` — read-only consumption of their
+outputs only). No new HTTP calls, no new backend endpoint, no changed API
+contract. `frontend/src/test/agentTrace.test.tsx` and
+`frontend/src/test/engineRoom.test.tsx` cover the parallel count, the
+collapse/expand behaviour, the conditional-edge route case, and that no tier
+badge renders without a response.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |

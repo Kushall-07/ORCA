@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import { ASSESSMENT_NAV_ITEMS, type AssessmentSection } from "./navItems";
+import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, type AssessmentSection } from "./navItems";
 
 /**
  * Workspace-mode horizontal navigation. "Ask ORCA" marks the current
@@ -27,6 +27,17 @@ export function WorkspaceNav({
           <span className="top-nav__item is-active" aria-current="page">
             {t("chat.title")}
           </span>
+        </li>
+        <li>
+          {/* Always enabled - the Engine Room explains the architecture and
+              needs no query in flight, unlike every other section here. */}
+          <button
+            type="button"
+            className="top-nav__item"
+            onClick={() => onNavigate(ENGINE_ROOM_ITEM.id)}
+          >
+            {t(ENGINE_ROOM_ITEM.key)}
+          </button>
         </li>
         {ASSESSMENT_NAV_ITEMS.map((item) => (
           <li key={item.id}>

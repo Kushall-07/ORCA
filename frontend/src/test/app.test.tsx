@@ -224,7 +224,7 @@ describe("ORCA workspace", () => {
     await sendQuery();
     await waitForResponse();
     await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
-    const routeStep = screen.getByText("Route agent (A*)").closest(".activity-step");
+    const routeStep = screen.getByText("Route Agent (A*)").closest(".activity-step");
     expect(routeStep?.className).toContain("activity-step--skipped");
   });
 
@@ -235,7 +235,7 @@ describe("ORCA workspace", () => {
     await waitForResponse();
     await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
     // real duration_ms rendered next to a completed stage
-    const fabricStep = screen.getByText("Spatial-temporal fabric").closest(".activity-step");
+    const fabricStep = screen.getByText("Marine Data Fabric").closest(".activity-step");
     expect(fabricStep?.textContent).toMatch(/2\.4 ms/);
     // measured-timing note, not a "no timings" disclaimer
     expect(screen.getByText(/measured server-side/i)).toBeInTheDocument();
@@ -251,7 +251,7 @@ describe("ORCA workspace", () => {
     await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
     expect(screen.getByText(/no per-stage timing in this response/i)).toBeInTheDocument();
     // agent_trace still drives status
-    const routeStep = screen.getByText("Route agent (A*)").closest(".activity-step");
+    const routeStep = screen.getByText("Route Agent (A*)").closest(".activity-step");
     expect(routeStep?.className).toContain("activity-step--skipped");
   });
 
@@ -1000,7 +1000,7 @@ describe("ORCA sidebar navigation", () => {
     await sendQuery();
     await waitForResponse();
     await userEvent.click(screen.getByRole("button", { name: /^activity$/i }));
-    expect(screen.getByText("Route agent (A*)")).toBeInTheDocument();
+    expect(screen.getByText("Route Agent (A*)")).toBeInTheDocument();
   });
 
   it("clicking Report displays the Report page in place, without opening a new tab", async () => {

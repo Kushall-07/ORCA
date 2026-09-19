@@ -1227,21 +1227,80 @@ summary:focus-visible {
 .explain__template { margin: 0; font-size: 0.74rem; color: var(--orca-caution); }
 .explain__reasons { margin: 0; padding-left: 1.1rem; font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.2rem; }
 
-/* ---------- agent activity ---------- */
+/* ---------- agent activity / execution trace ---------- */
 .activity__lead { margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--orca-faint); }
+.activity-phase { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px solid var(--orca-border-soft); }
+.activity-phase:first-of-type { margin-top: 0.3rem; padding-top: 0; border-top: none; }
+.activity-phase__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; margin-bottom: 0.2rem; }
+.activity-phase__title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orca-text-muted); }
+.activity-phase__note { font-size: 0.7rem; color: var(--orca-faint); }
+.activity-phase__note--parallel { color: var(--orca-accent-2); }
+.activity-phase--empty .activity-phase__head { margin-bottom: 0; }
+
 .activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+/* the real parallel fan-out (collect_weather | collect_ocean | collect_gis |
+   collect_environment | collect_advisory) gets a bracket, like the
+   provenance graph's columns, so the reader sees five branches, not a list */
+.activity-list--branch { border-left: 2px solid var(--orca-accent-2); padding-left: 0.5rem; margin-left: 0.15rem; }
+
 .activity-step { display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.5rem; align-items: center; font-size: 0.8rem; padding: 0.25rem 0.3rem; }
+.activity-step__body { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
+.activity-step__row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.activity-step__detail { font-size: 0.7rem; color: var(--orca-faint); overflow-wrap: anywhere; }
+.activity-step__kind { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.02rem 0.3rem; border-radius: 3px; border: 1px solid var(--orca-border); color: var(--orca-muted); }
+.activity-step__kind--llm { border-color: #9775fa; color: #b7a3f7; }
+.activity-step__kind--deterministic { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
+.activity-step__kind--data { border-color: var(--orca-border-strong); color: var(--orca-muted); }
 .activity-step__ms { font-size: 0.68rem; color: var(--orca-faint); font-variant-numeric: tabular-nums; }
-.activity-step__mark { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--orca-faint); flex: none; }
+.activity-step__mark { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--orca-faint); flex: none; margin-top: 0.15rem; }
 .activity-step--done .activity-step__mark { background: var(--ok); }
-.activity-step--skipped .activity-step__mark { background: transparent; border: 1px solid var(--orca-faint); }
+.activity-step--skipped .activity-step__mark,
+.activity-step--pending .activity-step__mark { background: transparent; border: 1px solid var(--orca-faint); }
 .activity-step--error .activity-step__mark { background: var(--bad); }
-.activity-step--pending .activity-step__mark { background: var(--orca-border); }
-.activity-step--skipped { opacity: 0.6; }
-.activity-step__state { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orca-muted); }
+/* every stage here belongs to an already-finished turn, so "pending" never
+   means "queued" - like "skipped", it means the graph did not run this node
+   this turn (most often a conditional edge it did not take) */
+.activity-step--skipped, .activity-step--pending { opacity: 0.6; }
+.activity-step__state { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orca-muted); align-self: start; }
 .activity__foot { margin: 0.4rem 0 0; font-size: 0.7rem; color: var(--orca-faint); }
 .activity__corr { margin: 0.3rem 0 0; font-size: 0.68rem; color: var(--orca-faint); overflow-wrap: anywhere; }
 .activity__corr code { font-size: 0.66rem; }
+
+/* ---------- engine room ---------- */
+.engine__lead { margin: 0 0 0.4rem; font-size: 0.8rem; color: var(--orca-muted); }
+.engine__no-query { margin: 0 0 0.6rem; font-size: 0.78rem; color: var(--orca-faint); background: var(--orca-panel-2); border: 1px dashed var(--orca-border); border-radius: 6px; padding: 0.45rem 0.6rem; }
+.engine__arrow { text-align: center; color: var(--orca-faint); font-size: 0.85rem; margin: 0.1rem 0; }
+.engine-section { display: flex; flex-direction: column; gap: 0.4rem; }
+.engine-section__head h4 { margin: 0; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--orca-text); }
+.engine-section__head p { margin: 0.1rem 0 0; font-size: 0.74rem; color: var(--orca-muted); }
+.engine-section__stat { margin: 0; font-size: 0.72rem; color: var(--orca-accent-2); font-variant-numeric: tabular-nums; }
+.engine-section--core { background: var(--orca-panel-2); border: 1px solid var(--orca-border); border-radius: 6px; padding: 0.55rem 0.6rem; }
+
+.engine-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.engine-row--compact { gap: 0.3rem; }
+.engine-chip { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.72rem; padding: 0.25rem 0.45rem; border: 1px solid var(--orca-border); border-radius: 5px; background: var(--orca-panel-2); }
+.engine-chip__label { color: var(--orca-text); }
+.engine-chip__detail { color: var(--orca-faint); font-size: 0.68rem; }
+.engine-tag { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--orca-border-strong); color: var(--orca-text-muted); }
+
+.engine-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.4rem; }
+.engine-agent { border: 1px solid var(--orca-border); border-radius: 6px; padding: 0.45rem 0.5rem; background: var(--orca-panel-2); display: flex; flex-direction: column; gap: 0.2rem; }
+.engine-agent__head { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; }
+.engine-agent__kind { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.02rem 0.3rem; border-radius: 3px; border: 1px solid var(--orca-border); color: var(--orca-muted); }
+.engine-agent__kind--llm { border-color: #9775fa; color: #b7a3f7; }
+.engine-agent__kind--deterministic { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
+.engine-agent__kind--data { border-color: var(--orca-border-strong); color: var(--orca-muted); }
+.engine-agent__status { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--orca-faint); }
+.engine-agent__status--done { color: var(--ok); }
+.engine-agent__status--error { color: var(--bad); }
+.engine-agent__status--skipped { color: var(--orca-faint); }
+.engine-agent__label { font-size: 0.78rem; font-weight: 600; color: var(--orca-text); }
+.engine-agent__desc { font-size: 0.68rem; color: var(--orca-muted); }
+
+.engine-core-chain { display: flex; flex-wrap: wrap; align-items: center; font-size: 0.76rem; color: var(--orca-text); }
+.engine-core-chain__step { display: inline-flex; align-items: center; }
+.engine-core-chain__step > span[aria-hidden] { color: var(--orca-faint); margin: 0 0.1rem; }
+.engine-core__safety { margin: 0; font-size: 0.7rem; color: var(--orca-muted); }
 
 /* ---------- provenance ---------- */
 .prov__lead { margin: 0; font-size: 0.76rem; color: var(--orca-muted); }

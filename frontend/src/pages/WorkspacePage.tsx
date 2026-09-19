@@ -26,11 +26,9 @@ import {
   EvidencePanel,
   ReferencePanel,
 } from "../components/evidence/EvidencePanels";
-import {
-  AgentActivity,
-  AlertsPanel,
-  ExplanationPanel,
-} from "../components/intel/IntelPanels";
+import { AlertsPanel, ExplanationPanel } from "../components/intel/IntelPanels";
+import { AgentActivity } from "../components/intel/AgentTrace";
+import { EngineRoomView } from "../components/system/EngineRoom";
 import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPanel";
 import { AdvisoryPanel } from "../components/advisory/AdvisoryPanel";
 import { GeofencePanel } from "../components/advisory/GeofencePanel";
@@ -393,7 +391,9 @@ export default function WorkspacePage() {
 
           <main className="assessment__content">
             <div className="rail__content">
-              {!latest ? null : page === "decision" ? (
+              {page === "system" ? (
+                <EngineRoomView resp={latest} />
+              ) : !latest ? null : page === "decision" ? (
                 // PRIMARY — the operational answer, one scannable block, plus
                 // Decision Replay directly beneath it (not buried in Details)
                 // so a judge/user can immediately explore how the same

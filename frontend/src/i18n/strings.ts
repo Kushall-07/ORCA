@@ -46,6 +46,75 @@ export type StringKey =
   | "panel.marineDetails"
   | "nav.sections"
   | "nav.returnToWorkspace"
+  | "nav.engineRoom"
+  | "panel.engineRoom"
+  | "phase.understanding"
+  | "phase.collection"
+  | "phase.core"
+  | "phase.route"
+  | "phase.intelligence"
+  | "phase.output"
+  | "kind.llm"
+  | "kind.deterministic"
+  | "kind.data"
+  | "stage.understand"
+  | "stage.normalize"
+  | "stage.weather"
+  | "stage.ocean"
+  | "stage.gis"
+  | "stage.environment"
+  | "stage.advisory"
+  | "stage.fabric"
+  | "stage.temporal"
+  | "stage.fusion"
+  | "stage.arbitration"
+  | "stage.conflicts"
+  | "stage.suitability"
+  | "stage.risk"
+  | "stage.policy"
+  | "stage.decision"
+  | "stage.route"
+  | "stage.route.reasonNotAllowed"
+  | "stage.route.reasonNotRequested"
+  | "stage.alerts"
+  | "stage.whatif"
+  | "stage.pfz"
+  | "stage.productivity"
+  | "stage.environmentalComparison"
+  | "stage.environmentalStability"
+  | "stage.environmentalAnomaly"
+  | "stage.environmentalNeighbourhood"
+  | "stage.environmentalEvidence"
+  | "stage.research"
+  | "stage.provenance"
+  | "stage.explain"
+  | "stage.assemble"
+  | "activity.parallelNote"
+  | "activity.intelligenceSummary"
+  | "activity.showAll"
+  | "activity.hideAll"
+  | "engine.title"
+  | "engine.subtitle"
+  | "engine.noQuery"
+  | "engine.thisTurn"
+  | "engine.sources.title"
+  | "engine.sources.desc"
+  | "engine.fabric.title"
+  | "engine.fabric.desc"
+  | "engine.agents.title"
+  | "engine.agents.desc"
+  | "engine.core.title"
+  | "engine.core.desc"
+  | "engine.core.safetyNote"
+  | "engine.output.title"
+  | "engine.output.desc"
+  | "engine.agent.understand.desc"
+  | "engine.agent.weather.desc"
+  | "engine.agent.ocean.desc"
+  | "engine.agent.gis.desc"
+  | "engine.agent.risk.desc"
+  | "engine.agent.explain.desc"
+  | "engine.agent.route.desc"
   | "decision.safetyStatus"
   | "decision.primaryFactors"
   | "decision.dataConfidence"
@@ -400,6 +469,75 @@ const en: Table = {
   "panel.marineDetails": "Marine Details",
   "nav.sections": "Sections",
   "nav.returnToWorkspace": "Return to Workspace",
+  "nav.engineRoom": "Engine Room",
+  "panel.engineRoom": "ORCA Engine Room",
+  "phase.understanding": "Understanding",
+  "phase.collection": "Parallel Data Collection",
+  "phase.core": "Deterministic Reasoning Core",
+  "phase.route": "Routing",
+  "phase.intelligence": "Environmental & Reference Intelligence",
+  "phase.output": "Output & Provenance",
+  "kind.llm": "LLM interpretation",
+  "kind.deterministic": "Deterministic",
+  "kind.data": "Data intelligence",
+  "stage.understand": "Query Understanding",
+  "stage.normalize": "Normalize / resolve location",
+  "stage.weather": "Weather Intelligence",
+  "stage.ocean": "Oceanographic Intelligence",
+  "stage.gis": "GIS & Geofencing",
+  "stage.environment": "Ocean-colour agent",
+  "stage.advisory": "Marine advisory agent",
+  "stage.fabric": "Marine Data Fabric",
+  "stage.temporal": "Temporal Validity Gate",
+  "stage.fusion": "Spatial-Temporal Fusion",
+  "stage.arbitration": "Evidence Arbitration",
+  "stage.conflicts": "Conflict Detection",
+  "stage.suitability": "Fishing Suitability Engine",
+  "stage.risk": "Risk Engine",
+  "stage.policy": "Policy & Safety Guard",
+  "stage.decision": "Decision Engine",
+  "stage.route": "Route Agent (A*)",
+  "stage.route.reasonNotAllowed": "safety status does not permit routing",
+  "stage.route.reasonNotRequested": "no route requested",
+  "stage.alerts": "Alert Synthesis",
+  "stage.whatif": "What-if Simulation",
+  "stage.pfz": "PFZ Reference Lookup",
+  "stage.productivity": "Environmental Productivity",
+  "stage.environmentalComparison": "Environmental Comparison",
+  "stage.environmentalStability": "Environmental Stability",
+  "stage.environmentalAnomaly": "Environmental Anomaly Lens",
+  "stage.environmentalNeighbourhood": "Environmental Neighbourhood",
+  "stage.environmentalEvidence": "Environmental Evidence & Reproducibility",
+  "stage.research": "Research Mode",
+  "stage.provenance": "Provenance Graph",
+  "stage.explain": "Evidence & Explanation",
+  "stage.assemble": "Assemble Response",
+  "activity.parallelNote": "{ran} of {total} parallel branches ran",
+  "activity.intelligenceSummary": "{ran} ran · {skipped} not applicable to this query",
+  "activity.showAll": "Show all stages",
+  "activity.hideAll": "Hide inapplicable stages",
+  "engine.title": "ORCA Engine Room",
+  "engine.subtitle": "How ORCA is constructed - live status overlaid for the current turn",
+  "engine.noQuery": "No query yet. Ask ORCA a question to overlay this turn's live status.",
+  "engine.thisTurn": "This turn",
+  "engine.sources.title": "Data Sources",
+  "engine.sources.desc": "External providers ORCA reads from, each stamped with its live, cached, reference or demo status.",
+  "engine.fabric.title": "Marine Data Fabric",
+  "engine.fabric.desc": "Normalises every agent result, gates it by validity window, fuses and arbitrates disagreement.",
+  "engine.agents.title": "Specialized Agents",
+  "engine.agents.desc": "Seven agent modules. Two interpret with an LLM; the rest are deterministic or pure data intelligence.",
+  "engine.core.title": "Deterministic Reasoning Core",
+  "engine.core.desc": "No LLM, no network, no randomness. Same input and configuration always produce the same output.",
+  "engine.core.safetyNote": "Hard geofence → missing evidence → SEVERE → HIGH/MODERATE → ALLOWED. The LLM cannot change this outcome.",
+  "engine.output.title": "Output",
+  "engine.output.desc": "The decision, an optional route, the provenance graph and a grounded explanation reach chat, map, alerts and reports.",
+  "engine.agent.understand.desc": "Language detection, intent & entity extraction",
+  "engine.agent.weather.desc": "Wind, precipitation, forecast conditions",
+  "engine.agent.ocean.desc": "Wave height, period, sea state",
+  "engine.agent.gis.desc": "Geofences, EEZ, protected areas, depth",
+  "engine.agent.risk.desc": "Deterministic risk & suitability coordination",
+  "engine.agent.explain.desc": "Grounded natural-language explanation",
+  "engine.agent.route.desc": "A* planning with hard-geofence validation",
   "decision.safetyStatus": "Safety status",
   "decision.primaryFactors": "Primary factors",
   "decision.dataConfidence": "Data confidence",
@@ -779,6 +917,75 @@ const hi: Table = {
   "panel.marineDetails": "समुद्री विवरण",
   "nav.sections": "अनुभाग",
   "nav.returnToWorkspace": "वर्कस्पेस पर लौटें",
+  "nav.engineRoom": "इंजन रूम",
+  "panel.engineRoom": "ORCA इंजन रूम",
+  "phase.understanding": "समझ",
+  "phase.collection": "समानांतर डेटा संग्रहण",
+  "phase.core": "निश्चित तर्क कोर",
+  "phase.route": "मार्ग नियोजन",
+  "phase.intelligence": "पर्यावरणीय एवं संदर्भ बुद्धिमत्ता",
+  "phase.output": "परिणाम एवं उत्पत्ति",
+  "kind.llm": "LLM व्याख्या",
+  "kind.deterministic": "निश्चित",
+  "kind.data": "डेटा बुद्धिमत्ता",
+  "stage.understand": "प्रश्न समझ एजेंट",
+  "stage.normalize": "स्थान सामान्यीकरण/समाधान",
+  "stage.weather": "मौसम बुद्धिमत्ता",
+  "stage.ocean": "समुद्र विज्ञान बुद्धिमत्ता",
+  "stage.gis": "GIS एवं जियोफेंसिंग",
+  "stage.environment": "समुद्र-रंग एजेंट",
+  "stage.advisory": "समुद्री सलाह एजेंट",
+  "stage.fabric": "समुद्री डेटा फैब्रिक",
+  "stage.temporal": "अस्थायी वैधता गेट",
+  "stage.fusion": "स्थानिक-अस्थायी संलयन",
+  "stage.arbitration": "साक्ष्य मध्यस्थता",
+  "stage.conflicts": "विरोध पहचान",
+  "stage.suitability": "मत्स्य उपयुक्तता इंजन",
+  "stage.risk": "जोखिम इंजन",
+  "stage.policy": "नीति एवं सुरक्षा गार्ड",
+  "stage.decision": "निर्णय इंजन",
+  "stage.route": "मार्ग एजेंट (A*)",
+  "stage.route.reasonNotAllowed": "सुरक्षा स्थिति मार्ग की अनुमति नहीं देती",
+  "stage.route.reasonNotRequested": "कोई मार्ग अनुरोधित नहीं",
+  "stage.alerts": "चेतावनी संश्लेषण",
+  "stage.whatif": "व्हाट-इफ सिमुलेशन",
+  "stage.pfz": "PFZ संदर्भ खोज",
+  "stage.productivity": "पर्यावरणीय उत्पादकता",
+  "stage.environmentalComparison": "पर्यावरणीय तुलना",
+  "stage.environmentalStability": "पर्यावरणीय स्थिरता",
+  "stage.environmentalAnomaly": "पर्यावरणीय विसंगति लेंस",
+  "stage.environmentalNeighbourhood": "पर्यावरणीय पड़ोस",
+  "stage.environmentalEvidence": "पर्यावरणीय साक्ष्य एवं पुनरुत्पादनीयता",
+  "stage.research": "अनुसंधान मोड",
+  "stage.provenance": "उत्पत्ति ग्राफ",
+  "stage.explain": "साक्ष्य एवं व्याख्या",
+  "stage.assemble": "प्रतिक्रिया संयोजन",
+  "activity.parallelNote": "{total} में से {ran} समानांतर शाखाएँ चलीं",
+  "activity.intelligenceSummary": "{ran} चलीं · {skipped} इस प्रश्न पर लागू नहीं",
+  "activity.showAll": "सभी चरण दिखाएँ",
+  "activity.hideAll": "अलागू चरण छिपाएँ",
+  "engine.title": "ORCA इंजन रूम",
+  "engine.subtitle": "ORCA कैसे बना है - वर्तमान प्रश्न की लाइव स्थिति सहित",
+  "engine.noQuery": "अभी कोई प्रश्न नहीं। इस प्रश्न की लाइव स्थिति देखने हेतु ORCA से कुछ पूछें।",
+  "engine.thisTurn": "यह प्रश्न",
+  "engine.sources.title": "डेटा स्रोत",
+  "engine.sources.desc": "बाहरी स्रोत जिनसे ORCA डेटा पढ़ता है, प्रत्येक की लाइव, कैश, संदर्भ या डेमो स्थिति के साथ।",
+  "engine.fabric.title": "समुद्री डेटा फैब्रिक",
+  "engine.fabric.desc": "हर एजेंट परिणाम को सामान्य करता है, वैधता खिड़की से जाँचता है, साक्ष्य को मिलाता और मध्यस्थता करता है।",
+  "engine.agents.title": "विशिष्ट एजेंट",
+  "engine.agents.desc": "सात एजेंट मॉड्यूल। दो LLM से व्याख्या करते हैं; शेष निश्चित या शुद्ध डेटा बुद्धिमत्ता हैं।",
+  "engine.core.title": "निश्चित तर्क कोर",
+  "engine.core.desc": "कोई LLM नहीं, कोई नेटवर्क नहीं, कोई यादृच्छिकता नहीं। समान इनपुट व कॉन्फ़िगरेशन हमेशा समान परिणाम देते हैं।",
+  "engine.core.safetyNote": "हार्ड जियोफेंस → अनुपलब्ध साक्ष्य → SEVERE → HIGH/MODERATE → ALLOWED। LLM यह परिणाम नहीं बदल सकता।",
+  "engine.output.title": "परिणाम",
+  "engine.output.desc": "निर्णय, वैकल्पिक मार्ग, उत्पत्ति ग्राफ और एक प्रामाणिक व्याख्या चैट, मानचित्र, चेतावनी और रिपोर्ट तक पहुँचते हैं।",
+  "engine.agent.understand.desc": "भाषा पहचान, आशय एवं इकाई निष्कर्षण",
+  "engine.agent.weather.desc": "हवा, वर्षा, पूर्वानुमान स्थितियाँ",
+  "engine.agent.ocean.desc": "लहर ऊँचाई, अवधि, समुद्री स्थिति",
+  "engine.agent.gis.desc": "जियोफेंस, EEZ, संरक्षित क्षेत्र, गहराई",
+  "engine.agent.risk.desc": "निश्चित जोखिम एवं उपयुक्तता समन्वय",
+  "engine.agent.explain.desc": "प्रामाणिक प्राकृतिक-भाषा व्याख्या",
+  "engine.agent.route.desc": "हार्ड-जियोफेंस सत्यापन सहित A* योजना",
   "decision.safetyStatus": "सुरक्षा स्थिति",
   "decision.primaryFactors": "मुख्य कारक",
   "decision.dataConfidence": "डेटा विश्वास",
@@ -1156,6 +1363,75 @@ const kn: Table = {
   "panel.marineDetails": "ಸಮುದ್ರ ವಿವರಗಳು",
   "nav.sections": "ವಿಭಾಗಗಳು",
   "nav.returnToWorkspace": "ಕಾರ್ಯಕ್ಷೇತ್ರಕ್ಕೆ ಹಿಂತಿರುಗಿ",
+  "nav.engineRoom": "ಎಂಜಿನ್ ಕೊಠಡಿ",
+  "panel.engineRoom": "ORCA ಎಂಜಿನ್ ಕೊಠಡಿ",
+  "phase.understanding": "ಗ್ರಹಿಕೆ",
+  "phase.collection": "ಸಮಾನಾಂತರ ಡೇಟಾ ಸಂಗ್ರಹಣೆ",
+  "phase.core": "ನಿಶ್ಚಿತ ತರ್ಕ ಕೋರ್",
+  "phase.route": "ಮಾರ್ಗ ಯೋಜನೆ",
+  "phase.intelligence": "ಪರಿಸರ ಮತ್ತು ಉಲ್ಲೇಖ ಬುದ್ಧಿಮತ್ತೆ",
+  "phase.output": "ಫಲಿತಾಂಶ ಮತ್ತು ಮೂಲ",
+  "kind.llm": "LLM ವ್ಯಾಖ್ಯಾನ",
+  "kind.deterministic": "ನಿಶ್ಚಿತ",
+  "kind.data": "ಡೇಟಾ ಬುದ್ಧಿಮತ್ತೆ",
+  "stage.understand": "ಪ್ರಶ್ನೆ ಗ್ರಹಿಕೆ ಏಜೆಂಟ್",
+  "stage.normalize": "ಸ್ಥಳ ಸಾಮಾನ್ಯೀಕರಣ/ಪರಿಹಾರ",
+  "stage.weather": "ಹವಾಮಾನ ಬುದ್ಧಿಮತ್ತೆ",
+  "stage.ocean": "ಸಮುದ್ರಶಾಸ್ತ್ರ ಬುದ್ಧಿಮತ್ತೆ",
+  "stage.gis": "GIS ಮತ್ತು ಜಿಯೋಫೆನ್ಸಿಂಗ್",
+  "stage.environment": "ಸಮುದ್ರ-ಬಣ್ಣ ಏಜೆಂಟ್",
+  "stage.advisory": "ಸಮುದ್ರ ಸಲಹಾ ಏಜೆಂಟ್",
+  "stage.fabric": "ಸಾಗರ ದತ್ತಾಂಶ ಫ್ಯಾಬ್ರಿಕ್",
+  "stage.temporal": "ತಾತ್ಕಾಲಿಕ ಸಿಂಧುತ್ವ ಗೇಟ್",
+  "stage.fusion": "ಪ್ರಾದೇಶಿಕ-ತಾತ್ಕಾಲಿಕ ಸಂಯೋಜನೆ",
+  "stage.arbitration": "ಸಾಕ್ಷ್ಯ ಮಧ್ಯಸ್ಥಿಕೆ",
+  "stage.conflicts": "ಸಂಘರ್ಷ ಪತ್ತೆ",
+  "stage.suitability": "ಮೀನುಗಾರಿಕೆ ಸೂಕ್ತತೆ ಎಂಜಿನ್",
+  "stage.risk": "ಅಪಾಯ ಎಂಜಿನ್",
+  "stage.policy": "ನೀತಿ ಮತ್ತು ಸುರಕ್ಷತಾ ಗಾರ್ಡ್",
+  "stage.decision": "ನಿರ್ಧಾರ ಎಂಜಿನ್",
+  "stage.route": "ಮಾರ್ಗ ಏಜೆಂಟ್ (A*)",
+  "stage.route.reasonNotAllowed": "ಸುರಕ್ಷತಾ ಸ್ಥಿತಿ ಮಾರ್ಗಕ್ಕೆ ಅನುಮತಿಸುವುದಿಲ್ಲ",
+  "stage.route.reasonNotRequested": "ಯಾವುದೇ ಮಾರ್ಗ ವಿನಂತಿಸಿಲ್ಲ",
+  "stage.alerts": "ಎಚ್ಚರಿಕೆ ಸಂಶ್ಲೇಷಣೆ",
+  "stage.whatif": "ವಾಟ್-ಇಫ್ ಸಿಮ್ಯುಲೇಶನ್",
+  "stage.pfz": "PFZ ಉಲ್ಲೇಖ ಹುಡುಕಾಟ",
+  "stage.productivity": "ಪರಿಸರ ಉತ್ಪಾದಕತೆ",
+  "stage.environmentalComparison": "ಪರಿಸರ ಹೋಲಿಕೆ",
+  "stage.environmentalStability": "ಪರಿಸರ ಸ್ಥಿರತೆ",
+  "stage.environmentalAnomaly": "ಪರಿಸರ ವೈಪರೀತ್ಯ ಲೆನ್ಸ್",
+  "stage.environmentalNeighbourhood": "ಪರಿಸರ ನೆರೆಹೊರೆ",
+  "stage.environmentalEvidence": "ಪರಿಸರ ಸಾಕ್ಷ್ಯ ಮತ್ತು ಪುನರುತ್ಪಾದನೀಯತೆ",
+  "stage.research": "ಸಂಶೋಧನಾ ಮೋಡ್",
+  "stage.provenance": "ಮೂಲ ಗ್ರಾಫ್",
+  "stage.explain": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ವಿವರಣೆ",
+  "stage.assemble": "ಪ್ರತಿಕ್ರಿಯೆ ಜೋಡಣೆ",
+  "activity.parallelNote": "{total} ರಲ್ಲಿ {ran} ಸಮಾನಾಂತರ ಶಾಖೆಗಳು ಚಾಲನೆಯಾದವು",
+  "activity.intelligenceSummary": "{ran} ಚಾಲನೆಯಾದವು · {skipped} ಈ ಪ್ರಶ್ನೆಗೆ ಅನ್ವಯಿಸುವುದಿಲ್ಲ",
+  "activity.showAll": "ಎಲ್ಲಾ ಹಂತಗಳನ್ನು ತೋರಿಸಿ",
+  "activity.hideAll": "ಅನ್ವಯಿಸದ ಹಂತಗಳನ್ನು ಮರೆಮಾಡಿ",
+  "engine.title": "ORCA ಎಂಜಿನ್ ಕೊಠಡಿ",
+  "engine.subtitle": "ORCA ಹೇಗೆ ನಿರ್ಮಿತವಾಗಿದೆ - ಪ್ರಸ್ತುತ ಪ್ರಶ್ನೆಯ ಲೈವ್ ಸ್ಥಿತಿಯೊಂದಿಗೆ",
+  "engine.noQuery": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರಶ್ನೆ ಇಲ್ಲ. ಈ ಪ್ರಶ್ನೆಯ ಲೈವ್ ಸ್ಥಿತಿ ನೋಡಲು ORCA ಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿ.",
+  "engine.thisTurn": "ಈ ಪ್ರಶ್ನೆ",
+  "engine.sources.title": "ಡೇಟಾ ಮೂಲಗಳು",
+  "engine.sources.desc": "ORCA ಓದುವ ಬಾಹ್ಯ ಮೂಲಗಳು, ಪ್ರತಿಯೊಂದೂ ಲೈವ್, ಕ್ಯಾಶ್, ಉಲ್ಲೇಖ ಅಥವಾ ಡೆಮೊ ಸ್ಥಿತಿಯೊಂದಿಗೆ.",
+  "engine.fabric.title": "ಸಾಗರ ದತ್ತಾಂಶ ಫ್ಯಾಬ್ರಿಕ್",
+  "engine.fabric.desc": "ಪ್ರತಿ ಏಜೆಂಟ್ ಫಲಿತಾಂಶವನ್ನು ಸಾಮಾನ್ಯಗೊಳಿಸುತ್ತದೆ, ಸಿಂಧುತ್ವ ಕಿಟಕಿಯ ಮೂಲಕ ಪರಿಶೀಲಿಸುತ್ತದೆ, ಸಾಕ್ಷ್ಯವನ್ನು ಸಂಯೋಜಿಸಿ ಮಧ್ಯಸ್ಥಿಕೆ ವಹಿಸುತ್ತದೆ.",
+  "engine.agents.title": "ವಿಶೇಷ ಏಜೆಂಟ್‌ಗಳು",
+  "engine.agents.desc": "ಏಳು ಏಜೆಂಟ್ ಮಾಡ್ಯೂಲ್‌ಗಳು. ಎರಡು LLM ಮೂಲಕ ವ್ಯಾಖ್ಯಾನಿಸುತ್ತವೆ; ಉಳಿದವು ನಿಶ್ಚಿತ ಅಥವಾ ಶುದ್ಧ ಡೇಟಾ ಬುದ್ಧಿಮತ್ತೆ.",
+  "engine.core.title": "ನಿಶ್ಚಿತ ತರ್ಕ ಕೋರ್",
+  "engine.core.desc": "LLM ಇಲ್ಲ, ನೆಟ್‌ವರ್ಕ್ ಇಲ್ಲ, ಯಾದೃಚ್ಛಿಕತೆ ಇಲ್ಲ. ಒಂದೇ ಇನ್‌ಪುಟ್ ಮತ್ತು ಕಾನ್ಫಿಗರೇಶನ್ ಯಾವಾಗಲೂ ಒಂದೇ ಫಲಿತಾಂಶ ನೀಡುತ್ತವೆ.",
+  "engine.core.safetyNote": "ಹಾರ್ಡ್ ಜಿಯೋಫೆನ್ಸ್ → ಕಾಣೆಯಾದ ಸಾಕ್ಷ್ಯ → SEVERE → HIGH/MODERATE → ALLOWED. LLM ಈ ಫಲಿತಾಂಶವನ್ನು ಬದಲಾಯಿಸಲಾಗುವುದಿಲ್ಲ.",
+  "engine.output.title": "ಫಲಿತಾಂಶ",
+  "engine.output.desc": "ನಿರ್ಧಾರ, ಐಚ್ಛಿಕ ಮಾರ್ಗ, ಮೂಲ ಗ್ರಾಫ್ ಮತ್ತು ಆಧಾರಸಹಿತ ವಿವರಣೆ ಚಾಟ್, ನಕ್ಷೆ, ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ವರದಿಗಳನ್ನು ತಲುಪುತ್ತವೆ.",
+  "engine.agent.understand.desc": "ಭಾಷಾ ಪತ್ತೆ, ಉದ್ದೇಶ ಮತ್ತು ಘಟಕ ಹೊರತೆಗೆಯುವಿಕೆ",
+  "engine.agent.weather.desc": "ಗಾಳಿ, ಮಳೆ, ಮುನ್ಸೂಚನೆ ಪರಿಸ್ಥಿತಿಗಳು",
+  "engine.agent.ocean.desc": "ಅಲೆಯ ಎತ್ತರ, ಅವಧಿ, ಸಮುದ್ರ ಸ್ಥಿತಿ",
+  "engine.agent.gis.desc": "ಜಿಯೋಫೆನ್ಸ್, EEZ, ಸಂರಕ್ಷಿತ ಪ್ರದೇಶಗಳು, ಆಳ",
+  "engine.agent.risk.desc": "ನಿಶ್ಚಿತ ಅಪಾಯ ಮತ್ತು ಸೂಕ್ತತೆ ಸಮನ್ವಯ",
+  "engine.agent.explain.desc": "ಆಧಾರಸಹಿತ ಸ್ವಾಭಾವಿಕ-ಭಾಷೆ ವಿವರಣೆ",
+  "engine.agent.route.desc": "ಹಾರ್ಡ್-ಜಿಯೋಫೆನ್ಸ್ ಪರಿಶೀಲನೆಯೊಂದಿಗೆ A* ಯೋಜನೆ",
   "decision.safetyStatus": "ಸುರಕ್ಷತಾ ಸ್ಥಿತಿ",
   "decision.primaryFactors": "ಮುಖ್ಯ ಅಂಶಗಳು",
   "decision.dataConfidence": "ದತ್ತಾಂಶ ವಿಶ್ವಾಸ",
