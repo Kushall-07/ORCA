@@ -20,6 +20,7 @@ from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
 from app.agents.weather import WeatherAgent
 from app.core.config import Settings, get_settings
+from app.environmental.anomaly import EnvironmentalAnomalyEngine
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
@@ -90,6 +91,13 @@ class OrcaDeps:
     # Fabric, fusion, arbitration or evidence[].
     neighbourhood_engine: EnvironmentalNeighbourhoodEngine | None = None
     neighbourhood_probe: object = None  # async (lat, lon, when, *, half_width_deg, settings[, client]) -> ChlorophyllNeighbourhood
+    # Phase 9 Step 8: deterministic Environmental Anomaly Lens (recent-
+    # distribution percentile position). Optional; when absent the
+    # environmental_anomaly node simply skips (non-blocking). It issues ZERO
+    # HTTP calls (consumes the SAME accepted Step 4/6 series the stability
+    # engine already uses) and never feeds risk / safety / decision / route /
+    # suitability.
+    anomaly_engine: EnvironmentalAnomalyEngine | None = None
 
     # Official IMD marine advisory (A). Optional / non-blocking; when absent
     # the collect_advisory node simply skips (advisory stays "unavailable").
@@ -137,6 +145,7 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         stability_engine=EnvironmentalStabilityEngine(),
         neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
         neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
+        anomaly_engine=EnvironmentalAnomalyEngine(),
         advisory_agent=MarineAdvisoryAgent(settings=settings, cache=live_cache),
         pfz_cache=JsonCache(InMemoryCache()),
     )

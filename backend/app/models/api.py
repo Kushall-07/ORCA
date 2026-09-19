@@ -400,6 +400,69 @@ class EnvironmentalNeighbourhoodInfo(BaseModel):
     engine_version: str = ""
 
 
+class AnomalySparklinePointInfo(BaseModel):
+    """One bounded, presentation-safe sparkline point: a calendar date and the
+    rounded value of an already-accepted valid historical observation - the
+    SAME points already counted by ``valid_count`` above. Never a new data
+    source and never unrestricted raw history."""
+
+    date: str
+    value: float
+
+
+class EnvironmentalAnomalyVariableInfo(BaseModel):
+    """Phase 9 Step 8: recent-distribution position ("Environmental Anomaly
+    Lens") for ONE variable. Purely descriptive research context - NOT a
+    scientific anomaly-event claim, a bloom / front / plume / eddy / hotspot,
+    or a fish-abundance / fishing-suitability signal, and it NEVER affects
+    risk, safety, decision, route or suitability. Quartiles are nearest-rank;
+    ``percentile`` is the standard empirical/mean-rank percentile. All
+    statistics are ``None`` when fewer than three valid historical
+    observations exist (honest missingness, never manufactured).
+    ``classification`` is a plain [Q1, Q3] band placement (below_recent_range
+    | within_recent_distribution | above_recent_range), never an "anomalous"
+    judgement. ``sparkline`` / ``window_days`` are a bounded presentational
+    view of the SAME data already summarised above - the Anomaly Lens 2.0
+    visualization layer, adding no new statistic."""
+
+    variable: str
+    unit: str = ""
+    window: str = ""
+    status: str = "insufficient_history"  # ok | current_unavailable | insufficient_history
+    classification: str | None = None
+    current_value: float | None = None
+    valid_count: int = 0
+    percentile: float | None = None
+    minimum: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    difference_from_median: float | None = None
+    coverage: str | None = None
+    limitations: list[str] = Field(default_factory=list)
+    sparkline: list[AnomalySparklinePointInfo] = Field(default_factory=list)
+    window_days: int = 0
+
+
+class EnvironmentalAnomalyInfo(BaseModel):
+    """Phase 9 Step 8: deterministic Environmental Anomaly Lens output.
+    Purely informational research context - it NEVER affects risk, safety,
+    decision, route or fishing suitability, and never predicts fish presence,
+    abundance or catch. Reuses the SAME accepted historical series the
+    stability profile above already carries; zero additional HTTP calls."""
+
+    sst: EnvironmentalAnomalyVariableInfo | None = None
+    chlorophyll_a: EnvironmentalAnomalyVariableInfo | None = None
+    window: str = ""
+    methodology: str = ""
+    data_sufficiency: str = "insufficient"
+    limitations: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+    engine_version: str = ""
+
+
 class EnvironmentalInfo(BaseModel):
     """Phase 9 Step 3: deterministic researcher-facing environmental context.
 
@@ -434,6 +497,11 @@ class EnvironmentalInfo(BaseModel):
     # observation and the isolated neighbourhood fetch succeeded. Additive -
     # existing clients are unaffected.
     neighbourhood: EnvironmentalNeighbourhoodInfo | None = None
+    # Phase 9 Step 8: optional deterministic "Environmental Anomaly Lens"
+    # recent-distribution position. Null unless the query was comparative and
+    # an accepted historical series was available. Additive - existing
+    # clients are unaffected.
+    anomaly: EnvironmentalAnomalyInfo | None = None
     # Phase 10A: modelled sea level / tide (Open-Meteo Marine
     # sea_level_height_msl). Null when no usable observation exists. A
     # MODELLED sea-level signal - NOT an official INCOIS tide-gauge

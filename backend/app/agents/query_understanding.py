@@ -551,6 +551,47 @@ def _is_environmental_neighbourhood_query(message: str) -> bool:
     return _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
 
 
+# ---- Deterministic Environmental Anomaly Lens (recent-distribution position) --
+# A researcher's plain "how unusual is the current observation" question -
+# DELIBERATELY a separate, narrower vocabulary from `_ANOMALY_WORDS` in
+# app.research.domains (R2 chlorophyll anomaly / HAB / hypoxia): that existing
+# domain owns every "anomaly"/"unusual" question that ALSO names chlorophyll
+# (see `detect_research_domain`, checked earlier in this override chain), and
+# this override is only ever reached when that returned nothing - e.g. a
+# SST-only "is the current SST unusual near Mangalore?", which R2 never
+# catches (it requires an explicit chlorophyll mention). It routes to
+# environmental_conditions with `wants_comparison` forced True (the same
+# posture as `_wants_environmental_dispersion_analysis` below) so the
+# ALREADY-UNGATED `environmental_anomaly_node` gets the accepted historical
+# series it needs - no new HTTP fetch, no new engine call site. Never fires
+# when a fishing/safety word is also present.
+_ANOMALY_LENS_WORDS = (
+    "unusual", "unusually", "outside the recent range", "outside the range",
+    "outside the normal range", "recent distribution", "position within",
+    "percentile", "compared with recent observations",
+    "compared to recent observations", "how unusual",
+    # Hindi / Kannada - a small, high-value set for the same question shape
+    # (see Part 6 "do not attempt exhaustive language expansion").
+    "असामान्य", "प्रतिशतक",
+    "ಅಸಾಮಾನ್ಯ", "ಶತಮಾನಾಂಕ",
+)
+
+
+def _is_environmental_anomaly_lens_query(message: str) -> bool:
+    """True for a researcher's recent-distribution / "how unusual" question
+    about SST/chlorophyll-a - e.g. "is the current SST unusual compared with
+    the last 30 days?", "how unusual is the current chlorophyll-a value
+    compared with recent observations?". Requires an explicit environmental
+    subject and never fires when a fishing/safety word is present - the same
+    posture as the other deterministic overrides above."""
+    low = message.lower()
+    if _any(low, _FISH_WORDS) or _any(low, _SAFE_WORDS):
+        return False
+    if not _any(low, _ANOMALY_LENS_WORDS):
+        return False
+    return _any(low, _ENV_WORDS) or any(_word_present(low, w) for w in _ENV_SHORT_WORDS)
+
+
 # ---- Deterministic environmental evidence-quality / sufficiency -----------
 # A SEPARATE trigger vocabulary from `_is_environmental_evidence_query` above
 # (which only catches "what data/evidence/sources did you use" / "how was
@@ -831,6 +872,32 @@ class QueryUnderstandingAgent:
                         "clarification_question": None,
                         "notes": understanding.notes
                         + ("deterministic environmental-neighbourhood override",),
+                    }
+                )
+            # Deterministic override: a researcher's recent-distribution /
+            # "how unusual" question about SST/chlorophyll-a ("is the current
+            # SST unusual compared with the last 30 days?") always routes to
+            # environmental_conditions with wants_comparison forced True so
+            # the already-ungated `environmental_anomaly_node` gets the
+            # accepted historical series it needs. Checked BEFORE the generic
+            # dispersion override just below (a message could otherwise be
+            # read as a plain stability question) and AFTER research-domain
+            # detection, so a chlorophyll-a "unusual"/"anomaly" question that
+            # ALSO names chlorophyll keeps its own R2/HAB-flavoured framing
+            # (see `_ANOMALY_LENS_WORDS` module comment above) - this override
+            # is only ever reached for a question R2 did not already claim,
+            # e.g. a SST-only "is the current SST unusual near Mangalore?".
+            elif _is_environmental_anomaly_lens_query(message):
+                understanding = understanding.model_copy(
+                    update={
+                        "intent": QueryIntent.ENVIRONMENTAL_CONDITIONS,
+                        "requested_output": RequestedOutput.ENVIRONMENTAL_INFORMATION,
+                        "wants_comparison": True,
+                        "requests_risk": False,
+                        "needs_clarification": False,
+                        "clarification_question": None,
+                        "notes": understanding.notes
+                        + ("deterministic environmental-anomaly-lens override",),
                     }
                 )
             # Deterministic override: a researcher's bounded-window temporal

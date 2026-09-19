@@ -16,6 +16,9 @@ from app.models.api import (
     ConflictItem,
     DataQualityInfo,
     DecisionInfo,
+    AnomalySparklinePointInfo,
+    EnvironmentalAnomalyInfo,
+    EnvironmentalAnomalyVariableInfo,
     EnvironmentalComparisonInfo,
     EnvironmentalComparisonVariableInfo,
     EnvironmentalEvidenceInfo,
@@ -135,6 +138,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
     comparison = state.get("environmental_comparison")
     evidence = state.get("environmental_evidence")
     stability = state.get("environmental_stability")
+    anomaly = state.get("environmental_anomaly")
     neighbourhood = state.get("environmental_neighbourhood")
     route = state.get("route_result")
     fabric = state.get("fabric")
@@ -361,6 +365,47 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             engine_version=stability.engine_version,
         )
 
+    anomaly_info = None
+    if anomaly is not None:
+        def _anom_var(a):  # type: ignore[no-untyped-def]
+            if a is None:
+                return None
+            return EnvironmentalAnomalyVariableInfo(
+                variable=a.variable,
+                unit=a.unit,
+                window=a.window,
+                status=a.status,
+                classification=a.classification,
+                current_value=a.current_value,
+                valid_count=a.valid_count,
+                percentile=a.percentile,
+                minimum=a.minimum,
+                q1=a.q1,
+                median=a.median,
+                q3=a.q3,
+                maximum=a.maximum,
+                range=a.range,
+                difference_from_median=a.difference_from_median,
+                coverage=a.coverage,
+                limitations=list(a.limitations),
+                sparkline=[
+                    AnomalySparklinePointInfo(date=p.date, value=p.value)
+                    for p in a.sparkline
+                ],
+                window_days=a.window_days,
+            )
+
+        anomaly_info = EnvironmentalAnomalyInfo(
+            sst=_anom_var(anomaly.sst),
+            chlorophyll_a=_anom_var(anomaly.chlorophyll_a),
+            window=anomaly.window,
+            methodology=anomaly.methodology,
+            data_sufficiency=anomaly.data_sufficiency.value,
+            limitations=list(anomaly.limitations),
+            disclaimer=anomaly.disclaimer,
+            engine_version=anomaly.engine_version,
+        )
+
     neighbourhood_info = None
     if neighbourhood is not None:
         neighbourhood_info = EnvironmentalNeighbourhoodInfo(
@@ -422,6 +467,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             comparison=comparison_info,
             evidence=evidence_info,
             stability=stability_info,
+            anomaly=anomaly_info,
             neighbourhood=neighbourhood_info,
             tide=tide_info,
         )
@@ -429,6 +475,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         comparison_info is not None
         or evidence_info is not None
         or stability_info is not None
+        or anomaly_info is not None
         or neighbourhood_info is not None
         or tide_info is not None
     ):
@@ -437,12 +484,14 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                 comparison.disclaimer if comparison is not None
                 else evidence.disclaimer if evidence is not None
                 else stability.disclaimer if stability is not None
+                else anomaly.disclaimer if anomaly is not None
                 else neighbourhood.disclaimer if neighbourhood is not None
                 else ""
             ),
             comparison=comparison_info,
             evidence=evidence_info,
             stability=stability_info,
+            anomaly=anomaly_info,
             neighbourhood=neighbourhood_info,
             tide=tide_info,
         )

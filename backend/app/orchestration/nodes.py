@@ -1168,6 +1168,58 @@ async def environmental_stability_node(deps, state: OrcaGraphState) -> dict:  # 
     }
 
 
+async def environmental_anomaly_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 9 Step 8: deterministic "Environmental Anomaly Lens" - the
+    recent-distribution percentile position of the CURRENT SST / chlorophyll-a
+    observation against the SAME accepted raw Step 4/6 series the stability
+    node already consumes.
+
+    Runs strictly downstream of decision / alerts / productivity / comparison
+    / stability and BEFORE environmental_neighbourhood / environmental_evidence.
+    It fetches NOTHING (zero HTTP calls), rebuilds NOTHING, invokes no LLM, and
+    NEVER feeds risk, safety, decision, route, suitability, geofencing, policy
+    or alerts. It is NOT a scientific anomaly-event detector, a bloom / front /
+    plume / eddy / hotspot, or a fishing-suitability signal - only a
+    descriptive statistical position. Skips (result ``None``) when there is no
+    reference series to describe or the engine is unavailable; any failure is
+    non-blocking.
+    """
+    from app.models.environmental import EnvironmentalAnomalyInputs
+
+    engine = getattr(deps, "anomaly_engine", None)
+    series = state.get("environmental_reference_series")
+
+    if engine is None or series is None:
+        return {
+            "environmental_anomaly": None,
+            "agent_trace": ["environmental_anomaly:skip"],
+        }
+
+    fabric = state.get("fabric")
+    try:
+        result = engine.assess(
+            EnvironmentalAnomalyInputs(
+                sst_current=_env_observation(state, fabric, "sea_surface_temperature", role="current"),
+                chl_current=_env_observation(state, fabric, "chlorophyll_a", role="current"),
+                sst_series=series.sst,
+                chl_series=series.chlorophyll_a,
+                window_label=series.window_label,
+                window_days=series.window_days,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - the engine should not raise; be defensive
+        logger.warning("environmental anomaly engine error: %s", type(exc).__name__)
+        return {
+            "environmental_anomaly": None,
+            "agent_trace": ["environmental_anomaly:skip"],
+        }
+
+    return {
+        "environmental_anomaly": result,
+        "agent_trace": ["environmental_anomaly"],
+    }
+
+
 async def environmental_neighbourhood_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     """Phase 9 Step 7: deterministic chlorophyll-a pixel-neighbourhood
     representativeness profile.
@@ -1529,6 +1581,13 @@ async def research_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
             comparison.chlorophyll_a if comparison is not None else None,
             current_class=current_class,
         )
+    # Phase 9 Step 8: the SAME deterministic Environmental Anomaly Lens result
+    # already computed by environmental_anomaly_node (reuses the SAME series
+    # and engine - no new computation), attached so `_render_research_intent`
+    # can show the percentile position as ADDITIONAL context underneath the
+    # existing magnitude-jump `anomaly` finding above for a chlorophyll-anomaly
+    # / HAB-flavoured research question. Never changes `anomaly` itself.
+    environmental_anomaly = state.get("environmental_anomaly")
 
     spatial_comparison = None
     destination = state.get("resolved_destination")
@@ -1624,6 +1683,7 @@ async def research_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
         capability=assessment,
         datasets_used=tuple(datasets_used),
         anomaly=anomaly,
+        environmental_anomaly=environmental_anomaly,
         spatial_comparison=spatial_comparison,
         limitations=tuple(
             [f"{v}: {research_capability.reason_for(v)}" for v in assessment.unavailable]
@@ -1654,6 +1714,7 @@ async def provenance_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[
         comparison=state.get("environmental_comparison"),
         evidence=state.get("environmental_evidence"),
         stability=state.get("environmental_stability"),
+        anomaly=state.get("environmental_anomaly"),
         neighbourhood=state.get("environmental_neighbourhood"),
         environment_tier=_tier(state.get("environment_result")),
         advisory=getattr(state.get("advisory_result"), "advisory", None),
@@ -1681,6 +1742,7 @@ async def explain_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-
         comparison=state.get("environmental_comparison"),
         environmental_evidence=state.get("environmental_evidence"),
         stability=state.get("environmental_stability"),
+        anomaly=state.get("environmental_anomaly"),
         neighbourhood=state.get("environmental_neighbourhood"),
         research=state.get("research_result"),
         pfz=state.get("pfz_result"),

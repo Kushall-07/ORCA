@@ -29,6 +29,7 @@ from app.replay.models import (
     REPLAY_LABEL,
     SAFETY_TRIGGER_LABELS,
     DecisionChangeExplanation,
+    ReplayFactor,
     ReplayResult,
     ReplaySnapshot,
 )
@@ -257,8 +258,15 @@ def build_replay(
             safety_status=safety.status,
             decision=decision.status,
             top_factors=risk.limiting_factors[:3],
+            factors=tuple(
+                ReplayFactor(name=f.name, contribution=round(f.contribution or 0.0, 2))
+                for f in risk.factors
+            ),
             reasons=decision.reasons[:3],
             triggered_rules=safety.triggered_rules,
+            triggered_rule_labels=tuple(
+                SAFETY_TRIGGER_LABELS.get(r, r) for r in safety.triggered_rules
+            ),
         )
         full.append(_FullSnapshot(snapshot=snapshot, risk=risk, safety=safety, decision=decision))
 

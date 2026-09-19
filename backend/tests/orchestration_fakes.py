@@ -15,6 +15,7 @@ from app.models.gis_agent import EezResult, GisQueryResult, LayerKind, Protected
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType, LayerAuthority
 from app.models.observations import MarineObservation
 from app.models.environmental import EnvironmentalObservation, ReferenceSeriesPoint
+from app.environmental.anomaly import EnvironmentalAnomalyEngine
 from app.environmental.comparison import EnvironmentalComparisonEngine
 from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
@@ -372,6 +373,7 @@ def make_pipeline(
     comparison_engine=_UNSET,
     evidence_engine=_UNSET,
     stability_engine=_UNSET,
+    anomaly_engine=_UNSET,
     neighbourhood_engine=_UNSET,
     neighbourhood_probe=None,
     historical_environment_agent=None,
@@ -420,6 +422,11 @@ def make_pipeline(
             EnvironmentalNeighbourhoodEngine()
             if neighbourhood_engine is _UNSET
             else neighbourhood_engine
+        ),
+        anomaly_engine=(
+            EnvironmentalAnomalyEngine()
+            if anomaly_engine is _UNSET
+            else anomaly_engine
         ),
         neighbourhood_probe=neighbourhood_probe,
         historical_environment_agent=historical_environment_agent,

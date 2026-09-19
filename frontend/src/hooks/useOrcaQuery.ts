@@ -21,6 +21,10 @@ export interface QueryCoordinateOverride {
   longitude?: number;
   destinationLatitude?: number;
   destinationLongitude?: number;
+  // Multiple explicit destinations, in map-selection order (additive; used
+  // when more than one PFZ reference is selected). A single-entry array is
+  // equivalent to destinationLatitude/destinationLongitude above.
+  destinations?: { latitude: number; longitude: number }[];
 }
 
 export interface UseOrcaQuery {
@@ -72,6 +76,7 @@ export function useOrcaQuery(opts: {
             longitude: coords?.longitude,
             destination_latitude: coords?.destinationLatitude,
             destination_longitude: coords?.destinationLongitude,
+            destinations: coords?.destinations,
           },
           controller.signal,
         );

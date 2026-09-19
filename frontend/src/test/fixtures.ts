@@ -1,4 +1,9 @@
-import type { PfzReferenceInfo, QueryResponse, WhatIfResponse } from "../types/api";
+import type {
+  PfzReferenceInfo,
+  QueryResponse,
+  ReplayResponse,
+  WhatIfResponse,
+} from "../types/api";
 
 export function makeResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
   return {
@@ -561,6 +566,116 @@ export function makeNeighbourhoodResponse(
   });
 }
 
+// A bounded, presentation-safe sparkline - the SAME points a real backend
+// response would carry in `sparkline` (see AnomalySparklinePointInfo):
+// oldest-to-newest dates derived from an anchor, with one deliberate gap day
+// so coverage-strip tests have something to distinguish.
+function _sparkline(
+  anchor: string,
+  daysAgo: number[],
+  values: number[],
+): { date: string; value: number }[] {
+  const anchorMs = Date.parse(`${anchor}T00:00:00Z`);
+  return daysAgo.map((d, i) => ({
+    date: new Date(anchorMs - d * 86400000).toISOString().slice(0, 10),
+    value: values[i],
+  }));
+}
+
+const _ANOM_ANCHOR = "2026-09-19";
+// 29 of the last 30 days - day 15 is a deliberate gap.
+const _SST_DAYS_AGO = Array.from({ length: 30 }, (_, i) => 30 - i).filter((d) => d !== 15);
+const _SST_VALUES = [
+  28.7, 28.7, 28.8, 28.8, 28.9, 28.9, 29.0, 29.0, 29.1, 29.1, 29.1, 29.2, 29.2, 29.3,
+  29.3, 29.4, 29.4, 29.5, 29.5, 29.6, 29.6, 29.7, 29.7, 29.8, 29.8, 29.9, 30.0, 30.1, 29.9,
+];
+// 24 of the last 30 days - sparser coverage than SST.
+const _CHL_DAYS_AGO = [29, 28, 26, 25, 23, 22, 20, 19, 17, 16, 14, 13, 11, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0, 9];
+const _CHL_VALUES = [
+  0.91, 1.0, 1.1, 1.2, 1.3, 1.42, 1.5, 1.6, 1.7, 1.8, 1.91, 2.0, 2.1, 2.2, 2.4, 2.6,
+  2.8, 3.0, 3.1, 3.2, 3.3, 3.4, 3.2, 2.0,
+];
+
+// Phase 9 Step 8 - "Environmental Anomaly Lens". Deterministic recent-
+// distribution percentile position of the CURRENT SST / chlorophyll-a
+// observation. Additive, neutral, never affects the safety chain, never a
+// scientific anomaly-event / bloom / front / plume / eddy / hotspot claim.
+export function makeAnomalyResponse(
+  overrides: Partial<QueryResponse> = {},
+): QueryResponse {
+  const base = makeEnvironmentalResponse();
+  return makeResponse({
+    ...base,
+    answer:
+      base.answer +
+      " Sea-surface temperature is currently 29.2 °C, at approximately the " +
+      "32nd percentile of the recent bounded-window distribution (minimum " +
+      "28.7, Q1 29.1, median 29.4, Q3 29.8, maximum 30.1 °C). This places the " +
+      "current sea-surface temperature value within the recent observed " +
+      "distribution.",
+    environmental: {
+      ...base.environmental!,
+      anomaly: {
+        sst: {
+          variable: "sea_surface_temperature",
+          unit: "°C",
+          window: "ORCA-computed reference over the last 30 days",
+          status: "ok",
+          classification: "within_recent_distribution",
+          current_value: 29.2,
+          valid_count: 29,
+          percentile: 32,
+          minimum: 28.7,
+          q1: 29.1,
+          median: 29.4,
+          q3: 29.8,
+          maximum: 30.1,
+          range: 1.4,
+          difference_from_median: -0.2,
+          coverage: "29 valid sea-surface temperature observation(s) in the 30-day window.",
+          limitations: [],
+          sparkline: _sparkline(_ANOM_ANCHOR, _SST_DAYS_AGO, _SST_VALUES),
+          window_days: 30,
+        },
+        chlorophyll_a: {
+          variable: "chlorophyll_a",
+          unit: "mg m-3",
+          window: "ORCA-computed reference over the last 30 days",
+          status: "ok",
+          classification: "above_recent_range",
+          current_value: 2.84,
+          valid_count: 24,
+          percentile: 78,
+          minimum: 0.91,
+          q1: 1.42,
+          median: 1.91,
+          q3: 3.1,
+          maximum: 3.4,
+          range: 2.49,
+          difference_from_median: 0.93,
+          coverage: "24 valid chlorophyll-a observation(s) in the 30-day window.",
+          limitations: [],
+          sparkline: _sparkline(_ANOM_ANCHOR, _CHL_DAYS_AGO, _CHL_VALUES),
+          window_days: 30,
+        },
+        window: "ORCA-computed reference over the last 30 days",
+        methodology:
+          "The current observation is positioned against valid historical " +
+          "observations from the existing bounded recent window. Invalid or " +
+          "missing values are excluded - never interpolated or zero-filled. " +
+          "A minimum of three valid historical observations is required.",
+        data_sufficiency: "sufficient",
+        limitations: [],
+        disclaimer:
+          "Descriptive statistical comparison only. This does not establish " +
+          "biological causation, fish presence or abundance, or fishing suitability.",
+        engine_version: "environmental-anomaly-0.1.0",
+      },
+    },
+    ...overrides,
+  });
+}
+
 // POST /whatif - a deterministic scenario-sensitivity result. `label` is stamped
 // by the backend and repeated on the payload so it can never be dropped.
 export function makeWhatIfResponse(
@@ -641,6 +756,129 @@ export function makeWhatIfResponse(
   };
 }
 
+// POST /replay - a deterministic Decision Replay Engine result. `label` is
+// stamped by the backend and repeated on the payload so it can never be
+// dropped, mirroring makeWhatIfResponse above.
+export function makeReplayResponse(
+  overrides: Partial<ReplayResponse> = {},
+): ReplayResponse {
+  return {
+    session_id: "web-test",
+    label: "DECISION REPLAY — DERIVED FROM FORECAST DATA",
+    baseline_message: "Is it safe to go fishing from Mangalore now?",
+    baseline_age_minutes: 0.4,
+    error: null,
+    data: {
+      label: "DECISION REPLAY — DERIVED FROM FORECAST DATA",
+      snapshots: [
+        {
+          timestamp: "2026-09-18T09:00:00+00:00",
+          is_current: true,
+          wave_height_m: 1.2,
+          wind_speed_ms: 5.1,
+          sst_c: 28.4,
+          risk_score: 18,
+          risk_level: "low",
+          safety_status: "ALLOWED",
+          decision: "PROCEED",
+          top_factors: ["wave"],
+          factors: [
+            { name: "wave", contribution: 8.2 },
+            { name: "wind", contribution: 5.4 },
+            { name: "cyclone", contribution: 0.7 },
+            { name: "lightning", contribution: 0.0 },
+            { name: "advisory", contribution: 0.0 },
+            { name: "geofence", contribution: 0.0 },
+          ],
+          reasons: ["risk level LOW (score 18.0)"],
+          triggered_rules: ["risk_within_band"],
+          triggered_rule_labels: ["Risk level within the LOW band"],
+        },
+        {
+          timestamp: "2026-09-18T14:00:00+00:00",
+          is_current: false,
+          wave_height_m: 1.9,
+          wind_speed_ms: 7.4,
+          sst_c: 28.2,
+          risk_score: 43,
+          risk_level: "moderate",
+          safety_status: "CAUTION",
+          decision: "PROCEED_WITH_CAUTION",
+          top_factors: ["wave", "wind"],
+          factors: [
+            { name: "wave", contribution: 18.5 },
+            { name: "wind", contribution: 14.1 },
+            { name: "cyclone", contribution: 0.7 },
+            { name: "lightning", contribution: 0.0 },
+            { name: "advisory", contribution: 0.0 },
+            { name: "geofence", contribution: 0.0 },
+          ],
+          reasons: ["risk level MODERATE (score 43.0)"],
+          triggered_rules: ["risk_moderate"],
+          triggered_rule_labels: ["Risk level reached MODERATE"],
+        },
+        {
+          timestamp: "2026-09-18T20:00:00+00:00",
+          is_current: false,
+          wave_height_m: 3.6,
+          wind_speed_ms: 14.2,
+          sst_c: null,
+          risk_score: 78,
+          risk_level: "severe",
+          safety_status: "BLOCKED",
+          decision: "DO_NOT_PROCEED",
+          top_factors: ["wave", "wind"],
+          factors: [
+            { name: "wave", contribution: 38.0 },
+            { name: "wind", contribution: 32.6 },
+            { name: "cyclone", contribution: 0.7 },
+            { name: "lightning", contribution: 0.0 },
+            { name: "advisory", contribution: 0.0 },
+            { name: "geofence", contribution: 0.0 },
+          ],
+          reasons: ["risk level SEVERE (score 78.0)"],
+          triggered_rules: ["risk_severe"],
+          triggered_rule_labels: ["Risk level reached SEVERE"],
+        },
+      ],
+      transitions: [
+        {
+          from_timestamp: "2026-09-18T09:00:00+00:00",
+          to_timestamp: "2026-09-18T14:00:00+00:00",
+          from_decision: "PROCEED",
+          to_decision: "PROCEED_WITH_CAUTION",
+          risk_score_delta: 25,
+          changes: [
+            "↑ Wave increased 1.2 → 1.9 m",
+            "↑ Wind increased 5.1 → 7.4 m/s",
+          ],
+          safety_trigger: "Risk level reached MODERATE",
+          safety_trigger_rule: "risk_moderate",
+        },
+        {
+          from_timestamp: "2026-09-18T14:00:00+00:00",
+          to_timestamp: "2026-09-18T20:00:00+00:00",
+          from_decision: "PROCEED_WITH_CAUTION",
+          to_decision: "DO_NOT_PROCEED",
+          risk_score_delta: 35,
+          changes: [
+            "↑ Wave increased 1.9 → 3.6 m",
+            "↑ Wind increased 7.4 → 14.2 m/s",
+          ],
+          safety_trigger: "Risk level reached SEVERE",
+          safety_trigger_rule: "risk_severe",
+        },
+      ],
+      window_hours: 24,
+      timestamp_count: 3,
+      data_coverage: { weather: "LIVE / FORECAST", waves: "LIVE / FORECAST", sst: "FRESH" },
+      provenance: { kind: "decision_replay" },
+      replay_version: "replay-1.0.0",
+    },
+    ...overrides,
+  };
+}
+
 export function makeNoRouteResponse(): QueryResponse {
   return makeResponse({
     intent: "ROUTE",
@@ -714,6 +952,54 @@ export function makePfzRouteResponse(overrides: Partial<QueryResponse> = {}): Qu
       hard_geofence_violations: 0,
       pfz_auto_destination: true,
       pfz_zone_distance_km: 9.4,
+    },
+    ...overrides,
+  });
+}
+
+/** Current-location -> multiple selected INCOIS PFZ references, chained. */
+export function makeMultiRouteFoundResponse(overrides: Partial<QueryResponse> = {}): QueryResponse {
+  return makeResponse({
+    intent: "ROUTE",
+    route: {
+      status: "ROUTE_FOUND",
+      waypoint_count: 6,
+      total_distance_m: 16400,
+      grid_path_cost: 11.2,
+      validation_passed: true,
+      reasons: [],
+      waypoints: [
+        [12.87, 74.84],
+        [12.9, 74.87],
+        [12.95, 74.9],
+        [12.98, 74.93],
+        [13.02, 74.96],
+        [13.05, 74.99],
+      ],
+      origin: [12.87, 74.84],
+      destination: [13.05, 74.99],
+      hard_geofence_violations: 0,
+      is_multi_destination: true,
+      destination_count: 2,
+      destinations: [
+        [12.95, 74.9],
+        [13.05, 74.99],
+      ],
+      ordering: "selection_order",
+      legs: [
+        {
+          leg_index: 0, origin: [12.87, 74.84], destination: [12.95, 74.9],
+          status: "ROUTE_FOUND", waypoint_count: 3, total_distance_m: 8200,
+          hard_geofence_violations: 0, reasons: [],
+        },
+        {
+          leg_index: 1, origin: [12.95, 74.9], destination: [13.05, 74.99],
+          status: "ROUTE_FOUND", waypoint_count: 3, total_distance_m: 8200,
+          hard_geofence_violations: 0, reasons: [],
+        },
+      ],
+      unattempted_destinations: [],
+      all_destinations_reached: true,
     },
     ...overrides,
   });

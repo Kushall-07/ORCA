@@ -9,6 +9,8 @@ import type {
   QueryRequestBody,
   QueryResponse,
   ReferenceRegistryEntry,
+  ReplayRequestBody,
+  ReplayResponse,
   WhatIfRequestBody,
   WhatIfResponse,
 } from "../types/api";
@@ -150,6 +152,52 @@ export async function postWhatIf(
     return (await response.json()) as WhatIfResponse;
   } catch {
     throw new ApiError("ORCA returned an unreadable what-if response.", "parse");
+  }
+}
+
+/**
+ * POST /replay - the ORCA Decision Replay Engine.
+ *
+ * Walks the hourly forecast data already fetched for the session's last
+ * assessment and returns a decision timeline. Same structured-error shape as
+ * postWhatIf: an expected failure mode (no baseline, stale baseline, no
+ * retained hourly forecast) resolves with `{ error: { code, message } }`
+ * (HTTP 422) instead of throwing; only a network / timeout / non-JSON failure
+ * throws an `ApiError`.
+ */
+export async function postReplay(
+  body: ReplayRequestBody,
+  signal?: AbortSignal,
+): Promise<ReplayResponse> {
+  const controller = new AbortController();
+  if (signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+  const timer = window.setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/replay`, {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    window.clearTimeout(timer);
+    if (controller.signal.aborted && !signal?.aborted) {
+      throw new ApiError("The replay request to ORCA timed out.", "timeout");
+    }
+    throw new ApiError(
+      err instanceof Error ? err.message : "Marine intelligence service unreachable.",
+      "network",
+    );
+  }
+  window.clearTimeout(timer);
+  try {
+    return (await response.json()) as ReplayResponse;
+  } catch {
+    throw new ApiError("ORCA returned an unreadable replay response.", "parse");
   }
 }
 

@@ -76,6 +76,7 @@ afterEach(() => {
   delete w.speechSynthesis;
   delete w.SpeechSynthesisUtterance;
   delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  delete (window as unknown as Record<string, unknown>).isSecureContext;
   FakeRecognition.last = null;
   vi.restoreAllMocks();
 });
@@ -220,11 +221,9 @@ describe("microphone / speech-to-text", () => {
     });
     renderChat();
 
-    await act(async () => {
-      await userEvent.click(
-        screen.getByRole("button", { name: /speak your question/i }),
-      );
-    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
 
     expect(
       screen.getByRole("button", { name: /stop listening/i }),
@@ -251,11 +250,9 @@ describe("microphone / speech-to-text", () => {
     });
     renderChat();
 
-    await act(async () => {
-      await userEvent.click(
-        screen.getByRole("button", { name: /speak your question/i }),
-      );
-    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
 
     expect(screen.getByText(/microphone permission denied/i)).toBeInTheDocument();
     // recognition itself must never have been started once the probe denied access
@@ -279,11 +276,9 @@ describe("microphone / speech-to-text", () => {
     });
     renderChat();
 
-    await act(async () => {
-      await userEvent.click(
-        screen.getByRole("button", { name: /speak your question/i }),
-      );
-    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
 
     expect(screen.getByText(/no microphone device found/i)).toBeInTheDocument();
 
@@ -293,14 +288,15 @@ describe("microphone / speech-to-text", () => {
   it("reports the insecure-connection hint (not a device/permission error) outside a secure context", async () => {
     (window as unknown as Record<string, unknown>).SpeechRecognition =
       FakeRecognition;
-    vi.spyOn(window, "isSecureContext", "get").mockReturnValue(false);
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: false,
+    });
     renderChat();
 
-    await act(async () => {
-      await userEvent.click(
-        screen.getByRole("button", { name: /speak your question/i }),
-      );
-    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /speak your question/i }),
+    );
 
     expect(
       screen.getByText(/secure \(https or localhost\) connection/i),

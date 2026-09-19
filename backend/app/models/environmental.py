@@ -528,6 +528,137 @@ class EnvironmentalNeighbourhoodResult(BaseModel):
 
 
 # ==========================================================================
+# Phase 9 Step 8: Environmental Anomaly Lens (recent-distribution position)
+# ==========================================================================
+# A deterministic, LLM-free, I/O-free engine that answers ONE research
+# question: "How does the current SST / chlorophyll-a observation sit within
+# its own recent (bounded-window) historical distribution?" It reuses the
+# EXACT SAME accepted raw Step 4/6 series the Stability Engine already
+# consumes (app.environmental.stability) - zero additional HTTP calls, zero
+# new data source.
+#
+# "Anomaly" here means only a descriptive statistical position - NEVER a
+# scientific anomaly-event claim, a bloom / front / plume / eddy / hotspot, a
+# fish-abundance or fishing-suitability signal. It computes NO trend, forecast,
+# machine-learning classification or spatial field, and it NEVER feeds risk,
+# safety, decision, route, suitability, geofencing, policy or alerts.
+
+ENVIRONMENTAL_ANOMALY_ENGINE_VERSION = "environmental-anomaly-0.1.0"
+
+ENVIRONMENTAL_ANOMALY_DISCLAIMER = (
+    "Descriptive statistical comparison only. This does not establish "
+    "biological causation, fish presence or abundance, or fishing suitability."
+)
+
+# per-variable status
+ANOMALY_STATUS_OK = "ok"
+ANOMALY_STATUS_CURRENT_UNAVAILABLE = "current_unavailable"
+ANOMALY_STATUS_INSUFFICIENT_HISTORY = "insufficient_history"
+
+# conservative [Q1, Q3] band classification - never "anomalous"/"anomaly".
+ANOMALY_CLASS_BELOW = "below_recent_range"
+ANOMALY_CLASS_WITHIN = "within_recent_distribution"
+ANOMALY_CLASS_ABOVE = "above_recent_range"
+
+
+class AnomalySparklinePoint(BaseModel):
+    """One bounded, PRESENTATION-SAFE point for the Environmental Anomaly Lens
+    sparkline: the calendar date (not the full timestamp) and the rounded
+    value of an already-accepted valid historical observation. Never a new
+    data source - derived only from the SAME Step 4/6 reference series the
+    aggregate statistics above are computed from, and bounded to exactly the
+    same valid observations already counted by ``valid_count``. This is NOT
+    an unrestricted raw-history export: no additional metadata (source,
+    dataset, tier, coordinates) is carried, only what a chart needs to plot a
+    point and label it on hover."""
+
+    model_config = ConfigDict(frozen=True)
+
+    date: str    # YYYY-MM-DD, truncated from the real observed_at
+    value: float  # rounded to the SAME decimals as current_value/median/etc.
+
+
+class EnvironmentalAnomalyVariable(BaseModel):
+    """Deterministic recent-distribution position for ONE variable. Quartiles
+    are computed with the SAME nearest-rank method app.environmental.stability
+    / app.environmental.neighbourhood already use; the percentile is the
+    standard empirical/mean-rank percentile (see app.environmental.anomaly for
+    the documented formula). ``classification`` is a plain [Q1, Q3] band
+    placement, never a biological or "anomalous" judgement - see
+    ``percentile`` for the continuous statistic. All statistics are ``None``
+    when fewer than three valid historical observations exist (honest
+    missingness, never manufactured). ``sparkline`` / ``window_days`` are a
+    purely presentational, bounded view of data already summarised above -
+    they add NO new statistic and NEVER widen what is exposed beyond the
+    already-loaded reference series."""
+
+    model_config = ConfigDict(frozen=True)
+
+    variable: str
+    unit: str = ""
+    window: str = ""
+    status: str = ANOMALY_STATUS_INSUFFICIENT_HISTORY
+    classification: str | None = None
+    current_value: float | None = None
+    valid_count: int = 0
+    percentile: float | None = None
+    minimum: float | None = None
+    q1: float | None = None
+    median: float | None = None
+    q3: float | None = None
+    maximum: float | None = None
+    range: float | None = None
+    difference_from_median: float | None = None
+    coverage: str | None = None
+    limitations: tuple[str, ...] = ()
+    sparkline: tuple[AnomalySparklinePoint, ...] = ()
+    window_days: int = 0
+
+    @property
+    def has_profile(self) -> bool:
+        return self.percentile is not None
+
+
+class EnvironmentalAnomalyInputs(BaseModel):
+    """Everything the anomaly engine needs. The node builds this from the SAME
+    accepted Step 4/6 series + current observation already in pipeline state;
+    the engine performs NO I/O and issues ZERO HTTP requests."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst_current: EnvironmentalObservation | None = None
+    chl_current: EnvironmentalObservation | None = None
+    sst_series: tuple[ReferenceSeriesPoint, ...] = ()
+    chl_series: tuple[ReferenceSeriesPoint, ...] = ()
+    window_label: str = ""
+    window_days: int = 0
+
+
+class EnvironmentalAnomalyResult(BaseModel):
+    """Deterministic output of the Environmental Anomaly Lens. Purely
+    descriptive research context - it NEVER feeds risk, safety, decision,
+    route, suitability, geofencing, policy or alerts, and never makes a bloom,
+    front, plume, eddy, hotspot, fish-abundance or fishing-suitability claim."""
+
+    model_config = ConfigDict(frozen=True)
+
+    sst: EnvironmentalAnomalyVariable | None = None
+    chlorophyll_a: EnvironmentalAnomalyVariable | None = None
+    window: str = ""
+    methodology: str = ""
+    data_sufficiency: DataSufficiency = DataSufficiency.INSUFFICIENT
+    limitations: tuple[str, ...] = ()
+    disclaimer: str = ENVIRONMENTAL_ANOMALY_DISCLAIMER
+    engine_version: str = ENVIRONMENTAL_ANOMALY_ENGINE_VERSION
+
+    @property
+    def any_profile(self) -> bool:
+        return any(
+            v is not None and v.has_profile for v in (self.sst, self.chlorophyll_a)
+        )
+
+
+# ==========================================================================
 # ORCA Environmental Suitability Spatial Grid (bounded spatial visualization)
 # ==========================================================================
 # A deterministic, LLM-free, I/O-free per-pixel classification of the SAME

@@ -25,6 +25,7 @@ afterEach(() => {
   delete w.speechSynthesis;
   delete w.SpeechSynthesisUtterance;
   delete (navigator as unknown as Record<string, unknown>).mediaDevices;
+  delete (window as unknown as Record<string, unknown>).isSecureContext;
   vi.restoreAllMocks();
 });
 
@@ -60,7 +61,10 @@ describe("checkMicrophoneAccess — capability probe", () => {
       configurable: true,
       value: { getUserMedia },
     });
-    vi.spyOn(window, "isSecureContext", "get").mockReturnValue(false);
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: false,
+    });
     expect(await checkMicrophoneAccess()).toEqual({
       ok: false,
       reason: "insecure-context",

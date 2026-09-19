@@ -244,6 +244,64 @@ export interface EnvironmentalNeighbourhoodInfo {
   engine_version: string;
 }
 
+// ---- Phase 9 Step 8: Environmental Anomaly Lens (recent-distribution position) ----
+// Deterministic statistical POSITION of the CURRENT SST / chlorophyll-a
+// observation within its own recent (bounded-window) historical distribution.
+// Reuses the SAME accepted historical series the stability profile above
+// already carries - zero additional HTTP calls. It is NOT a scientific
+// anomaly-event claim, a bloom / front / plume / eddy / hotspot, or a
+// fish-abundance / fishing-suitability signal, and never affects risk /
+// safety / decision / route. Quartiles are nearest-rank; `percentile` is the
+// standard empirical/mean-rank percentile. All statistics are null when fewer
+// than three valid historical observations exist. `classification` is a
+// plain [Q1, Q3] band placement (below_recent_range |
+// within_recent_distribution | above_recent_range), never an "anomalous"
+// judgement.
+// A bounded, presentation-safe sparkline point - the SAME valid historical
+// observation already counted by `valid_count` above, truncated to a
+// calendar date. Never a new statistic, never unrestricted raw history.
+export interface AnomalySparklinePointInfo {
+  date: string; // YYYY-MM-DD
+  value: number;
+}
+
+export interface EnvironmentalAnomalyVariableInfo {
+  variable: string;
+  unit: string;
+  window: string;
+  status: "ok" | "current_unavailable" | "insufficient_history" | string;
+  classification:
+    | "below_recent_range"
+    | "within_recent_distribution"
+    | "above_recent_range"
+    | null;
+  current_value: number | null;
+  valid_count: number;
+  percentile: number | null;
+  minimum: number | null;
+  q1: number | null;
+  median: number | null;
+  q3: number | null;
+  maximum: number | null;
+  range: number | null;
+  difference_from_median: number | null;
+  coverage: string | null;
+  limitations: string[];
+  sparkline: AnomalySparklinePointInfo[];
+  window_days: number;
+}
+
+export interface EnvironmentalAnomalyInfo {
+  sst: EnvironmentalAnomalyVariableInfo | null;
+  chlorophyll_a: EnvironmentalAnomalyVariableInfo | null;
+  window: string;
+  methodology: string;
+  data_sufficiency: "sufficient" | "insufficient" | string;
+  limitations: string[];
+  disclaimer: string;
+  engine_version: string;
+}
+
 export interface EnvironmentalInfo {
   sst: EnvironmentalObservationInfo | null;
   chlorophyll_a: EnvironmentalObservationInfo | null;
@@ -258,6 +316,7 @@ export interface EnvironmentalInfo {
   evidence?: EnvironmentalEvidenceInfo | null; // Phase 9 Step 5 - optional
   stability?: EnvironmentalStabilityInfo | null; // Phase 9 Step 6 - optional
   neighbourhood?: EnvironmentalNeighbourhoodInfo | null; // Phase 9 Step 7 - optional
+  anomaly?: EnvironmentalAnomalyInfo | null; // Phase 9 Step 8 - optional ("Environmental Anomaly Lens")
   // Phase 10A - modelled sea level (Open-Meteo Marine sea_level_height_msl).
   // NOT an official INCOIS tide-gauge observation or navigation prediction,
   // and never a safety/decision/route input. Null when unavailable.
@@ -301,6 +360,34 @@ export interface RouteInfo {
   // `pfz_zone_distance_km` is the straight-line distance to that zone point.
   pfz_auto_destination?: boolean;
   pfz_zone_distance_km?: number | null;
+  // ---- multi-destination extension (additive) ----------------------------
+  // True only when more than one PFZ reference was selected. `false` (the
+  // default) for every ordinary single-destination route above, which is
+  // unchanged.
+  is_multi_destination?: boolean;
+  destination_count?: number;
+  // Every requested destination, in the selected/planned order (for map
+  // markers) - always `[destination]` for a single-destination route.
+  destinations?: [number, number][];
+  // Deterministic ordering rule: the user's own PFZ map-selection order is
+  // always preserved verbatim, never re-sorted by ORCA.
+  ordering?: "selection_order";
+  legs?: RouteLegInfo[];
+  // Destinations never attempted because an earlier leg could not be safely
+  // routed - reported explicitly, never silently dropped.
+  unattempted_destinations?: [number, number][];
+  all_destinations_reached?: boolean;
+}
+
+export interface RouteLegInfo {
+  leg_index: number;
+  origin: [number, number];
+  destination: [number, number];
+  status: RouteStatus;
+  waypoint_count: number | null;
+  total_distance_m: number | null;
+  hard_geofence_violations: number | null;
+  reasons: string[];
 }
 
 export interface ProtectedAreaInfo {
@@ -583,6 +670,79 @@ export interface WhatIfRequestBody {
   wind_speed_delta_ms?: number | null;
 }
 
+// ---- Decision Replay Engine (POST /replay) ------------------------------
+// Walks the SAME already-fetched hourly forecast data across time, re-running
+// the live Risk -> Safety -> Decision chain once per available hourly
+// timestamp. Every payload carries a label starting with "DECISION REPLAY" -
+// it is derived from forecast data, never a second live decision. The
+// frontend only displays what the backend computes; no client-side math.
+export interface ReplayFactor {
+  name: string;
+  contribution: number;
+}
+
+export interface ReplaySnapshot {
+  timestamp: string;
+  is_current: boolean;
+  wave_height_m: number | null;
+  wind_speed_ms: number | null;
+  sst_c: number | null;
+  risk_score: number;
+  risk_level: RiskLevel;
+  safety_status: SafetyStatus;
+  decision: DecisionStatus;
+  top_factors: string[];
+  factors: ReplayFactor[];
+  reasons: string[];
+  triggered_rules: string[];
+  triggered_rule_labels: string[];
+}
+
+export interface DecisionChangeExplanation {
+  from_timestamp: string;
+  to_timestamp: string;
+  from_decision: DecisionStatus;
+  to_decision: DecisionStatus;
+  risk_score_delta: number;
+  changes: string[];
+  safety_trigger: string | null;
+  safety_trigger_rule: string | null;
+}
+
+export interface ReplayResult {
+  label: string;
+  snapshots: ReplaySnapshot[];
+  transitions: DecisionChangeExplanation[];
+  window_hours: number;
+  timestamp_count: number;
+  data_coverage: Record<string, string>;
+  provenance: Record<string, unknown>;
+  replay_version: string;
+}
+
+export interface ReplayError {
+  code:
+    | "REPLAY_BASELINE_UNAVAILABLE"
+    | "REPLAY_BASELINE_STALE"
+    | "REPLAY_INSUFFICIENT_FORECAST_DATA"
+    | string;
+  message: string;
+}
+
+export interface ReplayResponse {
+  session_id: string;
+  label: string | null;
+  baseline_message: string | null;
+  baseline_age_minutes: number | null;
+  data: ReplayResult | null;
+  error: ReplayError | null;
+}
+
+export interface ReplayRequestBody {
+  session_id: string;
+  window_hours?: number | null;
+}
+
 export interface QueryRequestBody {
   session_id?: string;
   message: string;
@@ -594,6 +754,10 @@ export interface QueryRequestBody {
   // hard-geofence / Safety Guard chain is unchanged either way.
   destination_latitude?: number;
   destination_longitude?: number;
+  // Multiple explicit destination coordinates, in the order the user
+  // selected them on the map (additive; a single-element array is
+  // equivalent to `destination_latitude`/`destination_longitude` above).
+  destinations?: { latitude: number; longitude: number }[];
   date_hint?: string;
   stakeholder?: string;
   language?: LanguageCode;

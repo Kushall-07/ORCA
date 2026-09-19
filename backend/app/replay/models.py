@@ -53,6 +53,17 @@ SAFETY_TRIGGER_LABELS: dict[str, str] = {
 }
 
 
+class ReplayFactor(BaseModel):
+    """One risk factor's contribution at a replayed timestamp - a direct,
+    unrounded-logic carry of ``RiskFactor.name``/``RiskFactor.contribution``
+    from that timestamp's real ``RiskResult``. No recomputation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    contribution: float = 0.0
+
+
 class ReplaySnapshot(BaseModel):
     """One replayed timestamp's deterministic decision - derived, never live."""
 
@@ -73,9 +84,17 @@ class ReplaySnapshot(BaseModel):
     # Top contributing risk factor names, highest contribution first (mirrors
     # RiskResult.limiting_factors - never recomputed, just carried forward).
     top_factors: tuple[str, ...] = ()
+    # Every factor's numeric contribution at this timestamp (mirrors
+    # RiskResult.factors verbatim) - lets the UI show a full breakdown without
+    # duplicating RiskEngine's maths.
+    factors: tuple[ReplayFactor, ...] = ()
     # The Safety Guard's own reasons for THIS timestamp (== DecisionResult.reasons).
     reasons: tuple[str, ...] = ()
     triggered_rules: tuple[str, ...] = ()
+    # Human-readable labels for triggered_rules (via SAFETY_TRIGGER_LABELS) -
+    # same lookup already used for DecisionChangeExplanation.safety_trigger,
+    # just carried per-snapshot too so the UI never has to re-derive one.
+    triggered_rule_labels: tuple[str, ...] = ()
 
 
 class DecisionChangeExplanation(BaseModel):

@@ -22,7 +22,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.common import Coordinate
-from app.models.environmental import EnvironmentalObservation
+from app.models.environmental import EnvironmentalAnomalyResult, EnvironmentalObservation
 from app.models.query import AnalysisType, CapabilityStatus, ResearchDomain
 
 RESEARCH_ENGINE_VERSION = "research-0.1.0"
@@ -129,6 +129,14 @@ class ResearchResult(BaseModel):
     capability: ResearchCapabilityAssessment = ResearchCapabilityAssessment()
     datasets_used: tuple[ResearchDatasetUsed, ...] = ()
     anomaly: ChlorophyllAnomalyAssessment | None = None
+    # Phase 9 Step 8: the SAME deterministic Environmental Anomaly Lens result
+    # (recent-distribution percentile position) surfaced elsewhere in the
+    # response, attached here ONLY so a researcher's R2 chlorophyll-anomaly /
+    # HAB-flavoured question (see `anomaly` above, app.research.anomaly) can
+    # show the percentile position as ADDITIONAL context underneath its own
+    # existing magnitude-jump finding - it never replaces or changes that
+    # finding. Reuses the SAME engine/state; no new computation.
+    environmental_anomaly: EnvironmentalAnomalyResult | None = None
     spatial_comparison: ResearchSpatialComparison | None = None
     limitations: tuple[str, ...] = ()
     notes: tuple[str, ...] = ()

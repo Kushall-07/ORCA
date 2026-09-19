@@ -35,6 +35,7 @@ import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPan
 import { AdvisoryPanel } from "../components/advisory/AdvisoryPanel";
 import { GeofencePanel } from "../components/advisory/GeofencePanel";
 import { WhatIfPanel } from "../components/whatif/WhatIfPanel";
+import { ReplayPanel } from "../components/replay/ReplayPanel";
 import { ProvenanceViewer } from "../components/provenance/ProvenanceViewer";
 import { RoutePanel } from "../components/route/RoutePanel";
 import { ReportView } from "../components/report/ReportView";
@@ -162,8 +163,14 @@ export default function WorkspacePage() {
     suitabilityData !== undefined &&
     (suitabilityData === null || suitabilityData.features.length === 0);
 
-  // ---- Phase C: select an INCOIS PFZ reference feature on the map --------
-  const [selectedPfz, setSelectedPfz] = useState<SelectedPfz | null>(null);
+  // ---- Phase C: select INCOIS PFZ reference feature(s) on the map --------
+  // An ordered list, not a single value, so multiple PFZs can be selected
+  // for a multi-destination route - see REQUIRED BEHAVIOR #2/#3. Exactly one
+  // selection behaves identically to the original single-PFZ flow below.
+  // Clicking an already-selected PFZ again removes it (toggle); clicking a
+  // new one appends it, preserving selection order for deterministic
+  // multi-leg routing (see app.agents.route.RouteAgent.plan_multi).
+  const [selectedPfzs, setSelectedPfzs] = useState<SelectedPfz[]>([]);
   const onSelectPfz = (
     feature: Feature<Geometry, Record<string, unknown>>,
     clickLatLng: [number, number],
@@ -174,11 +181,22 @@ export default function WorkspacePage() {
     );
     if (!point) return;
     const p = feature.properties ?? {};
-    setSelectedPfz({
+    const id =
+      p.OBJECTID != null ? String(p.OBJECTID)
+      : p.gml_id != null ? String(p.gml_id)
+      : p.id != null ? String(p.id)
+      : undefined;
+    const next: SelectedPfz = {
+      id,
       lat: point.lat,
       lon: point.lon,
       state: p.State_Name ? String(p.State_Name) : undefined,
       day: p.Julian_day ? String(p.Julian_day) : undefined,
+    };
+    setSelectedPfzs((prev) => {
+      const idx = prev.findIndex((s) => s.lat === next.lat && s.lon === next.lon);
+      if (idx >= 0) return prev.filter((_, i) => i !== idx);
+      return [...prev, next];
     });
   };
 
@@ -189,20 +207,24 @@ export default function WorkspacePage() {
   // manual map-click selection would, so the user never has to open Map
   // Layers or click a PFZ marker themselves. A PFZ-only query (no route
   // requested) never sets this flag, so it never fires here - the manual
-  // "Navigate to this PFZ" flow (onSelectPfz above) is unaffected.
+  // "Navigate to this PFZ" flow (onSelectPfz above) is unaffected. This
+  // always REPLACES the selection with the single auto-picked PFZ - it is a
+  // distinct interaction mode from manual multi-select.
   useEffect(() => {
     const route = latest?.route;
     if (!route?.pfz_auto_destination || !route.destination) return;
     const [lat, lon] = route.destination;
-    setSelectedPfz((prev) =>
-      prev && prev.lat === lat && prev.lon === lon
+    setSelectedPfzs((prev) =>
+      prev.length === 1 && prev[0].lat === lat && prev[0].lon === lon
         ? prev
-        : {
-            lat,
-            lon,
-            state: latest?.pfz_reference?.area_matched ?? undefined,
-            day: latest?.pfz_reference?.issued_at ?? undefined,
-          },
+        : [
+            {
+              lat,
+              lon,
+              state: latest?.pfz_reference?.area_matched ?? undefined,
+              day: latest?.pfz_reference?.issued_at ?? undefined,
+            },
+          ],
     );
   }, [latest]);
 
@@ -215,12 +237,65 @@ export default function WorkspacePage() {
     : null);
 
   const onNavigateToPfz = () => {
-    if (!selectedPfz || !navigateOrigin) return;
-    void send(t("route.myLocationToPfz"), {
+    if (selectedPfzs.length === 0 || !navigateOrigin) return;
+    if (selectedPfzs.length === 1) {
+      // SINGLE PFZ: unchanged from the original single-selection behaviour.
+      void send(t("route.myLocationToPfz"), {
+        latitude: navigateOrigin.latitude,
+        longitude: navigateOrigin.longitude,
+        destinationLatitude: selectedPfzs[0].lat,
+        destinationLongitude: selectedPfzs[0].lon,
+      });
+      return;
+    }
+    // MULTIPLE PFZs: route through every selected destination, in the exact
+    // order they were selected (see RouteAgent.plan_multi's ordering).
+    void send(t("route.myLocationToPfzs", { count: selectedPfzs.length }), {
       latitude: navigateOrigin.latitude,
       longitude: navigateOrigin.longitude,
-      destinationLatitude: selectedPfz.lat,
-      destinationLongitude: selectedPfz.lon,
+      destinations: selectedPfzs.map((p) => ({ latitude: p.lat, longitude: p.lon })),
+    });
+  };
+
+  // A typed chat message such as "Route me through all the selected PFZs in
+  // Mangalore." must ALSO carry the current map selection - otherwise the
+  // backend sees a route+PFZ request with no explicit destination and falls
+  // back to its automatic nearest-PFZ lookup (see
+  // app.orchestration.nodes.normalize's `pfz_route_destination` branch),
+  // which silently ignores the user's actual selection. Only the dedicated
+  // "Navigate"/"Route through all N selected PFZs" button did this before;
+  // free-text chat never did. This mirrors the backend's own route-wording
+  // detection (`app.agents.query_understanding._ROUTE_WORDS` / `_GO_TO_RE`)
+  // purely to decide whether to ATTACH the selection - the backend alone
+  // still decides whether the request is actually a route (`requests_route`),
+  // so an unrelated message (e.g. "what's the weather?") with a stale
+  // selection is unaffected.
+  const looksLikeRouteRequest = (text: string) => {
+    const low = text.toLowerCase();
+    return (
+      /\b(route|navigate|navigation|path to|way to|sail to)\b/.test(low) ||
+      /\bgo to\b(?!\s*sea\b)/.test(low) ||
+      /मार्ग|रास्ता|ಮಾರ್ಗ/.test(text)
+    );
+  };
+
+  const onChatSend = (text: string) => {
+    if (selectedPfzs.length === 0 || !looksLikeRouteRequest(text)) {
+      return send(text);
+    }
+    const originCoords = navigateOrigin
+      ? { latitude: navigateOrigin.latitude, longitude: navigateOrigin.longitude }
+      : {};
+    if (selectedPfzs.length === 1) {
+      return send(text, {
+        ...originCoords,
+        destinationLatitude: selectedPfzs[0].lat,
+        destinationLongitude: selectedPfzs[0].lon,
+      });
+    }
+    return send(text, {
+      ...originCoords,
+      destinations: selectedPfzs.map((p) => ({ latitude: p.lat, longitude: p.lon })),
     });
   };
 
@@ -264,7 +339,12 @@ export default function WorkspacePage() {
                 activeLayers={activeLayers}
                 layerData={layerData}
                 gpsLocation={gpsCoordinate ? [gpsCoordinate.latitude, gpsCoordinate.longitude] : null}
-                selectedPfz={selectedPfz ? [selectedPfz.lat, selectedPfz.lon] : null}
+                selectedPfz={
+                  selectedPfzs.length > 0
+                    ? [selectedPfzs[selectedPfzs.length - 1].lat, selectedPfzs[selectedPfzs.length - 1].lon]
+                    : null
+                }
+                selectedPfzs={selectedPfzs.map((p) => [p.lat, p.lon] as [number, number])}
                 onSelectPfz={onSelectPfz}
               />
               <div className="workspace__map-overlay">
@@ -274,13 +354,14 @@ export default function WorkspacePage() {
                 )}
                 <DataTierLegend />
                 <GpsControl gps={gps} />
-                {selectedPfz && (
+                {selectedPfzs.length > 0 && (
                   <PfzSelectionCard
-                    selection={selectedPfz}
+                    selections={selectedPfzs}
                     landingCentre={latest?.pfz_reference?.nearest_landing_centre}
                     canNavigate={!!navigateOrigin}
                     onNavigate={onNavigateToPfz}
-                    onClear={() => setSelectedPfz(null)}
+                    onRemove={(i) => setSelectedPfzs((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClear={() => setSelectedPfzs([])}
                   />
                 )}
               </div>
@@ -293,7 +374,7 @@ export default function WorkspacePage() {
               <ChatPanel
                 messages={messages}
                 loading={loading}
-                onSend={send}
+                onSend={onChatSend}
                 onRetry={retry}
                 onClear={clear}
                 stakeholder={stakeholder}
@@ -313,10 +394,16 @@ export default function WorkspacePage() {
           <main className="assessment__content">
             <div className="rail__content">
               {!latest ? null : page === "decision" ? (
-                // PRIMARY — the operational answer, one scannable block. This
-                // is the whole Decision page: "Can I go?" and nothing else.
-                // Supporting detail lives one click away on Marine Details.
-                <DecisionCard resp={latest} />
+                // PRIMARY — the operational answer, one scannable block, plus
+                // Decision Replay directly beneath it (not buried in Details)
+                // so a judge/user can immediately explore how the same
+                // decision evolves across the forecast window.
+                <>
+                  <DecisionCard resp={latest} />
+                  {latest.decision && latest.status === "OK" && (
+                    <ReplayPanel resp={latest} />
+                  )}
+                </>
               ) : page === "details" ? (
                 <>
                   <p className="rail__group-label">{t("panel.marineDetails")}</p>

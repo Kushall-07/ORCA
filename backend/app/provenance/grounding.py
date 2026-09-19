@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.models.decision import DecisionResult
 from app.models.environmental import (
+    EnvironmentalAnomalyResult,
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalNeighbourhoodResult,
@@ -74,6 +75,7 @@ def _engine_values(
     comparison: EnvironmentalComparisonResult | None,
     environmental_evidence: EnvironmentalEvidenceResult | None,
     stability: EnvironmentalStabilityResult | None,
+    anomaly: EnvironmentalAnomalyResult | None,
     neighbourhood: EnvironmentalNeighbourhoodResult | None,
     extra: tuple[float, ...],
 ) -> list[float]:
@@ -121,6 +123,22 @@ def _engine_values(
             ):
                 if n is not None:
                     values += [n, round(n, 1), round(n, 2), round(n, 3), round(n)]
+    if anomaly is not None:
+        # Step 8 explanation text uses categorical words + a percentile + already-
+        # observed dispersion values; every figure is a copy of an already-grounded
+        # observation or a deterministic count, added here so any figure the
+        # explanation restates is grounded.
+        for av in (anomaly.sst, anomaly.chlorophyll_a):
+            if av is None:
+                continue
+            values.append(float(av.valid_count))
+            for n in (
+                av.current_value, av.percentile, av.minimum, av.q1, av.median,
+                av.q3, av.maximum, av.range, av.difference_from_median,
+            ):
+                if n is not None:
+                    values += [n, round(n, 1), round(n, 2), round(n, 3), round(n),
+                               abs(n), round(abs(n), 1), round(abs(n), 2)]
     if neighbourhood is not None:
         # Step 7 explanation text uses categorical words + counts + already-observed
         # dispersion values; every figure is a copy of a validated native pixel or
@@ -169,12 +187,13 @@ def ground_text(
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    anomaly: EnvironmentalAnomalyResult | None = None,
     neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
     extra_allowed: tuple[float, ...] = (),
 ) -> GroundingReport:
     engine = _engine_values(
         provenance, decision, risk, suitability, route, environmental, comparison,
-        environmental_evidence, stability, neighbourhood, extra_allowed,
+        environmental_evidence, stability, anomaly, neighbourhood, extra_allowed,
     )
     claims: list[GroundingClaim] = []
     unsupported: list[str] = []

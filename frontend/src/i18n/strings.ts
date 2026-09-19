@@ -164,6 +164,37 @@ export type StringKey =
   | "env.nbhd.status.limited"
   | "env.nbhd.status.insufficient"
   | "env.nbhd.status.unavailable"
+  | "env.anom.title"
+  | "env.anom.subtitle"
+  | "env.anom.percentile"
+  | "env.anom.percentileSuffix"
+  | "env.anom.range"
+  | "env.anom.median"
+  | "env.anom.diffFromMedian"
+  | "env.anom.observations"
+  | "env.anom.currentUnavailable"
+  | "env.anom.insufficientProfile"
+  | "env.anom.howCalculated"
+  | "env.anom.methodologyFallback"
+  | "env.anom.status.ok"
+  | "env.anom.status.currentUnavailable"
+  | "env.anom.status.insufficientHistory"
+  | "env.anom.class.below"
+  | "env.anom.class.within"
+  | "env.anom.class.above"
+  | "env.anom2.current"
+  | "env.anom2.recentMedian"
+  | "env.anom2.difference"
+  | "env.anom2.position"
+  | "env.anom2.dataCoverage"
+  | "env.anom2.lastDays"
+  | "env.anom2.daysLabel"
+  | "env.anom2.windowLabel"
+  | "env.anom2.dataUnavailable"
+  | "env.anom2.insufficientData"
+  | "env.anom2.isAbove"
+  | "env.anom2.isWithin"
+  | "env.anom2.isBelow"
   | "panel.route"
   | "route.status"
   | "route.distance"
@@ -231,6 +262,7 @@ export type StringKey =
   | "map.noRoute"
   | "map.origin"
   | "map.destination"
+  | "map.routeDestinationN"
   | "layer.group.marineBase"
   | "layer.group.orcaAnalysis"
   | "layer.group.fishingEnvironment"
@@ -284,8 +316,12 @@ export type StringKey =
   | "gps.unavailable"
   | "gps.markerLabel"
   | "pfz.selectedTitle"
+  | "pfz.selectedTitleMulti"
   | "pfz.selectedMarkerLabel"
+  | "pfz.selectedMarkerLabelMulti"
   | "pfz.navigate"
+  | "pfz.navigateMulti"
+  | "pfz.removeSelection"
   | "pfz.notSafetyNote"
   | "pfz.clearSelection"
   | "pfz.cannotRoute"
@@ -297,6 +333,7 @@ export type StringKey =
   | "pfz.validUntil"
   | "pfz.officialSource"
   | "route.myLocationToPfz"
+  | "route.myLocationToPfzs"
   | "env.interp"
   | "env.interp.limited"
   | "env.interp.limitedNote"
@@ -491,6 +528,40 @@ const en: Table = {
   "env.nbhd.status.limited": "LIMITED",
   "env.nbhd.status.insufficient": "INSUFFICIENT",
   "env.nbhd.status.unavailable": "UNAVAILABLE",
+  "env.anom.title": "Environmental Anomaly Lens",
+  "env.anom.subtitle": "Recent-distribution analysis · position within recent observations",
+  "env.anom.percentile": "Percentile",
+  "env.anom.percentileSuffix": "th percentile",
+  "env.anom.range": "range",
+  "env.anom.median": "median",
+  "env.anom.diffFromMedian": "vs median",
+  "env.anom.observations": "observations",
+  "env.anom.currentUnavailable":
+    "The current observation is unavailable; no recent-distribution position could be determined.",
+  "env.anom.insufficientProfile":
+    "Fewer than three valid historical observations in the window - no recent-distribution position was computed.",
+  "env.anom.howCalculated": "How is this calculated?",
+  "env.anom.methodologyFallback":
+    "The current observation is positioned against valid observations from the existing bounded recent window. Invalid or missing values are excluded, never interpolated. A minimum of three valid historical observations is required.",
+  "env.anom.status.ok": "POSITIONED",
+  "env.anom.status.currentUnavailable": "UNAVAILABLE",
+  "env.anom.status.insufficientHistory": "INSUFFICIENT",
+  "env.anom.class.below": "BELOW RECENT RANGE",
+  "env.anom.class.within": "WITHIN RECENT DISTRIBUTION",
+  "env.anom.class.above": "ABOVE RECENT RANGE",
+  "env.anom2.current": "Current",
+  "env.anom2.recentMedian": "Recent median",
+  "env.anom2.difference": "Difference",
+  "env.anom2.position": "Position",
+  "env.anom2.dataCoverage": "Data coverage",
+  "env.anom2.lastDays": "Last",
+  "env.anom2.daysLabel": "days",
+  "env.anom2.windowLabel": "{days}-DAY OBSERVATION WINDOW",
+  "env.anom2.dataUnavailable": "DATA UNAVAILABLE",
+  "env.anom2.insufficientData": "INSUFFICIENT DATA",
+  "env.anom2.isAbove": "is above the recent interquartile range.",
+  "env.anom2.isWithin": "is within the recent distribution.",
+  "env.anom2.isBelow": "is below the recent interquartile range.",
   "panel.route": "Route",
   "route.status": "Status",
   "route.distance": "Distance",
@@ -561,6 +632,7 @@ const en: Table = {
   "map.noRoute": "No safe route",
   "map.origin": "Origin",
   "map.destination": "Destination",
+  "map.routeDestinationN": "PFZ {n} of {count}",
   "layer.group.marineBase": "Marine base",
   "layer.group.orcaAnalysis": "ORCA analysis",
   "layer.group.fishingEnvironment": "Fishing & environment",
@@ -619,8 +691,12 @@ const en: Table = {
   "gps.unavailable": "Current location unavailable",
   "gps.markerLabel": "My current location",
   "pfz.selectedTitle": "INCOIS PFZ Reference selected",
+  "pfz.selectedTitleMulti": "{count} INCOIS PFZ references selected",
   "pfz.selectedMarkerLabel": "Selected PFZ reference",
+  "pfz.selectedMarkerLabelMulti": "Selected PFZ {n}",
   "pfz.navigate": "Navigate to this PFZ",
+  "pfz.navigateMulti": "Route through all {count} selected PFZs",
+  "pfz.removeSelection": "Remove selection {n}",
   "pfz.notSafetyNote": "PFZ reference is not a safety recommendation.",
   "pfz.clearSelection": "Clear selection",
   "pfz.cannotRoute": "Selected PFZ reference cannot be safely routed to.",
@@ -632,6 +708,7 @@ const en: Table = {
   "pfz.validUntil": "Valid until",
   "pfz.officialSource": "Official INCOIS reference",
   "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
+  "route.myLocationToPfzs": "My Location → {count} selected INCOIS PFZ References",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
   "env.interp.limitedNote":
@@ -830,6 +907,40 @@ const hi: Table = {
   "env.nbhd.status.limited": "सीमित",
   "env.nbhd.status.insufficient": "अपर्याप्त",
   "env.nbhd.status.unavailable": "अनुपलब्ध",
+  "env.anom.title": "पर्यावरणीय असामान्यता लेंस",
+  "env.anom.subtitle": "हाल के वितरण का विश्लेषण · हाल के प्रेक्षणों के भीतर स्थिति",
+  "env.anom.percentile": "प्रतिशतक",
+  "env.anom.percentileSuffix": "वां प्रतिशतक",
+  "env.anom.range": "परिसर",
+  "env.anom.median": "माध्यिका",
+  "env.anom.diffFromMedian": "माध्यिका से",
+  "env.anom.observations": "प्रेक्षण",
+  "env.anom.currentUnavailable":
+    "वर्तमान प्रेक्षण अनुपलब्ध है; हाल के वितरण में कोई स्थिति निर्धारित नहीं की जा सकी।",
+  "env.anom.insufficientProfile":
+    "अवधि में तीन से कम मान्य ऐतिहासिक प्रेक्षण - हाल के वितरण में कोई स्थिति नहीं निकाली गई।",
+  "env.anom.howCalculated": "यह कैसे गणना की जाती है?",
+  "env.anom.methodologyFallback":
+    "वर्तमान प्रेक्षण को मौजूदा सीमित हाल की अवधि के मान्य प्रेक्षणों के विरुद्ध स्थित किया जाता है। अमान्य या अनुपलब्ध मान बाहर रखे जाते हैं, कभी प्रक्षेपित नहीं किए जाते। न्यूनतम तीन मान्य ऐतिहासिक प्रेक्षण आवश्यक हैं।",
+  "env.anom.status.ok": "स्थिति निर्धारित",
+  "env.anom.status.currentUnavailable": "अनुपलब्ध",
+  "env.anom.status.insufficientHistory": "अपर्याप्त",
+  "env.anom.class.below": "हाल की सीमा से नीचे",
+  "env.anom.class.within": "हाल के वितरण के भीतर",
+  "env.anom.class.above": "हाल की सीमा से ऊपर",
+  "env.anom2.current": "वर्तमान",
+  "env.anom2.recentMedian": "हाल की माध्यिका",
+  "env.anom2.difference": "अंतर",
+  "env.anom2.position": "स्थिति",
+  "env.anom2.dataCoverage": "डेटा कवरेज",
+  "env.anom2.lastDays": "पिछले",
+  "env.anom2.daysLabel": "दिन",
+  "env.anom2.windowLabel": "{days}-दिन अवलोकन विंडो",
+  "env.anom2.dataUnavailable": "डेटा अनुपलब्ध",
+  "env.anom2.insufficientData": "अपर्याप्त डेटा",
+  "env.anom2.isAbove": "हाल की इंटरक्वार्टाइल सीमा से ऊपर है।",
+  "env.anom2.isWithin": "हाल के वितरण के भीतर है।",
+  "env.anom2.isBelow": "हाल की इंटरक्वार्टाइल सीमा से नीचे है।",
   "panel.route": "मार्ग",
   "route.status": "स्थिति",
   "route.distance": "दूरी",
@@ -899,6 +1010,7 @@ const hi: Table = {
   "map.noRoute": "कोई सुरक्षित मार्ग नहीं",
   "map.origin": "आरंभ",
   "map.destination": "गंतव्य",
+  "map.routeDestinationN": "PFZ {n} / {count}",
   "layer.group.marineBase": "समुद्री आधार",
   "layer.group.orcaAnalysis": "ORCA विश्लेषण",
   "layer.group.fishingEnvironment": "मत्स्यन एवं पर्यावरण",
@@ -956,8 +1068,12 @@ const hi: Table = {
   "gps.unavailable": "वर्तमान स्थान उपलब्ध नहीं है",
   "gps.markerLabel": "मेरा वर्तमान स्थान",
   "pfz.selectedTitle": "INCOIS PFZ संदर्भ चयनित",
+  "pfz.selectedTitleMulti": "{count} INCOIS PFZ संदर्भ चयनित",
   "pfz.selectedMarkerLabel": "चयनित PFZ संदर्भ",
+  "pfz.selectedMarkerLabelMulti": "चयनित PFZ {n}",
   "pfz.navigate": "इस PFZ की ओर मार्ग बनाएं",
+  "pfz.navigateMulti": "सभी {count} चयनित PFZ के माध्यम से मार्ग बनाएं",
+  "pfz.removeSelection": "चयन {n} हटाएं",
   "pfz.notSafetyNote": "PFZ संदर्भ कोई सुरक्षा सिफारिश नहीं है।",
   "pfz.clearSelection": "चयन साफ़ करें",
   "pfz.cannotRoute": "चयनित PFZ संदर्भ तक सुरक्षित रूप से मार्ग नहीं बनाया जा सकता।",
@@ -969,6 +1085,7 @@ const hi: Table = {
   "pfz.validUntil": "मान्य तक",
   "pfz.officialSource": "आधिकारिक INCOIS संदर्भ",
   "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
+  "route.myLocationToPfzs": "मेरा स्थान → {count} चयनित INCOIS PFZ संदर्भ",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
   "env.interp.limitedNote":
@@ -1167,6 +1284,40 @@ const kn: Table = {
   "env.nbhd.status.limited": "ಸೀಮಿತ",
   "env.nbhd.status.insufficient": "ಅಸಮರ್ಪಕ",
   "env.nbhd.status.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "env.anom.title": "ಪರಿಸರ ಅಸಾಮಾನ್ಯ ಮಸೂರ",
+  "env.anom.subtitle": "ಇತ್ತೀಚಿನ-ವಿತರಣೆ ವಿಶ್ಲೇಷಣೆ · ಇತ್ತೀಚಿನ ವೀಕ್ಷಣೆಗಳೊಳಗಿನ ಸ್ಥಾನ",
+  "env.anom.percentile": "ಶತಮಾನಾಂಕ",
+  "env.anom.percentileSuffix": "ನೇ ಶತಮಾನಾಂಕ",
+  "env.anom.range": "ವ್ಯಾಪ್ತಿ",
+  "env.anom.median": "ಮಧ್ಯಂಕ",
+  "env.anom.diffFromMedian": "ಮಧ್ಯಂಕದಿಂದ",
+  "env.anom.observations": "ವೀಕ್ಷಣೆಗಳು",
+  "env.anom.currentUnavailable":
+    "ಪ್ರಸ್ತುತ ವೀಕ್ಷಣೆ ಲಭ್ಯವಿಲ್ಲ; ಇತ್ತೀಚಿನ ವಿತರಣೆಯಲ್ಲಿ ಸ್ಥಾನವನ್ನು ನಿರ್ಧರಿಸಲಾಗಲಿಲ್ಲ.",
+  "env.anom.insufficientProfile":
+    "ಅವಧಿಯಲ್ಲಿ ಮೂರಕ್ಕಿಂತ ಕಡಿಮೆ ಮಾನ್ಯ ಐತಿಹಾಸಿಕ ವೀಕ್ಷಣೆಗಳು - ಇತ್ತೀಚಿನ ವಿತರಣೆಯ ಸ್ಥಾನವನ್ನು ಲೆಕ್ಕಿಸಲಾಗಿಲ್ಲ.",
+  "env.anom.howCalculated": "ಇದನ್ನು ಹೇಗೆ ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತದೆ?",
+  "env.anom.methodologyFallback":
+    "ಪ್ರಸ್ತುತ ವೀಕ್ಷಣೆಯನ್ನು ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸೀಮಿತ ಇತ್ತೀಚಿನ ಅವಧಿಯ ಮಾನ್ಯ ವೀಕ್ಷಣೆಗಳ ವಿರುದ್ಧ ಇರಿಸಲಾಗುತ್ತದೆ. ಅಮಾನ್ಯ ಅಥವಾ ಲಭ್ಯವಿಲ್ಲದ ಮೌಲ್ಯಗಳನ್ನು ಹೊರಗಿಡಲಾಗುತ್ತದೆ, ಎಂದಿಗೂ ಪ್ರಕ್ಷೇಪಿಸಲಾಗುವುದಿಲ್ಲ. ಕನಿಷ್ಠ ಮೂರು ಮಾನ್ಯ ಐತಿಹಾಸಿಕ ವೀಕ್ಷಣೆಗಳು ಅಗತ್ಯವಿದೆ.",
+  "env.anom.status.ok": "ಸ್ಥಾನ ನಿರ್ಧರಿಸಲಾಗಿದೆ",
+  "env.anom.status.currentUnavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "env.anom.status.insufficientHistory": "ಅಸಮರ್ಪಕ",
+  "env.anom.class.below": "ಇತ್ತೀಚಿನ ವ್ಯಾಪ್ತಿಗಿಂತ ಕೆಳಗೆ",
+  "env.anom.class.within": "ಇತ್ತೀಚಿನ ವಿತರಣೆಯೊಳಗೆ",
+  "env.anom.class.above": "ಇತ್ತೀಚಿನ ವ್ಯಾಪ್ತಿಗಿಂತ ಮೇಲೆ",
+  "env.anom2.current": "ಪ್ರಸ್ತುತ",
+  "env.anom2.recentMedian": "ಇತ್ತೀಚಿನ ಮಧ್ಯಂಕ",
+  "env.anom2.difference": "ವ್ಯತ್ಯಾಸ",
+  "env.anom2.position": "ಸ್ಥಾನ",
+  "env.anom2.dataCoverage": "ಡೇಟಾ ವ್ಯಾಪ್ತಿ",
+  "env.anom2.lastDays": "ಕಳೆದ",
+  "env.anom2.daysLabel": "ದಿನಗಳು",
+  "env.anom2.windowLabel": "{days}-ದಿನಗಳ ವೀಕ್ಷಣಾ ವಿಂಡೋ",
+  "env.anom2.dataUnavailable": "ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
+  "env.anom2.insufficientData": "ಅಸಮರ್ಪಕ ಡೇಟಾ",
+  "env.anom2.isAbove": "ಇತ್ತೀಚಿನ ಇಂಟರ್‌ಕ್ವಾರ್ಟೈಲ್ ವ್ಯಾಪ್ತಿಗಿಂತ ಮೇಲಿದೆ.",
+  "env.anom2.isWithin": "ಇತ್ತೀಚಿನ ವಿತರಣೆಯೊಳಗೆ ಇದೆ.",
+  "env.anom2.isBelow": "ಇತ್ತೀಚಿನ ಇಂಟರ್‌ಕ್ವಾರ್ಟೈಲ್ ವ್ಯಾಪ್ತಿಗಿಂತ ಕೆಳಗಿದೆ.",
   "panel.route": "ಮಾರ್ಗ",
   "route.status": "ಸ್ಥಿತಿ",
   "route.distance": "ದೂರ",
@@ -1236,6 +1387,7 @@ const kn: Table = {
   "map.noRoute": "ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಇಲ್ಲ",
   "map.origin": "ಆರಂಭ",
   "map.destination": "ಗಮ್ಯ",
+  "map.routeDestinationN": "PFZ {n} / {count}",
   "layer.group.marineBase": "ಸಮುದ್ರ ಆಧಾರ",
   "layer.group.orcaAnalysis": "ORCA ವಿಶ್ಲೇಷಣೆ",
   "layer.group.fishingEnvironment": "ಮೀನುಗಾರಿಕೆ ಮತ್ತು ಪರಿಸರ",
@@ -1293,8 +1445,12 @@ const kn: Table = {
   "gps.unavailable": "ಪ್ರಸ್ತುತ ಸ್ಥಳ ಲಭ್ಯವಿಲ್ಲ",
   "gps.markerLabel": "ನನ್ನ ಪ್ರಸ್ತುತ ಸ್ಥಳ",
   "pfz.selectedTitle": "INCOIS PFZ ಉಲ್ಲೇಖ ಆಯ್ಕೆಯಾಗಿದೆ",
+  "pfz.selectedTitleMulti": "{count} INCOIS PFZ ಉಲ್ಲೇಖಗಳು ಆಯ್ಕೆಯಾಗಿವೆ",
   "pfz.selectedMarkerLabel": "ಆಯ್ಕೆಮಾಡಿದ PFZ ಉಲ್ಲೇಖ",
+  "pfz.selectedMarkerLabelMulti": "ಆಯ್ಕೆಮಾಡಿದ PFZ {n}",
   "pfz.navigate": "ಈ PFZ ಗೆ ಮಾರ್ಗ ನಿರ್ದೇಶನ",
+  "pfz.navigateMulti": "ಎಲ್ಲಾ {count} ಆಯ್ಕೆಮಾಡಿದ PFZ ಗಳ ಮೂಲಕ ಮಾರ್ಗ ನಿರ್ದೇಶನ",
+  "pfz.removeSelection": "ಆಯ್ಕೆ {n} ತೆಗೆದುಹಾಕಿ",
   "pfz.notSafetyNote": "PFZ ಉಲ್ಲೇಖವು ಸುರಕ್ಷತಾ ಶಿಫಾರಸು ಅಲ್ಲ.",
   "pfz.clearSelection": "ಆಯ್ಕೆ ತೆರವುಗೊಳಿಸಿ",
   "pfz.cannotRoute": "ಆಯ್ಕೆಮಾಡಿದ PFZ ಉಲ್ಲೇಖಕ್ಕೆ ಸುರಕ್ಷಿತವಾಗಿ ಮಾರ್ಗ ನಿರ್ದೇಶನ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
@@ -1306,6 +1462,7 @@ const kn: Table = {
   "pfz.validUntil": "ಮಾನ್ಯವಾಗಿರುವವರೆಗೆ",
   "pfz.officialSource": "ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ",
   "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
+  "route.myLocationToPfzs": "ನನ್ನ ಸ್ಥಳ → {count} ಆಯ್ಕೆಮಾಡಿದ INCOIS PFZ ಉಲ್ಲೇಖಗಳು",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
   "env.interp.limitedNote":

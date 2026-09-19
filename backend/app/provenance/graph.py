@@ -10,6 +10,7 @@ from app.models.advisory import MarineAdvisory
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
+    EnvironmentalAnomalyResult,
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalNeighbourhoodResult,
@@ -60,6 +61,7 @@ def build_provenance(
     comparison: EnvironmentalComparisonResult | None = None,
     evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    anomaly: EnvironmentalAnomalyResult | None = None,
     neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
 ) -> ProvenanceGraph:
     nodes: list[ProvNode] = []
@@ -455,6 +457,87 @@ def build_provenance(
                 },
             ),
             stab_agent, *dict.fromkeys(stab_prof_ids),
+        )
+
+    # ---- Environmental Anomaly Lens: recent-distribution position (Phase 9 Step 8; never feeds safety) ----
+    if anomaly is not None and (
+        anomaly.sst is not None or anomaly.chlorophyll_a is not None
+    ):
+        _ANOM = ProvNodeKind.ENVIRONMENTAL_ANOMALY
+        anom_hist_parent = (
+            "agent:environment_history"
+            if any(n.id == "agent:environment_history" for n in nodes)
+            else parent_for_data
+        )
+        anom_agent = add(
+            ProvNode(
+                id="agent:environment_anomaly", kind=_AGENT_RESULT,
+                label=(
+                    "environmental anomaly lens (ORCA-derived, recent-"
+                    "distribution percentile position)"
+                ),
+                value=anomaly.window or "bounded window",
+                source="orca-environmental-anomaly-engine",
+            ),
+            anom_hist_parent,
+        )
+
+        anom_ids: list[str] = []
+        overall_bits: list[str] = []
+        for var, av in (
+            ("sea_surface_temperature", anomaly.sst),
+            ("chlorophyll_a", anomaly.chlorophyll_a),
+        ):
+            if av is None:
+                continue
+            overall_bits.append(f"{var}={av.status}")
+            adetail: dict[str, str] = {
+                "variable": var,
+                "status": av.status,
+                "window": av.window,
+                "valid_count": f"{av.valid_count}",
+                "methodology": anomaly.methodology,
+                "engine_version": anomaly.engine_version,
+                "disclaimer": anomaly.disclaimer,
+            }
+            if av.classification:
+                adetail["classification"] = av.classification
+            for k, v in (
+                ("current_value", av.current_value), ("percentile", av.percentile),
+                ("minimum", av.minimum), ("q1", av.q1), ("median", av.median),
+                ("q3", av.q3), ("maximum", av.maximum), ("range", av.range),
+                ("difference_from_median", av.difference_from_median),
+            ):
+                if v is not None:
+                    adetail[k] = f"{v}"
+            if av.coverage:
+                adetail["coverage"] = av.coverage
+            anom_ids.append(
+                add(
+                    ProvNode(
+                        id=f"anomaly:{var}", kind=_ANOM,
+                        label=f"{var} recent-distribution position",
+                        value=(av.percentile if av.percentile is not None else av.status),
+                        unit=(av.unit or None) if av.percentile is not None else None,
+                        detail=adetail,
+                    ),
+                    anom_agent,
+                )
+            )
+
+        add(
+            ProvNode(
+                id="assessment:environment_anomaly", kind=_ANOM,
+                label="environmental anomaly lens assessment (ORCA-derived)",
+                value="; ".join(overall_bits) if overall_bits else "unavailable",
+                detail={
+                    "window": anomaly.window,
+                    "engine_version": anomaly.engine_version,
+                    "disclaimer": anomaly.disclaimer,
+                    "limitations": " | ".join(anomaly.limitations),
+                },
+            ),
+            anom_agent, *dict.fromkeys(anom_ids),
         )
 
     # ---- chlorophyll-a pixel-neighbourhood representativeness (Phase 9 Step 7; never feeds safety) ----

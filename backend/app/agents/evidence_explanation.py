@@ -24,7 +24,10 @@ from app.i18n.messages import (
 from app.models.conflict import Conflict, ConflictType
 from app.models.decision import DecisionResult, DecisionStatus
 from app.models.environmental import (
+    ANOMALY_CLASS_ABOVE,
+    ANOMALY_CLASS_BELOW,
     ComparisonDirection,
+    EnvironmentalAnomalyResult,
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalNeighbourhoodResult,
@@ -164,6 +167,7 @@ class ExplanationAgent:
         comparison: EnvironmentalComparisonResult | None = None,
         environmental_evidence: EnvironmentalEvidenceResult | None = None,
         stability: EnvironmentalStabilityResult | None = None,
+        anomaly: EnvironmentalAnomalyResult | None = None,
         neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
         research: ResearchResult | None = None,
         pfz: PfzReferenceResult | None = None,
@@ -185,6 +189,7 @@ class ExplanationAgent:
             comparison=comparison,
             environmental_evidence=environmental_evidence,
             stability=stability,
+            anomaly=anomaly,
             neighbourhood=neighbourhood,
             research=research,
             pfz=pfz,
@@ -247,7 +252,8 @@ class ExplanationAgent:
         context = json.dumps(
             _llm_context(language, understanding, decision, risk, suitability,
                          conflicts, route, fabric, productivity, comparison,
-                         environmental_evidence, stability, neighbourhood),
+                         environmental_evidence, stability, neighbourhood,
+                         anomaly=anomaly),
             ensure_ascii=False,
         )
         user = f"CONTEXT (authoritative, do not change):\n{context}\n\nExplain this decision."
@@ -265,7 +271,7 @@ class ExplanationAgent:
                 text, provenance=provenance, decision=decision, risk=risk,
                 suitability=suitability, route=route, environmental=productivity,
                 comparison=comparison, environmental_evidence=environmental_evidence,
-                stability=stability, neighbourhood=neighbourhood,
+                stability=stability, anomaly=anomaly, neighbourhood=neighbourhood,
             )
             contradiction = _contradicts_decision(text, decision)
             biological = (
@@ -273,9 +279,10 @@ class ExplanationAgent:
                 or comparison is not None
                 or environmental_evidence is not None
                 or stability is not None
+                or anomaly is not None
                 or neighbourhood is not None
             ) and _contains_biological_claim(
-                text, check_neighbourhood=neighbourhood is not None
+                text, check_neighbourhood=neighbourhood is not None or anomaly is not None
             )
             if report.grounded and not contradiction and not biological:
                 return Explanation(
@@ -321,6 +328,7 @@ def render_template(
     comparison: EnvironmentalComparisonResult | None = None,
     environmental_evidence: EnvironmentalEvidenceResult | None = None,
     stability: EnvironmentalStabilityResult | None = None,
+    anomaly: EnvironmentalAnomalyResult | None = None,
     neighbourhood: EnvironmentalNeighbourhoodResult | None = None,
     research: ResearchResult | None = None,
     pfz: PfzReferenceResult | None = None,
@@ -369,7 +377,7 @@ def render_template(
     if understanding is not None and understanding.intent is QueryIntent.ENVIRONMENTAL_CONDITIONS:
         return _render_environmental_intent(
             language, understanding, productivity, comparison,
-            environmental_evidence, stability, neighbourhood, notes,
+            environmental_evidence, stability, anomaly, neighbourhood, notes,
         )
 
     _render_simple_core(parts, language, decision, risk, fabric, advisory_clear, geofence_clear)
@@ -430,6 +438,19 @@ def render_template(
         ):
             parts.append(frag(language, "env_disclaimer"))
 
+    # ---- Environmental Anomaly Lens: recent-distribution position (Phase 9 Step 8) ----
+    if anomaly is not None and (
+        anomaly.sst is not None or anomaly.chlorophyll_a is not None
+    ):
+        _render_anomaly(parts, language, anomaly)
+        if (
+            productivity is None
+            and comparison is None
+            and environmental_evidence is None
+            and stability is None
+        ):
+            parts.append(frag(language, "env_disclaimer"))
+
     # ---- chlorophyll-a pixel-neighbourhood representativeness (Phase 9 Step 7) ----
     if neighbourhood is not None:
         _render_neighbourhood(parts, language, neighbourhood)
@@ -438,6 +459,7 @@ def render_template(
             and comparison is None
             and environmental_evidence is None
             and stability is None
+            and anomaly is None
         ):
             parts.append(frag(language, "env_disclaimer"))
 
@@ -850,7 +872,7 @@ _UNRESOLVED_LOCATION = "an unresolved location"
 
 def _render_environmental_intent(  # type: ignore[no-untyped-def]
     language, understanding, productivity, comparison, environmental_evidence,
-    stability, neighbourhood, notes,
+    stability, anomaly, neighbourhood, notes,
 ) -> Explanation:
     """A researcher's plain ``environmental_conditions`` question - current
     SST/chlorophyll-a, a 30-day comparison, bounded-window stability, a
@@ -909,6 +931,12 @@ def _render_environmental_intent(  # type: ignore[no-untyped-def]
         any_data = True
     if has_stability:
         _render_stability(parts, language, stability)
+        any_data = True
+    has_anomaly = anomaly is not None and (
+        anomaly.sst is not None or anomaly.chlorophyll_a is not None
+    )
+    if has_anomaly:
+        _render_anomaly(parts, language, anomaly)
         any_data = True
     if neighbourhood is not None:
         _render_neighbourhood(parts, language, neighbourhood)
@@ -1083,6 +1111,21 @@ def _render_research_intent(language, understanding, research, notes, conflicts=
             basis=research.anomaly.basis,
         ))
         finding_lines.append(frag(language, "research_hab_hypoxia_caution"))
+        # Phase 9 Step 8: the SAME deterministic Environmental Anomaly Lens
+        # percentile position, shown as ADDITIONAL descriptive context under
+        # the existing magnitude-jump finding above - it never replaces or
+        # changes that finding, and never upgrades it into a bloom/hypoxia
+        # claim (see `research_hab_hypoxia_caution` just above).
+        chl_anom = (
+            research.environmental_anomaly.chlorophyll_a
+            if research.environmental_anomaly is not None else None
+        )
+        if chl_anom is not None and chl_anom.status == "ok" and chl_anom.percentile is not None:
+            finding_lines.append(frag(
+                language, "research_finding_anomaly_percentile",
+                percentile=f"{chl_anom.percentile:.0f}",
+                median=_fmt_stat(chl_anom.median), unit=chl_anom.unit,
+            ))
         finding_added = True
     if research is not None and research.spatial_comparison is not None:
         # Sediment/shoreline questions ask about the seabed/coast, not about
@@ -1403,6 +1446,53 @@ def _render_stability(parts, language, stability) -> None:  # type: ignore[no-un
     parts.append(frag(language, "env_stab_note"))
 
 
+_ANOM_CLASS_KEY = {
+    ANOMALY_CLASS_BELOW: "env_anom_class_below",
+    ANOMALY_CLASS_ABOVE: "env_anom_class_above",
+}
+
+
+def _render_anomaly(parts, language, anomaly) -> None:  # type: ignore[no-untyped-def]
+    """Append deterministic "Environmental Anomaly Lens" sentences (EN / HI /
+    KN): the current value's percentile position within its own recent
+    bounded-window distribution, its quartiles, and a plain [Q1, Q3] band
+    classification. NEVER the word "anomalous"/"anomaly", a bloom, front,
+    plume, eddy, hotspot, trend, forecast or a fish / catch claim - a value
+    above the median is not itself unusual.
+    """
+    for a in (anomaly.sst, anomaly.chlorophyll_a):
+        if a is None:
+            continue
+        is_sst = a.variable == "sea_surface_temperature"
+        var_label = frag(language, "env_var_sst" if is_sst else "env_var_chl")
+
+        if a.status == "current_unavailable":
+            parts.append(frag(language, "env_anom_current_unavailable", var=var_label))
+            continue
+        if a.status == "insufficient_history" or a.percentile is None:
+            parts.append(
+                frag(language, "env_anom_insufficient", var=var_label, count=a.valid_count)
+            )
+            continue
+
+        parts.append(
+            frag(
+                language, "env_anom_result",
+                var=var_label, value=_fmt_stat(a.current_value), unit=a.unit,
+                percentile=f"{a.percentile:.0f}",
+                minimum=_fmt_stat(a.minimum), q1=_fmt_stat(a.q1),
+                median=_fmt_stat(a.median), q3=_fmt_stat(a.q3),
+                maximum=_fmt_stat(a.maximum),
+            )
+        )
+        parts.append(
+            frag(language, _ANOM_CLASS_KEY.get(a.classification, "env_anom_class_within"), var=var_label)
+        )
+        if a.coverage:
+            parts.append(frag(language, "env_anom_coverage", var=var_label, coverage=a.coverage))
+    parts.append(frag(language, "env_anom_note"))
+
+
 _VS_KEY = {
     "within": "env_nbhd_within",
     "above": "env_nbhd_above",
@@ -1493,7 +1583,7 @@ def _structured_notes(decision, risk, suitability, conflicts, route, alerts, fab
     }
 
 
-def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None, stability=None, neighbourhood=None) -> dict:  # type: ignore[no-untyped-def]
+def _llm_context(language, understanding, decision, risk, suitability, conflicts, route, fabric, productivity=None, comparison=None, environmental_evidence=None, stability=None, neighbourhood=None, anomaly=None) -> dict:  # type: ignore[no-untyped-def]
     ctx: dict = {"language": language.value if hasattr(language, "value") else str(language)}
     if understanding is not None:
         ctx["intent"] = understanding.intent.value
@@ -1683,6 +1773,48 @@ def _llm_context(language, understanding, decision, risk, suitability, conflicts
                 "rising/declining, forecast, seasonality, bloom, more/fewer fish, "
                 "better/worse fishing, catch or yield. A narrow spread is not "
                 "'safer fishing'; sparse coverage is not 'poor conditions'."
+            ),
+        }
+
+    if anomaly is not None and (
+        anomaly.sst is not None or anomaly.chlorophyll_a is not None
+    ):
+        def _anom_ctx(a):  # type: ignore[no-untyped-def]
+            if a is None:
+                return None
+            return {
+                "variable": a.variable,
+                "status": a.status,
+                "classification": a.classification,
+                "current_value": a.current_value,
+                "valid_count": a.valid_count,
+                "percentile": a.percentile,
+                "minimum": a.minimum,
+                "q1": a.q1,
+                "median": a.median,
+                "q3": a.q3,
+                "maximum": a.maximum,
+                "range": a.range,
+                "difference_from_median": a.difference_from_median,
+                "unit": a.unit,
+                "coverage": a.coverage,
+            }
+
+        ctx["environmental_anomaly"] = {
+            "sst": _anom_ctx(anomaly.sst),
+            "chlorophyll_a": _anom_ctx(anomaly.chlorophyll_a),
+            "window": anomaly.window,
+            "methodology": anomaly.methodology,
+            "limitations": list(anomaly.limitations),
+            "disclaimer": anomaly.disclaimer,
+            "note": (
+                "A descriptive statistical POSITION of the current observation "
+                "within its own recent bounded-window distribution. Restate the "
+                "given percentile/classification/quartiles only - do NOT compute "
+                "them. NEVER say anomalous, anomaly, bloom, front, plume, eddy, "
+                "hotspot, unusual biological event, more/fewer fish, better/worse "
+                "fishing, catch or yield. A value above the median is not itself "
+                "unusual."
             ),
         }
 

@@ -1096,3 +1096,315 @@ async def test_api_is_backward_compatible_and_hides_raw_series() -> None:
         message=FISHING_Q, session_id="s6-api-plain", now=NOW
     )
     assert plain.environmental is None
+
+
+# ==========================================================================
+# Phase 9 Step 8 - the Environmental Anomaly Lens + environmental_anomaly node
+# ==========================================================================
+# Deterministic recent-distribution PERCENTILE POSITION of the CURRENT SST /
+# chlorophyll-a observation, reusing the SAME accepted Step 4/6 series the
+# stability node already consumes (0 additional HTTP calls). It is a
+# researcher-facing statistical description ONLY - NOT a scientific
+# anomaly-event claim, a bloom / front / plume / eddy / hotspot, and NOT a
+# fishing-suitability signal. It must NEVER enter the safety chain.
+ANOMALY_Q = (
+    "Is the current sea surface temperature unusual compared with the last "
+    "30 days near Mangalore?"
+)
+
+
+def _anom_pipeline(**kw):
+    kw.setdefault("weather", FakeWeatherAgent())
+    kw.setdefault("ocean", _ocean_with_sst(29.1))
+    kw.setdefault("environment", FakeEnvironmentalAgent(1.8))
+    kw.setdefault(
+        "historical_environment_agent",
+        FakeHistoricalEnvironmentalAgent(sst=27.9, chl=1.1),
+    )
+    return make_pipeline(**kw)
+
+
+async def test_safety_chain_byte_identical_with_anomaly_enabled_disabled_failing() -> None:
+    """MANDATORY Step 8 regression: enabling / disabling / failing the anomaly
+    engine must produce byte-identical risk / safety / decision / route
+    output, for both a plain fishing query and the anomaly-lens query."""
+
+    class BoomAnomaly:
+        version = "environmental-anomaly-0.1.0"
+
+        def assess(self, _inputs):
+            raise RuntimeError("anomaly engine exploded")
+
+    for q, tag in ((FISHING_Q, "fish"), (ANOMALY_Q, "anom")):
+        runs = {
+            "off": _anom_pipeline(anomaly_engine=None),
+            "on": _anom_pipeline(),
+            "raises": _anom_pipeline(anomaly_engine=BoomAnomaly()),
+        }
+        results = {
+            n: await p.run(message=q, session_id=f"s8-{tag}-{n}", now=NOW)
+            for n, p in runs.items()
+        }
+        baseline = _safety_chain_snapshot(results["off"])
+        for n, r in results.items():
+            assert _safety_chain_snapshot(r) == baseline, f"safety chain moved for {tag}/{n}"
+
+
+async def test_anomaly_present_for_the_anomaly_lens_query_absent_otherwise() -> None:
+    r_anom = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-anom", now=NOW)
+    assert r_anom.environmental is not None
+    assert r_anom.environmental.anomaly is not None
+    assert "environmental_anomaly" in r_anom.agent_trace
+
+    # a non-comparative environmental query -> no anomaly block (existing
+    # clients unaffected), but the environmental block itself still appears.
+    r_plain = await _anom_pipeline().run(message=ENV_Q, session_id="s8-plain", now=NOW)
+    assert r_plain.environmental is not None
+    assert r_plain.environmental.anomaly is None
+    assert "environmental_anomaly:skip" in r_plain.agent_trace
+
+
+async def test_anomaly_runs_strictly_downstream_of_decision_and_stability() -> None:
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-order", now=NOW)
+    trace = r.agent_trace
+    assert "decision" in trace and "environmental_anomaly" in trace
+    assert trace.index("decision") < trace.index("environmental_anomaly")
+    assert trace.index("environmental_stability") < trace.index("environmental_anomaly")
+    assert trace.index("environmental_anomaly") < trace.index("provenance")
+
+
+async def test_anomaly_engine_failure_is_nonblocking() -> None:
+    class BoomAnomaly:
+        version = "x"
+
+        def assess(self, _inputs):
+            raise RuntimeError("boom")
+
+    r = await _anom_pipeline(anomaly_engine=BoomAnomaly()).run(
+        message=ANOMALY_Q, session_id="s8-boom", now=NOW
+    )
+    assert r.status == "OK"
+    assert r.decision is not None
+    assert r.environmental is not None
+    assert r.environmental.anomaly is None
+
+
+async def test_anomaly_never_mutates_suitability_risk_decision_route() -> None:
+    without = await _anom_pipeline(anomaly_engine=None).run(
+        message=FISHING_Q, session_id="s8-mut-off", now=NOW
+    )
+    with_anom = await _anom_pipeline().run(
+        message=FISHING_Q, session_id="s8-mut-on", now=NOW
+    )
+    assert (with_anom.suitability and (with_anom.suitability.level, with_anom.suitability.score)) == \
+           (without.suitability and (without.suitability.level, without.suitability.score))
+    assert _decision_snapshot(with_anom) == _decision_snapshot(without)
+
+
+def test_risk_engine_input_has_no_anomaly_fields() -> None:
+    fields = set(RiskEngineInput.model_fields)
+    for bad in (
+        "anomaly", "percentile", "classification", "anomaly_lens",
+        "environmental_anomaly", "difference_from_median",
+    ):
+        assert bad not in fields
+
+
+async def test_risk_safety_decision_route_do_not_consume_anomaly() -> None:
+    """The safety-chain nodes must receive identical inputs whether or not the
+    anomaly engine ran, and never read the anomaly result from state."""
+    seen: list = []
+
+    def _capture(pipe):
+        orig = pipe.deps.risk_engine.evaluate
+
+        def wrapper(data):
+            seen.append((data.wave_height_m, data.wind_speed_ms,
+                         data.min_pressure_hpa, data.weather_codes))
+            return orig(data)
+
+        pipe.deps.risk_engine.evaluate = wrapper  # type: ignore[assignment]
+        return pipe
+
+    await _capture(_anom_pipeline(anomaly_engine=None)).run(
+        message=ANOMALY_Q, session_id="s8-cap1", now=NOW
+    )
+    await _capture(_anom_pipeline()).run(
+        message=ANOMALY_Q, session_id="s8-cap2", now=NOW
+    )
+    assert len(seen) == 2 and seen[0] == seen[1]
+
+    import pathlib
+
+    nodes_src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "orchestration" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    for fn in ("risk_node", "policy_node", "decision_node", "route_node"):
+        body = nodes_src.split(f"async def {fn}", 1)[1].split("async def ", 1)[0]
+        assert "environmental_anomaly" not in body, f"{fn} references environmental_anomaly"
+
+
+def test_anomaly_modules_do_not_import_the_safety_chain() -> None:
+    import ast as _ast
+    import pathlib as _pl
+
+    targets = [
+        _pl.Path(__file__).resolve().parents[1] / "app" / "environmental" / "anomaly.py",
+    ]
+    banned = ("app.policy", "app.risk.engine", "app.decision", "app.routing", "app.safety")
+    for py in targets:
+        tree = _ast.parse(py.read_text(encoding="utf-8"))
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.ImportFrom) and node.module:
+                assert not any(node.module.startswith(b) for b in banned), \
+                    f"{py.name} imports {node.module}"
+
+
+def test_no_additional_http_calls_added_by_step8() -> None:
+    """The anomaly node performs NO network I/O: anomaly.py imports no HTTP
+    client and the node awaits no fetch / query / fetch_reference."""
+    import ast
+    import pathlib
+
+    an = pathlib.Path(__file__).resolve().parents[1] / "app" / "environmental" / "anomaly.py"
+    tree = ast.parse(an.read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name.split(".")[0] for a in node.names)
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    for banned in ("httpx", "requests", "aiohttp", "urllib3"):
+        assert banned not in imported, f"anomaly.py imports {banned}"
+
+    nodes_src = (
+        pathlib.Path(__file__).resolve().parents[1] / "app" / "orchestration" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    body = nodes_src.split("async def environmental_anomaly_node", 1)[1].split("async def ", 1)[0]
+    assert "fetch(" not in body and ".query(" not in body
+    assert "fetch_reference" not in body
+
+
+def test_anomaly_module_has_no_llm_dependency() -> None:
+    code = (
+        "import sys, app.environmental.anomaly;"
+        "bad=[m for m in sys.modules if m.split('.')[0] in "
+        "('groq','langgraph','langchain','langchain_core','openai','anthropic','ollama')];"
+        "print('BAD' if bad else 'CLEAN', bad)"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    assert out.startswith("CLEAN"), out
+
+
+async def test_anomaly_provenance_traces_to_root_and_is_the_right_kind() -> None:
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-prov", now=NOW)
+    nodes = r.provenance.get("nodes", [])
+    anom_nodes = [n for n in nodes if n.get("kind") == "environmental_anomaly"]
+    assert anom_nodes, "no environmental_anomaly provenance node"
+    ids = {n["id"] for n in nodes}
+    assert "assessment:environment_anomaly" in ids
+    assert "agent:environment_anomaly" in ids
+
+    root = r.provenance.get("root_id", "query")
+    incoming: dict[str, list[str]] = {}
+    for e in r.provenance.get("edges", []):
+        incoming.setdefault(e["dst"], []).append(e["src"])
+
+    def traces(nid: str) -> bool:
+        seen, stack = set(), [nid]
+        while stack:
+            cur = stack.pop()
+            if cur == root:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            stack.extend(incoming.get(cur, []))
+        return False
+
+    for n in nodes:
+        assert traces(n["id"]), f"provenance node {n['id']} is orphaned"
+
+
+async def test_anomaly_numbers_in_answer_are_grounded() -> None:
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-ground", now=NOW)
+    assert r.environmental.anomaly is not None
+    assert r.grounded is True
+
+
+async def test_anomaly_answer_makes_no_biological_trend_or_forecast_claim() -> None:
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-nobio", now=NOW)
+    low = r.answer.lower()
+    for bad in (
+        "more fish", "fewer fish", "better fishing", "worse fishing",
+        "higher catch", "lower catch", "yield", "bloom", "front", "plume",
+        "eddy", "hotspot", "anomalous", "confirmed anomaly", "harmful algal",
+        "rising trend", "declining trend", "trending up", "trending down",
+        "safer fishing", "fish abundance",
+    ):
+        assert bad not in low
+
+
+async def test_anomaly_never_calls_it_anomalous_only_a_recent_distribution_position() -> None:
+    """Section 9 requirement: a value merely above/below the median is never
+    itself labelled 'anomalous' - only a conservative [Q1, Q3] band word."""
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-conservative", now=NOW)
+    a = r.environmental.anomaly
+    assert a is not None and a.sst is not None
+    assert a.sst.classification in (
+        "below_recent_range", "within_recent_distribution", "above_recent_range",
+    )
+
+
+async def test_anomaly_missing_current_chl_reports_unavailable_honestly() -> None:
+    r = await _anom_pipeline(environment=FakeEnvironmentalAgent(None)).run(
+        message=ANOMALY_Q, session_id="s8-chl-missing", now=NOW
+    )
+    a = r.environmental.anomaly
+    assert a is not None
+    assert a.chlorophyll_a is not None
+    assert a.chlorophyll_a.status == "current_unavailable"
+    assert a.chlorophyll_a.percentile is None
+
+
+async def test_existing_researcher_queries_still_route_correctly_with_anomaly_enabled() -> None:
+    """Section 17/28 regression: adding the anomaly lens must not steal or
+    change the meaning of the existing environmental research questions."""
+    cases = [
+        ("current conditions", ENV_Q),
+        ("30-day comparison", CMP_Q),
+        ("stability", STABILITY_Q),
+        ("evidence", EVIDENCE_Q),
+    ]
+    for label, q in cases:
+        r = await _anom_pipeline().run(message=q, session_id=f"s8-regress-{label}", now=NOW)
+        assert r.status == "OK", label
+        assert r.environmental is not None, label
+
+    # the operational fisherman safety workflow is entirely unaffected
+    r_fish = await _anom_pipeline().run(
+        message=FISHING_Q, session_id="s8-regress-fish", now=NOW
+    )
+    assert r_fish.decision is not None
+    assert r_fish.decision.status in (
+        "PROCEED", "PROCEED_WITH_CAUTION", "NO_SAFE_RECOMMENDATION", "DO_NOT_PROCEED",
+    )
+
+
+async def test_api_hides_no_new_raw_series_and_stays_additive() -> None:
+    r = await _anom_pipeline().run(message=ANOMALY_Q, session_id="s8-api", now=NOW)
+    dumped = r.model_dump()
+    env = dumped["environmental"]
+    assert "anomaly" in env  # additive field present
+    anom = env["anomaly"]
+    blob = repr(anom)
+    for leaked in ("observed_at", "ReferenceSeriesPoint", "sst_series", "chl_series"):
+        assert leaked not in blob
+
+    # a response without any environmental intelligence still validates and omits it
+    plain = await make_pipeline(weather=FakeWeatherAgent(), ocean=FakeOceanAgent()).run(
+        message=FISHING_Q, session_id="s8-api-plain", now=NOW
+    )
+    assert plain.environmental is None

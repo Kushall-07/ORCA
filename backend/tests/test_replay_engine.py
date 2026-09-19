@@ -170,6 +170,49 @@ def test_snapshot_matches_a_direct_live_chain_run_at_that_hour() -> None:
     assert snap.decision == decision.status
 
 
+# ---- per-snapshot factor breakdown + safety rule labels (additive) -------
+def test_snapshot_factors_mirror_the_live_risk_result_verbatim() -> None:
+    """ReplaySnapshot.factors must carry the SAME RiskResult.factors this
+    timestamp's live RiskEngine.evaluate produced - no recomputation, no
+    invented factor."""
+    hrs = _hours(1)
+    weather = _weather([(hrs[0], {"wind_speed": 9.0})])
+    ocean = _ocean([(hrs[0], {"wave_height": 2.4})])
+    baseline = _baseline()
+    result = build_replay(weather=weather, ocean=ocean, baseline_risk_input=baseline, risk_engine=ENGINE)
+    assert result is not None
+    snap = result.snapshots[0]
+
+    expected_input = baseline.model_copy(
+        update={"wave_height_m": 2.4, "wind_speed_ms": 9.0, "min_pressure_hpa": None,
+                "weather_codes": None, "evidence": ()}
+    )
+    risk = ENGINE.evaluate(expected_input)
+    assert len(snap.factors) == len(risk.factors)
+    for got, want in zip(snap.factors, risk.factors):
+        assert got.name == want.name
+        assert got.contribution == round(want.contribution or 0.0, 2)
+
+
+def test_snapshot_triggered_rule_labels_are_human_readable() -> None:
+    """triggered_rule_labels must be the SAME SAFETY_TRIGGER_LABELS lookup used
+    for DecisionChangeExplanation.safety_trigger - never a raw rule id, never
+    an invented label."""
+    from app.replay.models import SAFETY_TRIGGER_LABELS
+
+    hrs = _hours(1)
+    weather = _weather([(hrs[0], {"wind_speed": 25.0})])
+    ocean = _ocean([(hrs[0], {"wave_height": 6.0})])
+    baseline = _baseline(geofence_result=_geofence(inside_hard=True))
+    result = build_replay(weather=weather, ocean=ocean, baseline_risk_input=baseline, risk_engine=ENGINE)
+    assert result is not None
+    snap = result.snapshots[0]
+    assert snap.triggered_rules
+    assert len(snap.triggered_rule_labels) == len(snap.triggered_rules)
+    for rule_id, label in zip(snap.triggered_rules, snap.triggered_rule_labels):
+        assert label == SAFETY_TRIGGER_LABELS.get(rule_id, rule_id)
+
+
 # ---- decision transitions -------------------------------------------------
 def test_decision_transitions_proceed_to_caution_to_do_not_proceed() -> None:
     hrs = _hours(3)

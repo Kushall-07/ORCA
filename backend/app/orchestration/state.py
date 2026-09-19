@@ -17,6 +17,7 @@ from app.models.common import Coordinate
 from app.models.conflict import Conflict
 from app.models.decision import DecisionResult
 from app.models.environmental import (
+    EnvironmentalAnomalyResult,
     EnvironmentalComparisonResult,
     EnvironmentalEvidenceResult,
     EnvironmentalNeighbourhoodResult,
@@ -168,6 +169,12 @@ class OrcaGraphState(TypedDict, total=False):
     # one extra batched HTTP request; downstream-only research context; never
     # feeds the safety chain, the fabric, fusion, arbitration or evidence[].
     environmental_neighbourhood: EnvironmentalNeighbourhoodResult | None
+    # Phase 9 Step 8: deterministic Environmental Anomaly Lens (recent-
+    # distribution percentile position). Consumes ONLY the SAME accepted raw
+    # series the stability profile above already carries - zero additional
+    # HTTP calls; downstream-only research context; never feeds the safety
+    # chain, the fabric, fusion, arbitration or evidence[].
+    environmental_anomaly: EnvironmentalAnomalyResult | None
     # Marine Researcher / Oceanographer analytical support (see
     # app.orchestration.nodes.research_node / app.research.*). Downstream-only
     # research context - reuses the SAME SST/chlorophyll-a data the Phase 9

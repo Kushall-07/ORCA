@@ -3,6 +3,9 @@ import type { GeolocationState } from "../../hooks/useGeolocation";
 import type { PfzLandingCentreInfo } from "../../types/api";
 
 export interface SelectedPfz {
+  // PFZ/reference id, only when the clicked feature's own properties carry
+  // one (see WorkspacePage.onSelectPfz) - never fabricated when absent.
+  id?: string;
   lat: number;
   lon: number;
   state?: string;
@@ -50,7 +53,7 @@ export function GpsControl({ gps }: { gps: GeolocationState }) {
   );
 }
 
-export function PfzSelectionCard({
+function SinglePfzSelectionCard({
   selection,
   landingCentre,
   canNavigate,
@@ -58,11 +61,6 @@ export function PfzSelectionCard({
   onClear,
 }: {
   selection: SelectedPfz;
-  /** The current query's nearest official INCOIS landing-centre reference
-   * (already fetched for the response, see `pfz_reference`). Only shown when
-   * its sector matches the selected PFZ's sector, so figures relative to one
-   * coastal landing centre are never attached to a zone in a different
-   * sector. Every field is projected as-is - never fabricated or inferred. */
   landingCentre?: PfzLandingCentreInfo | null;
   canNavigate: boolean;
   onNavigate: () => void;
@@ -151,6 +149,98 @@ export function PfzSelectionCard({
         disabled={!canNavigate}
       >
         {t("pfz.navigate")}
+      </button>
+      {!canNavigate && <p className="pfz-selection-card__note">{t("gps.unavailable")}</p>}
+    </div>
+  );
+}
+
+/**
+ * Selected-PFZ-reference(s) card (Phase C, extended for multi-PFZ routing).
+ * Exactly one selection keeps the original single-PFZ layout (landing-centre
+ * detail, "Navigate to this PFZ") unchanged; more than one switches to a
+ * compact list (each entry individually removable) with a single "route
+ * through all" action, since a per-PFZ landing-centre detail card would not
+ * scale to several selections at once.
+ */
+export function PfzSelectionCard({
+  selections,
+  landingCentre,
+  canNavigate,
+  onNavigate,
+  onRemove,
+  onClear,
+}: {
+  selections: SelectedPfz[];
+  /** The current query's nearest official INCOIS landing-centre reference
+   * (already fetched for the response, see `pfz_reference`). Only shown for
+   * a single selection, and only when its sector matches - see
+   * SinglePfzSelectionCard. Every field is projected as-is - never
+   * fabricated or inferred. */
+  landingCentre?: PfzLandingCentreInfo | null;
+  canNavigate: boolean;
+  onNavigate: () => void;
+  /** Remove one selection by index - multi-selection only. */
+  onRemove: (index: number) => void;
+  onClear: () => void;
+}) {
+  const { t } = useI18n();
+
+  if (selections.length === 1) {
+    return (
+      <SinglePfzSelectionCard
+        selection={selections[0]}
+        landingCentre={landingCentre}
+        canNavigate={canNavigate}
+        onNavigate={onNavigate}
+        onClear={onClear}
+      />
+    );
+  }
+
+  return (
+    <div className="pfz-selection-card pfz-selection-card--multi">
+      <div className="pfz-selection-card__head">
+        <strong>{t("pfz.selectedTitleMulti", { count: selections.length })}</strong>
+        <button
+          type="button"
+          className="btn btn--ghost btn--small"
+          onClick={onClear}
+          aria-label={t("pfz.clearSelection")}
+        >
+          ×
+        </button>
+      </div>
+      <ol className="pfz-selection-card__list">
+        {selections.map((s, i) => (
+          <li key={`${s.lat},${s.lon}`} className="pfz-selection-card__list-item">
+            <span className="pfz-selection-card__list-index">{i + 1}</span>
+            <span className="pfz-selection-card__coords">
+              {Math.abs(s.lat).toFixed(2)}°{s.lat >= 0 ? "N" : "S"},{" "}
+              {Math.abs(s.lon).toFixed(2)}°{s.lon >= 0 ? "E" : "W"}
+              {(s.state || s.day) &&
+                ` — ${[s.state, s.day ? `day ${s.day}` : null].filter(Boolean).join(" · ")}`}
+            </span>
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => onRemove(i)}
+              aria-label={t("pfz.removeSelection", { n: i + 1 })}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ol>
+      <p className="pfz-selection-card__source">{t("pfz.officialSource")}</p>
+      <p className="pfz-selection-card__note">{t("pfz.notSafetyNote")}</p>
+      <button
+        type="button"
+        className="btn btn--primary btn--small"
+        onClick={onNavigate}
+        disabled={!canNavigate}
+      >
+        {t("pfz.navigateMulti", { count: selections.length })}
       </button>
       {!canNavigate && <p className="pfz-selection-card__note">{t("gps.unavailable")}</p>}
     </div>
