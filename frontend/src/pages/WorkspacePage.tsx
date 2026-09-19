@@ -7,7 +7,7 @@ import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useTour } from "../hooks/useTour";
 import { getStakeholder, type StakeholderId } from "../stakeholders";
-import type { BaselineRouteResult, GeoJsonFeatureCollection } from "../types/api";
+import type { BaselineRouteResult, GeoJsonFeatureCollection, QueryResponse } from "../types/api";
 import {
   ApiError,
   fetchEnvironmentalSuitabilityLayer,
@@ -46,6 +46,7 @@ import { RouteComparisonPanel } from "../components/route/RouteComparisonPanel";
 import { TripPlannerPanel } from "../components/trip/TripPlannerPanel";
 import { ExportEvidenceButton } from "../components/evidence/ExportEvidenceButton";
 import { ReportView } from "../components/report/ReportView";
+import { AuthorityDashboard } from "../dashboard/AuthorityDashboard";
 import {
   buildLayerToggles,
   DataTierLegend,
@@ -69,12 +70,14 @@ export default function WorkspacePage() {
     () => new Set(getStakeholder("fisherman").defaultLayers as LayerId[]),
   );
 
-  // Two distinct application modes (see WorkspaceNav / OrcaSidebar): Workspace
-  // (map + Ask ORCA, horizontal nav) is the entry point; Assessment (vertical
-  // sidebar, one section at a time) takes over once a response exists.
-  const [mode, setMode] = useState<"workspace" | "assessment">("workspace");
+  // Three application modes (see WorkspaceNav / OrcaSidebar): Workspace (map +
+  // Ask ORCA, horizontal nav) is the entry point; Assessment (vertical
+  // sidebar, one section at a time) takes over once a response exists;
+  // Authority (Milestone 5) is the coastal-operations overview, reachable
+  // independently of any query.
+  const [mode, setMode] = useState<"workspace" | "assessment" | "authority">("workspace");
 
-  const { messages, latest, loading, send, retry, clear } = useOrcaQuery({
+  const { messages, latest, loading, send, retry, clear, openExternal } = useOrcaQuery({
     stakeholder,
     language: lang,
   });
@@ -356,6 +359,21 @@ export default function WorkspacePage() {
     [latest, gis.manifest],
   );
 
+  // Milestone 5 - "Open Today View" / "Plan Trip" / "View System" / "View
+  // Execution Trace" from the Authority dashboard: promotes that location's
+  // already-fetched QueryResponse into this session as the latest turn (see
+  // useOrcaQuery.openExternal) and jumps straight to the requested existing
+  // section - never a second decision UI.
+  const onOpenAuthorityLocation = (
+    detail: QueryResponse,
+    page: AssessmentSection,
+    label: string,
+  ) => {
+    openExternal(detail, label);
+    setPage(page);
+    setMode("assessment");
+  };
+
   const onToggleLayer = (id: LayerId) => {
     setActiveLayers((prev) => {
       const next = new Set(prev);
@@ -376,10 +394,29 @@ export default function WorkspacePage() {
       />
       <TourOverlay tour={tour} />
 
-      {mode === "workspace" ? (
+      {mode === "authority" ? (
         <div className="workspace__shell">
           <WorkspaceNav
+            active="authority"
             sectionsEnabled={!!latest}
+            onNavigateChat={() => setMode("workspace")}
+            onNavigateAuthority={() => setMode("authority")}
+            onNavigate={(p) => {
+              setPage(p);
+              setMode("assessment");
+            }}
+          />
+          <div className="authority__shell">
+            <AuthorityDashboard onOpenLocation={onOpenAuthorityLocation} />
+          </div>
+        </div>
+      ) : mode === "workspace" ? (
+        <div className="workspace__shell">
+          <WorkspaceNav
+            active="chat"
+            sectionsEnabled={!!latest}
+            onNavigateChat={() => setMode("workspace")}
+            onNavigateAuthority={() => setMode("authority")}
             onNavigate={(p) => {
               setPage(p);
               setMode("assessment");
@@ -444,6 +481,7 @@ export default function WorkspacePage() {
             onNavigate={setPage}
             reportEnabled={!!latest}
             onReturnToWorkspace={() => setMode("workspace")}
+            onNavigateAuthority={() => setMode("authority")}
           />
 
           <main className="assessment__content">

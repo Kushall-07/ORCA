@@ -2,15 +2,23 @@ import { useI18n } from "../../i18n";
 import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, type AssessmentSection } from "./navItems";
 
 /**
- * Workspace-mode horizontal navigation. "Ask ORCA" marks the current
- * (Workspace) context; the remaining items are entry points straight into
- * Assessment mode at that section, only live once a response exists to show.
+ * Horizontal top navigation, shared by Workspace mode and Authority mode
+ * (Milestone 5). `active` marks whichever of those two top-level
+ * destinations the caller currently renders; the other one - and "System" /
+ * the per-query sections - are always plain entry points. The per-query
+ * sections stay disabled until a response exists to show.
  */
 export function WorkspaceNav({
+  active,
   sectionsEnabled,
+  onNavigateChat,
+  onNavigateAuthority,
   onNavigate,
 }: {
+  active: "chat" | "authority";
   sectionsEnabled: boolean;
+  onNavigateChat: () => void;
+  onNavigateAuthority: () => void;
   onNavigate: (page: AssessmentSection) => void;
 }) {
   const { t } = useI18n();
@@ -24,9 +32,26 @@ export function WorkspaceNav({
 
       <ul className="top-nav__list">
         <li>
-          <span className="top-nav__item is-active" aria-current="page">
-            {t("chat.title")}
-          </span>
+          {active === "chat" ? (
+            <span className="top-nav__item is-active" aria-current="page">
+              {t("chat.title")}
+            </span>
+          ) : (
+            <button type="button" className="top-nav__item" onClick={onNavigateChat}>
+              {t("chat.title")}
+            </button>
+          )}
+        </li>
+        <li>
+          {active === "authority" ? (
+            <span className="top-nav__item is-active" aria-current="page">
+              {t("nav.authority")}
+            </span>
+          ) : (
+            <button type="button" className="top-nav__item" onClick={onNavigateAuthority}>
+              {t("nav.authority")}
+            </button>
+          )}
         </li>
         <li>
           {/* Always enabled - the Engine Room explains the architecture and

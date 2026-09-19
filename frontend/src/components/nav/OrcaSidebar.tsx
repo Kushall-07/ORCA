@@ -15,11 +15,13 @@ export function OrcaSidebar({
   onNavigate,
   reportEnabled,
   onReturnToWorkspace,
+  onNavigateAuthority,
 }: {
   page: AssessmentSection;
   onNavigate: (page: AssessmentSection) => void;
   reportEnabled: boolean;
   onReturnToWorkspace: () => void;
+  onNavigateAuthority: () => void;
 }) {
   const { t } = useI18n();
 
@@ -39,6 +41,11 @@ export function OrcaSidebar({
       </button>
 
       <ul className="sidebar__nav">
+        <li>
+          <button type="button" className="sidebar__item" onClick={onNavigateAuthority}>
+            {t("nav.authority")}
+          </button>
+        </li>
         <li>
           <button
             type="button"

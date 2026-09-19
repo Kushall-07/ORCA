@@ -7,6 +7,7 @@ friends are added in Phase 5.
 
 from fastapi import APIRouter
 
+from app.api.authority import router as authority_router
 from app.api.gis import router as gis_router
 from app.api.health import router as health_router
 from app.api.query import router as query_router
@@ -21,5 +22,6 @@ api_router.include_router(gis_router)
 api_router.include_router(whatif_router)
 api_router.include_router(replay_router)
 api_router.include_router(route_compare_router)
+api_router.include_router(authority_router)
 
 __all__ = ["api_router"]

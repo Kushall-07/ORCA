@@ -35,6 +35,13 @@ export interface UseOrcaQuery {
   send: (text: string, coords?: QueryCoordinateOverride) => Promise<void>;
   retry: () => Promise<void>;
   clear: () => void;
+  /** Milestone 5 - promotes an already-fetched QueryResponse (e.g. one
+   * location's decision from the Authority dashboard) into this session as
+   * the latest turn, so the existing Today / Trip / Evidence / Replay /
+   * System views (all keyed to `latest`) work for it unchanged. Appends a
+   * synthetic user/orca turn pair, reusing the exact mechanism a real chat
+   * turn uses - no separate "external response" state. */
+  openExternal: (response: QueryResponse, label?: string) => void;
   sessionId: string;
 }
 
@@ -143,6 +150,16 @@ export function useOrcaQuery(opts: {
     lastQuery.current = null;
   }, []);
 
+  const openExternal = useCallback((response: QueryResponse, label?: string) => {
+    setMessages((prev) => [
+      ...prev,
+      ...(label
+        ? [{ id: nextId(), role: "user" as const, text: label, ts: Date.now() }]
+        : []),
+      { id: nextId(), role: "orca" as const, text: response.answer, response, ts: Date.now() },
+    ]);
+  }, []);
+
   const latest = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].response) return messages[i].response!;
@@ -150,5 +167,5 @@ export function useOrcaQuery(opts: {
     return null;
   }, [messages]);
 
-  return { messages, latest, loading, error, send, retry, clear, sessionId };
+  return { messages, latest, loading, error, send, retry, clear, openExternal, sessionId };
 }

@@ -568,7 +568,66 @@ export type StringKey =
   | "common.collapse"
   | "common.print"
   | "common.close"
-  | "common.na";
+  | "common.na"
+  | "nav.authority"
+  | "authority.title"
+  | "authority.subtitle"
+  | "authority.dataEdition.live"
+  | "authority.dataEdition.demo"
+  | "authority.edition.live"
+  | "authority.edition.demo"
+  | "authority.updated"
+  | "authority.refresh"
+  | "authority.loading"
+  | "authority.error"
+  | "authority.retry"
+  | "authority.locationsMonitored"
+  | "authority.activeWarnings"
+  | "authority.statusDistribution"
+  | "authority.map"
+  | "authority.mapLegend"
+  | "authority.attentionRequired"
+  | "authority.noAttention"
+  | "authority.locations"
+  | "authority.locationsTable.location"
+  | "authority.locationsTable.status"
+  | "authority.locationsTable.warning"
+  | "authority.locationsTable.data"
+  | "authority.locationsTable.updated"
+  | "authority.warnings"
+  | "authority.noWarnings"
+  | "authority.dataHealth"
+  | "authority.dataHealth.weather"
+  | "authority.dataHealth.marine"
+  | "authority.noLocations"
+  | "authority.noLocationsHint"
+  | "authority.selectLocation"
+  | "authority.detail.wave"
+  | "authority.detail.wind"
+  | "authority.detail.warnings"
+  | "authority.detail.geofence"
+  | "authority.detail.dataConfidence"
+  | "authority.detail.decision"
+  | "authority.detail.evidence"
+  | "authority.detail.evidenceSources"
+  | "authority.detail.openToday"
+  | "authority.detail.planTrip"
+  | "authority.detail.viewSystem"
+  | "authority.detail.viewTrace"
+  | "authority.detail.viewReplay"
+  | "authority.detail.exportEvidence"
+  | "authority.detail.source"
+  | "authority.detail.derivedSource"
+  | "authority.geofence.clear"
+  | "authority.geofence.inside"
+  | "authority.geofence.unavailable"
+  | "authority.attentionCategory.official_warning"
+  | "authority.attentionCategory.extreme"
+  | "authority.attentionCategory.high"
+  | "authority.attentionCategory.blocked"
+  | "authority.attentionCategory.geofence"
+  | "authority.attentionCategory.data_quality"
+  | "authority.attentionCategory.unavailable";
 
 type Table = Record<StringKey, string>;
 
@@ -1177,6 +1236,67 @@ const en: Table = {
   "common.print": "Print / export",
   "common.close": "Close",
   "common.na": "n/a",
+
+  // Milestone 5 - Authority / Operational Intelligence Dashboard
+  "nav.authority": "Authority",
+  "authority.title": "Coastal Operations",
+  "authority.subtitle": "Operational overview across monitored coastal locations",
+  "authority.dataEdition.live": "LIVE",
+  "authority.dataEdition.demo": "DEMO DATA",
+  "authority.edition.live": "Live",
+  "authority.edition.demo": "Demo data",
+  "authority.updated": "Updated {time}",
+  "authority.refresh": "Refresh",
+  "authority.loading": "Loading coastal operations…",
+  "authority.error": "Could not load the coastal operational overview.",
+  "authority.retry": "Retry",
+  "authority.locationsMonitored": "Locations monitored",
+  "authority.activeWarnings": "Active warnings",
+  "authority.statusDistribution": "Current Conditions",
+  "authority.map": "Operational Map",
+  "authority.mapLegend": "Status",
+  "authority.attentionRequired": "Attention Required",
+  "authority.noAttention": "No locations currently need attention.",
+  "authority.locations": "Locations",
+  "authority.locationsTable.location": "Location",
+  "authority.locationsTable.status": "Status",
+  "authority.locationsTable.warning": "Warning",
+  "authority.locationsTable.data": "Data",
+  "authority.locationsTable.updated": "Updated",
+  "authority.warnings": "Official Warnings",
+  "authority.noWarnings": "No active official warnings.",
+  "authority.dataHealth": "Data Health",
+  "authority.dataHealth.weather": "Weather",
+  "authority.dataHealth.marine": "Marine",
+  "authority.noLocations": "No operational locations available.",
+  "authority.noLocationsHint": "ORCA could not evaluate any curated coastal location right now.",
+  "authority.selectLocation": "Select a location for details",
+  "authority.detail.wave": "Wave",
+  "authority.detail.wind": "Wind",
+  "authority.detail.warnings": "Warnings",
+  "authority.detail.geofence": "Geofence",
+  "authority.detail.dataConfidence": "Data confidence",
+  "authority.detail.decision": "Decision",
+  "authority.detail.evidence": "Evidence",
+  "authority.detail.evidenceSources": "{count} sources",
+  "authority.detail.openToday": "Open Today View",
+  "authority.detail.planTrip": "Plan Trip",
+  "authority.detail.viewSystem": "View System",
+  "authority.detail.viewTrace": "View Execution Trace",
+  "authority.detail.viewReplay": "Decision Replay",
+  "authority.detail.exportEvidence": "Export Evidence",
+  "authority.detail.source": "Source",
+  "authority.detail.derivedSource": "ORCA deterministic rule",
+  "authority.geofence.clear": "No current violation",
+  "authority.geofence.inside": "Inside restricted area",
+  "authority.geofence.unavailable": "Unavailable",
+  "authority.attentionCategory.official_warning": "Official warning",
+  "authority.attentionCategory.extreme": "Extreme risk",
+  "authority.attentionCategory.high": "High risk",
+  "authority.attentionCategory.blocked": "Blocked",
+  "authority.attentionCategory.geofence": "Geofence",
+  "authority.attentionCategory.data_quality": "Data quality",
+  "authority.attentionCategory.unavailable": "Unavailable",
 };
 
 const hi: Table = {
@@ -1783,6 +1903,67 @@ const hi: Table = {
   "common.print": "प्रिंट / निर्यात",
   "common.close": "बंद करें",
   "common.na": "उपलब्ध नहीं",
+
+  // Milestone 5 - Authority / Operational Intelligence Dashboard
+  "nav.authority": "प्राधिकरण",
+  "authority.title": "तटीय संचालन",
+  "authority.subtitle": "निगरानी किए गए तटीय स्थानों का परिचालन अवलोकन",
+  "authority.dataEdition.live": "लाइव",
+  "authority.dataEdition.demo": "डेमो डेटा",
+  "authority.edition.live": "लाइव",
+  "authority.edition.demo": "डेमो डेटा",
+  "authority.updated": "अद्यतन {time}",
+  "authority.refresh": "ताज़ा करें",
+  "authority.loading": "तटीय संचालन लोड हो रहा है…",
+  "authority.error": "तटीय परिचालन अवलोकन लोड नहीं हो सका।",
+  "authority.retry": "पुनः प्रयास करें",
+  "authority.locationsMonitored": "निगरानी किए गए स्थान",
+  "authority.activeWarnings": "सक्रिय चेतावनियाँ",
+  "authority.statusDistribution": "वर्तमान स्थितियाँ",
+  "authority.map": "परिचालन मानचित्र",
+  "authority.mapLegend": "स्थिति",
+  "authority.attentionRequired": "ध्यान देने योग्य",
+  "authority.noAttention": "फ़िलहाल किसी स्थान पर ध्यान देने की आवश्यकता नहीं है।",
+  "authority.locations": "स्थान",
+  "authority.locationsTable.location": "स्थान",
+  "authority.locationsTable.status": "स्थिति",
+  "authority.locationsTable.warning": "चेतावनी",
+  "authority.locationsTable.data": "डेटा",
+  "authority.locationsTable.updated": "अद्यतन",
+  "authority.warnings": "आधिकारिक चेतावनियाँ",
+  "authority.noWarnings": "कोई सक्रिय आधिकारिक चेतावनी नहीं है।",
+  "authority.dataHealth": "डेटा स्वास्थ्य",
+  "authority.dataHealth.weather": "मौसम",
+  "authority.dataHealth.marine": "समुद्री",
+  "authority.noLocations": "कोई परिचालन स्थान उपलब्ध नहीं है।",
+  "authority.noLocationsHint": "ORCA अभी किसी भी चयनित तटीय स्थान का मूल्यांकन नहीं कर सका।",
+  "authority.selectLocation": "विवरण हेतु एक स्थान चुनें",
+  "authority.detail.wave": "लहर",
+  "authority.detail.wind": "हवा",
+  "authority.detail.warnings": "चेतावनियाँ",
+  "authority.detail.geofence": "जियोफेंस",
+  "authority.detail.dataConfidence": "डेटा विश्वसनीयता",
+  "authority.detail.decision": "निर्णय",
+  "authority.detail.evidence": "साक्ष्य",
+  "authority.detail.evidenceSources": "{count} स्रोत",
+  "authority.detail.openToday": "आज का दृश्य खोलें",
+  "authority.detail.planTrip": "यात्रा योजना बनाएं",
+  "authority.detail.viewSystem": "सिस्टम देखें",
+  "authority.detail.viewTrace": "निष्पादन ट्रेस देखें",
+  "authority.detail.viewReplay": "निर्णय रीप्ले",
+  "authority.detail.exportEvidence": "साक्ष्य निर्यात करें",
+  "authority.detail.source": "स्रोत",
+  "authority.detail.derivedSource": "ORCA नियतात्मक नियम",
+  "authority.geofence.clear": "कोई वर्तमान उल्लंघन नहीं",
+  "authority.geofence.inside": "प्रतिबंधित क्षेत्र के भीतर",
+  "authority.geofence.unavailable": "अनुपलब्ध",
+  "authority.attentionCategory.official_warning": "आधिकारिक चेतावनी",
+  "authority.attentionCategory.extreme": "अत्यधिक जोखिम",
+  "authority.attentionCategory.high": "उच्च जोखिम",
+  "authority.attentionCategory.blocked": "अवरुद्ध",
+  "authority.attentionCategory.geofence": "जियोफेंस",
+  "authority.attentionCategory.data_quality": "डेटा गुणवत्ता",
+  "authority.attentionCategory.unavailable": "अनुपलब्ध",
 };
 
 const kn: Table = {
@@ -2389,6 +2570,67 @@ const kn: Table = {
   "common.print": "ಮುದ್ರಿಸಿ / ರಫ್ತು",
   "common.close": "ಮುಚ್ಚಿ",
   "common.na": "ಲಭ್ಯವಿಲ್ಲ",
+
+  // Milestone 5 - Authority / Operational Intelligence Dashboard
+  "nav.authority": "ಪ್ರಾಧಿಕಾರ",
+  "authority.title": "ಕರಾವಳಿ ಕಾರ್ಯಾಚರಣೆಗಳು",
+  "authority.subtitle": "ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡಿದ ಕರಾವಳಿ ಸ್ಥಳಗಳ ಕಾರ್ಯಾಚರಣಾ ಅವಲೋಕನ",
+  "authority.dataEdition.live": "ನೈಜ",
+  "authority.dataEdition.demo": "ಡೆಮೊ ಡೇಟಾ",
+  "authority.edition.live": "ನೈಜ",
+  "authority.edition.demo": "ಡೆಮೊ ಡೇಟಾ",
+  "authority.updated": "ನವೀಕರಿಸಲಾಗಿದೆ {time}",
+  "authority.refresh": "ರಿಫ್ರೆಶ್",
+  "authority.loading": "ಕರಾವಳಿ ಕಾರ್ಯಾಚರಣೆಗಳು ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+  "authority.error": "ಕರಾವಳಿ ಕಾರ್ಯಾಚರಣಾ ಅವಲೋಕನವನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+  "authority.retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+  "authority.locationsMonitored": "ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡಿದ ಸ್ಥಳಗಳು",
+  "authority.activeWarnings": "ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳು",
+  "authority.statusDistribution": "ಪ್ರಸ್ತುತ ಪರಿಸ್ಥಿತಿಗಳು",
+  "authority.map": "ಕಾರ್ಯಾಚರಣಾ ನಕ್ಷೆ",
+  "authority.mapLegend": "ಸ್ಥಿತಿ",
+  "authority.attentionRequired": "ಗಮನ ಅಗತ್ಯವಿದೆ",
+  "authority.noAttention": "ಪ್ರಸ್ತುತ ಯಾವುದೇ ಸ್ಥಳಕ್ಕೆ ಗಮನ ಅಗತ್ಯವಿಲ್ಲ.",
+  "authority.locations": "ಸ್ಥಳಗಳು",
+  "authority.locationsTable.location": "ಸ್ಥಳ",
+  "authority.locationsTable.status": "ಸ್ಥಿತಿ",
+  "authority.locationsTable.warning": "ಎಚ್ಚರಿಕೆ",
+  "authority.locationsTable.data": "ಡೇಟಾ",
+  "authority.locationsTable.updated": "ನವೀಕರಿಸಲಾಗಿದೆ",
+  "authority.warnings": "ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆಗಳು",
+  "authority.noWarnings": "ಯಾವುದೇ ಸಕ್ರಿಯ ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆ ಇಲ್ಲ.",
+  "authority.dataHealth": "ಡೇಟಾ ಆರೋಗ್ಯ",
+  "authority.dataHealth.weather": "ಹವಾಮಾನ",
+  "authority.dataHealth.marine": "ಸಮುದ್ರ",
+  "authority.noLocations": "ಯಾವುದೇ ಕಾರ್ಯಾಚರಣಾ ಸ್ಥಳಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+  "authority.noLocationsHint": "ORCA ಪ್ರಸ್ತುತ ಯಾವುದೇ ಆಯ್ದ ಕರಾವಳಿ ಸ್ಥಳವನ್ನು ಮೌಲ್ಯಮಾಪನ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+  "authority.selectLocation": "ವಿವರಗಳಿಗಾಗಿ ಒಂದು ಸ್ಥಳವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+  "authority.detail.wave": "ಅಲೆ",
+  "authority.detail.wind": "ಗಾಳಿ",
+  "authority.detail.warnings": "ಎಚ್ಚರಿಕೆಗಳು",
+  "authority.detail.geofence": "ಜಿಯೋಫೆನ್ಸ್",
+  "authority.detail.dataConfidence": "ಡೇಟಾ ವಿಶ್ವಾಸಾರ್ಹತೆ",
+  "authority.detail.decision": "ನಿರ್ಣಯ",
+  "authority.detail.evidence": "ಪುರಾವೆ",
+  "authority.detail.evidenceSources": "{count} ಮೂಲಗಳು",
+  "authority.detail.openToday": "ಇಂದಿನ ವೀಕ್ಷಣೆ ತೆರೆಯಿರಿ",
+  "authority.detail.planTrip": "ಪ್ರಯಾಣ ಯೋಜಿಸಿ",
+  "authority.detail.viewSystem": "ಸಿಸ್ಟಮ್ ವೀಕ್ಷಿಸಿ",
+  "authority.detail.viewTrace": "ಎಕ್ಸಿಕ್ಯೂಶನ್ ಟ್ರೇಸ್ ವೀಕ್ಷಿಸಿ",
+  "authority.detail.viewReplay": "ನಿರ್ಣಯ ರಿಪ್ಲೇ",
+  "authority.detail.exportEvidence": "ಪುರಾವೆ ರಫ್ತು ಮಾಡಿ",
+  "authority.detail.source": "ಮೂಲ",
+  "authority.detail.derivedSource": "ORCA ನಿರ್ಣಾಯಕ ನಿಯಮ",
+  "authority.geofence.clear": "ಯಾವುದೇ ಪ್ರಸ್ತುತ ಉಲ್ಲಂಘನೆ ಇಲ್ಲ",
+  "authority.geofence.inside": "ನಿರ್ಬಂಧಿತ ಪ್ರದೇಶದ ಒಳಗೆ",
+  "authority.geofence.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+  "authority.attentionCategory.official_warning": "ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆ",
+  "authority.attentionCategory.extreme": "ತೀವ್ರ ಅಪಾಯ",
+  "authority.attentionCategory.high": "ಹೆಚ್ಚಿನ ಅಪಾಯ",
+  "authority.attentionCategory.blocked": "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+  "authority.attentionCategory.geofence": "ಜಿಯೋಫೆನ್ಸ್",
+  "authority.attentionCategory.data_quality": "ಡೇಟಾ ಗುಣಮಟ್ಟ",
+  "authority.attentionCategory.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
 };
 
 export const STRINGS: Record<LanguageCode, Table> = { en, hi, kn };
@@ -2499,4 +2741,37 @@ export const PRODUCTIVITY_LABEL: Record<LanguageCode, Record<string, string>> = 
   en: { unknown: "UNKNOWN", low: "LOW", moderate: "MODERATE", elevated: "ELEVATED" },
   hi: { unknown: "अज्ञात", low: "कम", moderate: "मध्यम", elevated: "बढ़ा हुआ" },
   kn: { unknown: "ಅಜ್ಞಾತ", low: "ಕಡಿಮೆ", moderate: "ಮಧ್ಯಮ", elevated: "ಹೆಚ್ಚಿನ" },
+};
+
+// Milestone 5 - the Authority dashboard's operational display buckets (see
+// backend app.authority.aggregation.operational_status). These group the
+// existing risk/safety/decision fields for display only - never a new scale.
+export const STATUS_LABEL: Record<LanguageCode, Record<string, string>> = {
+  en: {
+    SAFE: "SAFE",
+    CAUTION: "CAUTION",
+    HIGH: "HIGH",
+    EXTREME: "EXTREME",
+    NO_SAFE_RECOMMENDATION: "NO SAFE RECOMMENDATION",
+    BLOCKED: "BLOCKED",
+    UNAVAILABLE: "UNAVAILABLE",
+  },
+  hi: {
+    SAFE: "सुरक्षित",
+    CAUTION: "सावधानी",
+    HIGH: "उच्च जोखिम",
+    EXTREME: "अत्यधिक जोखिम",
+    NO_SAFE_RECOMMENDATION: "कोई सुरक्षित अनुशंसा नहीं",
+    BLOCKED: "अवरुद्ध",
+    UNAVAILABLE: "अनुपलब्ध",
+  },
+  kn: {
+    SAFE: "ಸುರಕ್ಷಿತ",
+    CAUTION: "ಎಚ್ಚರಿಕೆ",
+    HIGH: "ಹೆಚ್ಚಿನ ಅಪಾಯ",
+    EXTREME: "ತೀವ್ರ ಅಪಾಯ",
+    NO_SAFE_RECOMMENDATION: "ಸುರಕ್ಷಿತ ಶಿಫಾರಸು ಇಲ್ಲ",
+    BLOCKED: "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
+    UNAVAILABLE: "ಲಭ್ಯವಿಲ್ಲ",
+  },
 };

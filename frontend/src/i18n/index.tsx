@@ -11,6 +11,7 @@ import {
   DECISION_LABEL,
   PRODUCTIVITY_LABEL,
   RISK_LABEL,
+  STATUS_LABEL,
   STRINGS,
   SUITABILITY_LABEL,
   TIER_LABEL,
@@ -34,6 +35,7 @@ interface I18nValue {
   tierLabel: (tier: string) => string;
   chlClassLabel: (cls: string) => string;
   productivityLabel: (level: string) => string;
+  statusLabel: (status: string) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -82,6 +84,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       chlClassLabel: (cls) => CHL_CLASS_LABEL[lang][cls] ?? cls,
       productivityLabel: (level) =>
         PRODUCTIVITY_LABEL[lang][level] ?? level.toUpperCase(),
+      statusLabel: (status) => STATUS_LABEL[lang][status] ?? status,
     };
   }, [lang]);
 

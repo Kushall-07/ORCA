@@ -15,6 +15,7 @@ import type {
   WhatIfRequestBody,
   WhatIfResponse,
 } from "../types/api";
+import type { AuthorityOverview } from "../types/authority";
 
 export class ApiError extends Error {
   constructor(
@@ -307,6 +308,21 @@ export async function postRouteBaseline(
     body: JSON.stringify(body),
     signal,
   });
+}
+
+/**
+ * GET /authority/overview (Milestone 5) - the Authority dashboard's
+ * operational aggregation. `edition` "live" fans out the SAME deterministic
+ * pipeline used by /query across a curated set of coastal locations;
+ * "demo" reuses the existing scenario-fixture pipelines for a deterministic,
+ * network-free overview. Never a second risk/decision computation on the
+ * frontend - this only fetches an already-aggregated result.
+ */
+export async function fetchAuthorityOverview(
+  edition: "live" | "demo",
+  signal?: AbortSignal,
+): Promise<AuthorityOverview> {
+  return request<AuthorityOverview>(`/authority/overview?edition=${edition}`, { signal });
 }
 
 export function pfzSnapshotUrl(): string {
