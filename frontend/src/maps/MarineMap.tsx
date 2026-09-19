@@ -40,20 +40,24 @@ const CHL_CLASS_COLOR: Record<string, string> = {
   high: "#255d82",
 };
 
+// Same semantic tiers as --orca-safe/--orca-caution/--orca-high/--orca-extreme
+// in index.css - Leaflet path styling can't reference CSS custom properties,
+// so the hex values are kept in sync with those tokens by hand.
 const RISK_COLOR: Record<RiskLevel, string> = {
-  low: "#2f9e44",
-  moderate: "#f08c00",
-  high: "#e8590c",
-  severe: "#c92a2a",
+  low: "#4cc38a",
+  moderate: "#f2b84b",
+  high: "#e88945",
+  severe: "#e05252",
 };
 
 const LAYER_STYLE: Record<string, PathOptions> = {
   coastline: { color: "#5c7cfa", weight: 1.5, fillOpacity: 0 },
-  eez: { color: "#4dabf7", weight: 1.5, dashArray: "6 4", fillOpacity: 0.04 },
+  eez: { color: "#4da3d9", weight: 1.5, dashArray: "6 4", fillOpacity: 0.04 },
   protected_soft: { color: "#f59f00", weight: 1.5, fillOpacity: 0.08 },
-  protected_hard: { color: "#c92a2a", weight: 2.5, fillOpacity: 0.16 },
+  // Hard restriction = the same blocking severity as --orca-extreme.
+  protected_hard: { color: "#e05252", weight: 2.5, fillOpacity: 0.16 },
   // Official INCOIS PFZ reference - visually distinct (teal/dashed) from ORCA
-  // Risk (red-orange), Route (blue) and Protected Areas (orange/red), so a
+  // Risk (red-orange), Route (accent) and Protected Areas (orange/red), so a
   // user never mistakes a fishing-potential reference for a safety layer.
   pfz: { color: "#0ca678", weight: 2, dashArray: "3 3", fillOpacity: 0 },
 };
@@ -155,8 +159,15 @@ export interface MarineMapProps {
    * query's resolved origin - null when GPS was never requested / granted. */
   gpsLocation?: [number, number] | null;
   /** A PFZ reference destination the user selected by clicking the layer
-   * (Phase C) but has not yet (or has already) routed to. */
+   * (Phase C) but has not yet (or has already) routed to. Deprecated in
+   * favour of `selectedPfzs` (plural) below when both are given - kept only
+   * so an existing single-selection caller needs no change. */
   selectedPfz?: [number, number] | null;
+  /** Every selected PFZ reference, in selection order (multi-PFZ routing).
+   * When given, this takes precedence over the singular `selectedPfz` for
+   * rendering; a single-element array renders identically to the singular
+   * prop. */
+  selectedPfzs?: [number, number][] | null;
   /** Fired when a PFZ feature is clicked. */
   onSelectPfz?: (feature: Feature<Geometry, Record<string, unknown>>, clickLatLng: [number, number]) => void;
 }
@@ -167,6 +178,7 @@ export default function MarineMap({
   layerData,
   gpsLocation = null,
   selectedPfz = null,
+  selectedPfzs = null,
   onSelectPfz,
 }: MarineMapProps) {
   const { t } = useI18n();
@@ -223,7 +235,7 @@ export default function MarineMap({
       {activeLayers.has("route") && route.length >= 2 && (
         <Polyline
           positions={route as [number, number][]}
-          pathOptions={{ color: "#1971c2", weight: 4, opacity: 0.9 }}
+          pathOptions={{ color: "#18b6d9", weight: 4, opacity: 0.9 }}
         >
           <Tooltip sticky>
             {t("map.route")}
@@ -238,7 +250,7 @@ export default function MarineMap({
         <CircleMarker
           center={origin}
           radius={7}
-          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#1971c2", fillOpacity: 1 }}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#18b6d9", fillOpacity: 1 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("map.origin")}
@@ -250,7 +262,7 @@ export default function MarineMap({
         <CircleMarker
           center={destination}
           radius={7}
-          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#2f9e44", fillOpacity: 1 }}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#4ed0b0", fillOpacity: 1 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("map.destination")}
@@ -258,12 +270,28 @@ export default function MarineMap({
           </Tooltip>
         </CircleMarker>
       )}
+      {/* Multi-destination route (reuses the existing Route/destination
+       * marker style, one per selected PFZ) - every destination but the
+       * last, which the ordinary `destination` marker above already covers. */}
+      {resp?.route?.is_multi_destination &&
+        (resp.route.destinations?.slice(0, -1) ?? []).map((point, i) => (
+          <CircleMarker
+            key={`multi-dest-${point[0]},${point[1]}`}
+            center={point}
+            radius={7}
+            pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#4ed0b0", fillOpacity: 1 }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -8]}>
+              {t("map.routeDestinationN", { n: i + 1, count: resp.route!.destinations!.length })}
+            </Tooltip>
+          </CircleMarker>
+        ))}
 
       {gpsLocation && !resp && (
         <CircleMarker
           center={gpsLocation}
           radius={7}
-          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#1971c2", fillOpacity: 1 }}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#18b6d9", fillOpacity: 1 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("gps.markerLabel")}
@@ -271,17 +299,18 @@ export default function MarineMap({
         </CircleMarker>
       )}
 
-      {selectedPfz && (
+      {(selectedPfzs ?? (selectedPfz ? [selectedPfz] : [])).map((point, i, all) => (
         <CircleMarker
-          center={selectedPfz}
+          key={`${point[0]},${point[1]}`}
+          center={point}
           radius={8}
           pathOptions={{ color: "#0ca678", weight: 3, fillColor: "#ffffff", fillOpacity: 0.9 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
-            {t("pfz.selectedMarkerLabel")}
+            {all.length > 1 ? t("pfz.selectedMarkerLabelMulti", { n: i + 1 }) : t("pfz.selectedMarkerLabel")}
           </Tooltip>
         </CircleMarker>
-      )}
+      ))}
 
       {activeLayers.has("environmental") &&
         origin &&
