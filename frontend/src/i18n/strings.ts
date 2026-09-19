@@ -419,6 +419,89 @@ export type StringKey =
   | "voice.tts.stop"
   | "voice.tts.unsupported"
   | "voice.speaking"
+  | "tour.start"
+  | "tour.skip"
+  | "tour.back"
+  | "tour.next"
+  | "tour.finish"
+  | "tour.stepOf"
+  | "tour.overview.title"
+  | "tour.overview.body"
+  | "tour.ask.title"
+  | "tour.ask.body"
+  | "tour.liveData.title"
+  | "tour.liveData.body"
+  | "tour.decision.title"
+  | "tour.decision.body"
+  | "tour.why.title"
+  | "tour.why.body"
+  | "tour.safety.title"
+  | "tour.safety.body"
+  | "tour.replay.title"
+  | "tour.replay.body"
+  | "tour.route.title"
+  | "tour.route.body"
+  | "tour.evidence.title"
+  | "tour.evidence.body"
+  | "tour.environmental.title"
+  | "tour.environmental.body"
+  | "tour.engineRoom.title"
+  | "tour.engineRoom.body"
+  | "evidence.export"
+  | "evidence.export.success"
+  | "evidence.export.failure"
+  | "replay.title"
+  | "replay.emptyNote"
+  | "replay.intro"
+  | "replay.explore"
+  | "replay.building"
+  | "replay.genericError"
+  | "replay.noTimestamps"
+  | "replay.bannerTitle"
+  | "replay.bannerSubtitle"
+  | "replay.windowLabel"
+  | "replay.howItWorks"
+  | "replay.howItWorksBody"
+  | "replay.forecastAt"
+  | "replay.timestampSlider"
+  | "replay.trajectoryLabel"
+  | "replay.changeFromPrevious"
+  | "replay.baselineNote"
+  | "replay.decisionStable"
+  | "replay.decisionStableBody"
+  | "replay.whyChanged"
+  | "replay.decisionChangedBadge"
+  | "replay.whatChanged"
+  | "replay.riskDeltaLabel"
+  | "replay.safetyTriggerLabel"
+  | "replay.wave"
+  | "replay.wind"
+  | "replay.sst"
+  | "replay.risk"
+  | "replay.safety"
+  | "replay.decisionRemains"
+  | "replay.riskFactorsAt"
+  | "replay.total"
+  | "replay.safetyCheck"
+  | "replay.deterministicSafety"
+  | "replay.safetyRuleSingular"
+  | "replay.safetyRulePlural"
+  | "replay.pipelineCaption"
+  | "replay.previous"
+  | "replay.next"
+  | "replay.pause"
+  | "replay.playLabel"
+  | "replay.dataCoverage"
+  | "replay.disclaimerBody"
+  | "replay.noPreviousHour"
+  | "replay.vsPrev"
+  | "replay.legendProceed"
+  | "replay.legendCaution"
+  | "replay.legendDoNotProceed"
+  | "replay.chartTitle"
+  | "replay.chartInsufficientData"
+  | "replay.previewSuffix"
+  | "replay.chartRowAria"
   | "common.expand"
   | "common.collapse"
   | "common.print"
@@ -867,6 +950,104 @@ const en: Table = {
   "voice.tts.stop": "Stop reading",
   "voice.tts.unsupported": "Read aloud is not supported in this browser",
   "voice.speaking": "Speaking…",
+  "tour.start": "Start Tour",
+  "tour.skip": "Skip",
+  "tour.back": "Back",
+  "tour.next": "Next",
+  "tour.finish": "Finish",
+  "tour.stepOf": "{current} of {total}",
+  "tour.overview.title": "Welcome to ORCA",
+  "tour.overview.body":
+    "ORCA is a marine decision-support system for fishers, disaster managers and researchers. This tour walks through the real interface — nothing here is a mock-up.",
+  "tour.ask.title": "Ask a marine question",
+  "tour.ask.body":
+    "Type a question here, or pick one of the suggested queries below. Your question goes through ORCA's real pipeline — understanding, data collection, deterministic risk and safety evaluation, then a decision.",
+  "tour.liveData.title": "Live marine & weather data",
+  "tour.liveData.body":
+    "This panel controls the map layers — live wave, wind, sea-surface temperature and official INCOIS/IMD reference data ORCA fetches for your query location.",
+  "tour.decision.title": "The decision",
+  "tour.decision.body":
+    "Once ORCA has an answer, this card shows the operational verdict — PROCEED, PROCEED WITH CAUTION or DO NOT PROCEED — computed deterministically, never guessed by the AI.",
+  "tour.why.title": "Why this decision?",
+  "tour.why.body":
+    "These are the actual reasons behind the verdict, taken directly from the Risk Engine and Safety Guard — never an invented explanation.",
+  "tour.safety.title": "Safety guard",
+  "tour.safety.body":
+    "Safety is evaluated separately from risk by a deterministic Safety Guard, and can override everything else — the one thing the AI layer can never change.",
+  "tour.replay.title": "Decision replay",
+  "tour.replay.body":
+    "Explore how this same decision evolves hour by hour across the forecast window — re-run through the identical deterministic pipeline, never a second live decision.",
+  "tour.route.title": "Route planning",
+  "tour.route.body":
+    "When a route is requested, ORCA plans it against real geofences, protected areas and marine conditions, and refuses a route that crosses a hard safety boundary.",
+  "tour.evidence.title": "Evidence & provenance",
+  "tour.evidence.body":
+    "Every value ORCA used to reach this decision is listed here with its source, tier and validity, so the decision can be independently checked.",
+  "tour.environmental.title": "Environmental research",
+  "tour.environmental.body":
+    "For researchers: sea-surface temperature, chlorophyll-a and related context — descriptive only, never used to predict a catch or guarantee a fishing outcome.",
+  "tour.engineRoom.title": "Engine Room",
+  "tour.engineRoom.body":
+    "ORCA's actual architecture, and for the last query, the real agent execution trace — exactly which steps ran, in what order, and how long each took.",
+  "evidence.export": "Export Evidence",
+  "evidence.export.success": "Evidence exported",
+  "evidence.export.failure": "Evidence export failed",
+  "replay.title": "Decision replay",
+  "replay.emptyNote":
+    "Run an assessment first, then explore how the decision evolves over the available forecast window here.",
+  "replay.intro":
+    "See how marine conditions, risk and the deterministic decision evolve across the available hourly forecast - derived from the same forecast data already fetched for this assessment.",
+  "replay.explore": "Explore decision over time →",
+  "replay.building": "Building replay...",
+  "replay.genericError": "The decision replay could not be run.",
+  "replay.noTimestamps": "No forecast timestamps were available to replay.",
+  "replay.bannerTitle": "ORCA DECISION REPLAY",
+  "replay.bannerSubtitle": "How the marine decision evolves over time",
+  "replay.windowLabel": "FORECAST · {hours}H",
+  "replay.howItWorks": "How it works",
+  "replay.howItWorksBody":
+    "Replay evaluates each available forecast hour through the same deterministic Risk → Safety → Decision pipeline. It does not create a second live decision.",
+  "replay.forecastAt": "FORECAST · {time}",
+  "replay.timestampSlider": "Replay timestamp",
+  "replay.trajectoryLabel": "Hourly decision trajectory",
+  "replay.changeFromPrevious": "Change from previous hour",
+  "replay.baselineNote": "Baseline timestamp — no previous hour available.",
+  "replay.decisionStable": "Decision stable",
+  "replay.decisionStableBody": "Decision remains {decision} across this interval.",
+  "replay.whyChanged": "Why did the decision change?",
+  "replay.decisionChangedBadge": "DECISION CHANGED",
+  "replay.whatChanged": "What changed?",
+  "replay.riskDeltaLabel": "Risk",
+  "replay.safetyTriggerLabel": "Safety rule triggered:",
+  "replay.wave": "Wave",
+  "replay.wind": "Wind",
+  "replay.sst": "SST",
+  "replay.risk": "Risk",
+  "replay.safety": "Safety",
+  "replay.decisionRemains": "Decision remains {decision}",
+  "replay.riskFactorsAt": "Risk factors — {time}",
+  "replay.total": "Total",
+  "replay.safetyCheck": "Safety check",
+  "replay.deterministicSafety": "DETERMINISTIC SAFETY",
+  "replay.safetyRuleSingular": "Safety rule",
+  "replay.safetyRulePlural": "Safety rules",
+  "replay.pipelineCaption": "Risk Engine → Safety Guard → Decision",
+  "replay.previous": "Previous",
+  "replay.next": "Next",
+  "replay.pause": "Pause",
+  "replay.playLabel": "REPLAY {hours}H",
+  "replay.dataCoverage": "Data coverage",
+  "replay.disclaimerBody":
+    "{label}. This walks forecast data already fetched for this assessment through ORCA's deterministic Risk, Safety and Decision engines - it is not a second live decision.",
+  "replay.noPreviousHour": "no previous hour",
+  "replay.vsPrev": "vs prev",
+  "replay.legendProceed": "Proceed",
+  "replay.legendCaution": "Caution",
+  "replay.legendDoNotProceed": "Do not proceed",
+  "replay.chartTitle": "Marine conditions & risk over time",
+  "replay.chartInsufficientData": "Not enough forecast hours were returned to plot a trend.",
+  "replay.previewSuffix": "(preview)",
+  "replay.chartRowAria": "{label} over the replay window",
   "common.expand": "Expand",
   "common.collapse": "Collapse",
   "common.print": "Print / export",
@@ -1313,6 +1494,104 @@ const hi: Table = {
   "voice.tts.stop": "पढ़ना बंद करें",
   "voice.tts.unsupported": "इस ब्राउज़र में ज़ोर से पढ़ना समर्थित नहीं है",
   "voice.speaking": "बोल रहा है…",
+  "tour.start": "टूर शुरू करें",
+  "tour.skip": "छोड़ें",
+  "tour.back": "पीछे",
+  "tour.next": "आगे",
+  "tour.finish": "समाप्त",
+  "tour.stepOf": "{total} में से {current}",
+  "tour.overview.title": "ORCA में आपका स्वागत है",
+  "tour.overview.body":
+    "ORCA मछुआरों, आपदा प्रबंधकों और शोधकर्ताओं के लिए एक समुद्री निर्णय-सहायता प्रणाली है। यह टूर वास्तविक इंटरफ़ेस से होकर गुज़रता है — यहाँ कुछ भी नकली नहीं है।",
+  "tour.ask.title": "समुद्री प्रश्न पूछें",
+  "tour.ask.body":
+    "यहाँ अपना प्रश्न टाइप करें, या नीचे दिए गए सुझाए गए प्रश्नों में से कोई चुनें। आपका प्रश्न ORCA की वास्तविक प्रक्रिया से गुज़रता है — समझ, डेटा संग्रह, नियतात्मक जोखिम व सुरक्षा मूल्यांकन, फिर निर्णय।",
+  "tour.liveData.title": "लाइव समुद्री और मौसम डेटा",
+  "tour.liveData.body":
+    "यह पैनल मानचित्र परतों को नियंत्रित करता है — लाइव लहर, हवा, समुद्र-सतह तापमान और आधिकारिक INCOIS/IMD संदर्भ डेटा जो ORCA आपके प्रश्न स्थान के लिए प्राप्त करता है।",
+  "tour.decision.title": "निर्णय",
+  "tour.decision.body":
+    "जब ORCA के पास उत्तर होता है, तो यह कार्ड परिचालन निर्णय दिखाता है — आगे बढ़ें, सावधानी से आगे बढ़ें, या आगे न बढ़ें — जो नियतात्मक रूप से गणना किया जाता है, AI द्वारा अनुमानित नहीं।",
+  "tour.why.title": "यह निर्णय क्यों?",
+  "tour.why.body":
+    "ये निर्णय के पीछे के वास्तविक कारण हैं, सीधे रिस्क इंजन और सेफ्टी गार्ड से लिए गए — कभी भी गढ़ा हुआ स्पष्टीकरण नहीं।",
+  "tour.safety.title": "सुरक्षा गार्ड",
+  "tour.safety.body":
+    "सुरक्षा का मूल्यांकन जोखिम से अलग, एक नियतात्मक सेफ्टी गार्ड द्वारा किया जाता है, और यह बाकी सब कुछ ओवरराइड कर सकता है — यह एकमात्र चीज़ है जिसे AI परत कभी नहीं बदल सकती।",
+  "tour.replay.title": "निर्णय रीप्ले",
+  "tour.replay.body":
+    "देखें कि यही निर्णय पूर्वानुमान अवधि में घंटे-दर-घंटे कैसे बदलता है — वही नियतात्मक प्रक्रिया दोबारा चलाई जाती है, यह कभी दूसरा लाइव निर्णय नहीं है।",
+  "tour.route.title": "मार्ग योजना",
+  "tour.route.body":
+    "जब मार्ग का अनुरोध किया जाता है, तो ORCA इसे वास्तविक जियोफ़ेंस, संरक्षित क्षेत्रों और समुद्री परिस्थितियों के विरुद्ध योजना बनाता है, और किसी सख्त सुरक्षा सीमा को पार करने वाले मार्ग को अस्वीकार करता है।",
+  "tour.evidence.title": "साक्ष्य और उद्गम",
+  "tour.evidence.body":
+    "इस निर्णय तक पहुँचने के लिए ORCA द्वारा उपयोग किया गया हर मान यहाँ उसके स्रोत, स्तर और वैधता के साथ सूचीबद्ध है, ताकि निर्णय की स्वतंत्र रूप से जाँच की जा सके।",
+  "tour.environmental.title": "पर्यावरणीय शोध",
+  "tour.environmental.body":
+    "शोधकर्ताओं के लिए: समुद्र-सतह तापमान, क्लोरोफिल-a और संबंधित संदर्भ — केवल वर्णनात्मक, कभी भी पकड़ के अनुमान या मछली पकड़ने के परिणाम की गारंटी के लिए उपयोग नहीं किया जाता।",
+  "tour.engineRoom.title": "इंजन रूम",
+  "tour.engineRoom.body":
+    "ORCA की वास्तविक संरचना, और पिछले प्रश्न के लिए, वास्तविक एजेंट निष्पादन ट्रेस — बिल्कुल कौन से चरण चले, किस क्रम में, और प्रत्येक में कितना समय लगा।",
+  "evidence.export": "साक्ष्य निर्यात करें",
+  "evidence.export.success": "साक्ष्य निर्यात किया गया",
+  "evidence.export.failure": "साक्ष्य निर्यात विफल",
+  "replay.title": "निर्णय रीप्ले",
+  "replay.emptyNote":
+    "पहले एक आकलन चलाएँ, फिर यहाँ देखें कि उपलब्ध पूर्वानुमान अवधि में निर्णय कैसे बदलता है।",
+  "replay.intro":
+    "देखें कि समुद्री परिस्थितियाँ, जोखिम और नियतात्मक निर्णय उपलब्ध घंटेवार पूर्वानुमान में कैसे बदलते हैं — इस आकलन के लिए पहले से प्राप्त उसी पूर्वानुमान डेटा से लिया गया।",
+  "replay.explore": "समय के साथ निर्णय देखें →",
+  "replay.building": "रीप्ले तैयार किया जा रहा है...",
+  "replay.genericError": "निर्णय रीप्ले नहीं चलाया जा सका।",
+  "replay.noTimestamps": "रीप्ले के लिए कोई पूर्वानुमान समय उपलब्ध नहीं था।",
+  "replay.bannerTitle": "ORCA निर्णय रीप्ले",
+  "replay.bannerSubtitle": "समुद्री निर्णय समय के साथ कैसे बदलता है",
+  "replay.windowLabel": "पूर्वानुमान · {hours} घं",
+  "replay.howItWorks": "यह कैसे काम करता है",
+  "replay.howItWorksBody":
+    "रीप्ले हर उपलब्ध पूर्वानुमान घंटे का उसी नियतात्मक रिस्क → सेफ्टी → निर्णय प्रक्रिया से मूल्यांकन करता है। यह दूसरा लाइव निर्णय नहीं बनाता।",
+  "replay.forecastAt": "पूर्वानुमान · {time}",
+  "replay.timestampSlider": "रीप्ले समय",
+  "replay.trajectoryLabel": "घंटेवार निर्णय प्रक्षेपवक्र",
+  "replay.changeFromPrevious": "पिछले घंटे से परिवर्तन",
+  "replay.baselineNote": "आधार समय — कोई पिछला घंटा उपलब्ध नहीं है।",
+  "replay.decisionStable": "निर्णय स्थिर है",
+  "replay.decisionStableBody": "इस अंतराल में निर्णय {decision} बना हुआ है।",
+  "replay.whyChanged": "निर्णय क्यों बदला?",
+  "replay.decisionChangedBadge": "निर्णय बदल गया",
+  "replay.whatChanged": "क्या बदला?",
+  "replay.riskDeltaLabel": "जोखिम",
+  "replay.safetyTriggerLabel": "सक्रिय सुरक्षा नियम:",
+  "replay.wave": "लहर",
+  "replay.wind": "हवा",
+  "replay.sst": "समुद्र सतह तापमान",
+  "replay.risk": "जोखिम",
+  "replay.safety": "सुरक्षा",
+  "replay.decisionRemains": "निर्णय {decision} बना हुआ है",
+  "replay.riskFactorsAt": "जोखिम कारक — {time}",
+  "replay.total": "कुल",
+  "replay.safetyCheck": "सुरक्षा जाँच",
+  "replay.deterministicSafety": "नियतात्मक सुरक्षा",
+  "replay.safetyRuleSingular": "सुरक्षा नियम",
+  "replay.safetyRulePlural": "सुरक्षा नियम",
+  "replay.pipelineCaption": "रिस्क इंजन → सेफ्टी गार्ड → निर्णय",
+  "replay.previous": "पिछला",
+  "replay.next": "अगला",
+  "replay.pause": "रोकें",
+  "replay.playLabel": "रीप्ले {hours} घं",
+  "replay.dataCoverage": "डेटा कवरेज",
+  "replay.disclaimerBody":
+    "{label}। यह इस आकलन के लिए पहले से प्राप्त पूर्वानुमान डेटा को ORCA के नियतात्मक रिस्क, सेफ्टी और निर्णय इंजनों से गुज़ारता है — यह दूसरा लाइव निर्णय नहीं है।",
+  "replay.noPreviousHour": "कोई पिछला घंटा नहीं",
+  "replay.vsPrev": "पिछले की तुलना में",
+  "replay.legendProceed": "आगे बढ़ें",
+  "replay.legendCaution": "सावधानी",
+  "replay.legendDoNotProceed": "आगे न बढ़ें",
+  "replay.chartTitle": "समुद्री परिस्थितियाँ और जोखिम समय के साथ",
+  "replay.chartInsufficientData": "रुझान दिखाने के लिए पर्याप्त पूर्वानुमान घंटे उपलब्ध नहीं थे।",
+  "replay.previewSuffix": "(पूर्वावलोकन)",
+  "replay.chartRowAria": "रीप्ले अवधि में {label}",
   "common.expand": "विस्तृत करें",
   "common.collapse": "संक्षिप्त करें",
   "common.print": "प्रिंट / निर्यात",
@@ -1759,6 +2038,104 @@ const kn: Table = {
   "voice.tts.stop": "ಓದುವುದನ್ನು ನಿಲ್ಲಿಸಿ",
   "voice.tts.unsupported": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಗಟ್ಟಿಯಾಗಿ ಓದುವುದು ಬೆಂಬಲಿತವಲ್ಲ",
   "voice.speaking": "ಮಾತನಾಡುತ್ತಿದೆ…",
+  "tour.start": "ಪ್ರವಾಸ ಪ್ರಾರಂಭಿಸಿ",
+  "tour.skip": "ಬಿಟ್ಟುಬಿಡಿ",
+  "tour.back": "ಹಿಂದೆ",
+  "tour.next": "ಮುಂದೆ",
+  "tour.finish": "ಮುಗಿಸಿ",
+  "tour.stepOf": "{total} ರಲ್ಲಿ {current}",
+  "tour.overview.title": "ORCA ಗೆ ಸುಸ್ವಾಗತ",
+  "tour.overview.body":
+    "ORCA ಮೀನುಗಾರರು, ವಿಪತ್ತು ನಿರ್ವಾಹಕರು ಮತ್ತು ಸಂಶೋಧಕರಿಗಾಗಿ ಒಂದು ಸಮುದ್ರ ನಿರ್ಧಾರ-ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ. ಈ ಪ್ರವಾಸ ನಿಜವಾದ ಇಂಟರ್‌ಫೇಸ್ ಮೂಲಕ ಸಾಗುತ್ತದೆ — ಇಲ್ಲಿ ಏನೂ ನಕಲಿಯಲ್ಲ.",
+  "tour.ask.title": "ಸಮುದ್ರ ಪ್ರಶ್ನೆ ಕೇಳಿ",
+  "tour.ask.body":
+    "ಇಲ್ಲಿ ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ, ಅಥವಾ ಕೆಳಗಿನ ಸೂಚಿತ ಪ್ರಶ್ನೆಗಳಲ್ಲಿ ಒಂದನ್ನು ಆರಿಸಿ. ನಿಮ್ಮ ಪ್ರಶ್ನೆ ORCA ದ ನಿಜವಾದ ಪ್ರಕ್ರಿಯೆಯ ಮೂಲಕ ಹೋಗುತ್ತದೆ — ಗ್ರಹಿಕೆ, ಡೇಟಾ ಸಂಗ್ರಹ, ನಿರ್ಣಾಯಕ ಅಪಾಯ ಮತ್ತು ಸುರಕ್ಷತಾ ಮೌಲ್ಯಮಾಪನ, ನಂತರ ನಿರ್ಣಯ.",
+  "tour.liveData.title": "ಲೈವ್ ಸಮುದ್ರ ಮತ್ತು ಹವಾಮಾನ ಡೇಟಾ",
+  "tour.liveData.body":
+    "ಈ ಪ್ಯಾನೆಲ್ ನಕ್ಷೆ ಪದರಗಳನ್ನು ನಿಯಂತ್ರಿಸುತ್ತದೆ — ಲೈವ್ ಅಲೆ, ಗಾಳಿ, ಸಮುದ್ರ-ಮೇಲ್ಮೈ ತಾಪಮಾನ ಮತ್ತು ಅಧಿಕೃತ INCOIS/IMD ಉಲ್ಲೇಖ ಡೇಟಾ ORCA ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಸ್ಥಳಕ್ಕಾಗಿ ಪಡೆಯುತ್ತದೆ.",
+  "tour.decision.title": "ನಿರ್ಣಯ",
+  "tour.decision.body":
+    "ORCA ಬಳಿ ಉತ್ತರ ಇದ್ದಾಗ, ಈ ಕಾರ್ಡ್ ಕಾರ್ಯಾಚರಣೆ ನಿರ್ಣಯವನ್ನು ತೋರಿಸುತ್ತದೆ — ಮುಂದುವರಿಯಿರಿ, ಎಚ್ಚರಿಕೆಯಿಂದ ಮುಂದುವರಿಯಿರಿ, ಅಥವಾ ಮುಂದುವರಿಯಬೇಡಿ — ಇದನ್ನು ನಿರ್ಣಾಯಕವಾಗಿ ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತದೆ, AI ಊಹಿಸುವುದಿಲ್ಲ.",
+  "tour.why.title": "ಈ ನಿರ್ಣಯ ಏಕೆ?",
+  "tour.why.body":
+    "ಇವು ನಿರ್ಣಯದ ಹಿಂದಿನ ನಿಜವಾದ ಕಾರಣಗಳು, ನೇರವಾಗಿ ರಿಸ್ಕ್ ಎಂಜಿನ್ ಮತ್ತು ಸೇಫ್ಟಿ ಗಾರ್ಡ್‌ನಿಂದ ತೆಗೆದುಕೊಳ್ಳಲಾಗಿದೆ — ಎಂದಿಗೂ ಸೃಷ್ಟಿಸಿದ ವಿವರಣೆಯಲ್ಲ.",
+  "tour.safety.title": "ಸುರಕ್ಷತಾ ಕಾವಲು",
+  "tour.safety.body":
+    "ಸುರಕ್ಷತೆಯನ್ನು ಅಪಾಯದಿಂದ ಪ್ರತ್ಯೇಕವಾಗಿ ಒಂದು ನಿರ್ಣಾಯಕ ಸೇಫ್ಟಿ ಗಾರ್ಡ್ ಮೌಲ್ಯಮಾಪನ ಮಾಡುತ್ತದೆ, ಮತ್ತು ಇದು ಉಳಿದೆಲ್ಲವನ್ನೂ ಅತಿಕ್ರಮಿಸಬಹುದು — AI ಪದರ ಎಂದಿಗೂ ಬದಲಾಯಿಸಲಾಗದ ಏಕೈಕ ವಿಷಯ ಇದು.",
+  "tour.replay.title": "ನಿರ್ಣಯ ರಿಪ್ಲೇ",
+  "tour.replay.body":
+    "ಮುನ್ಸೂಚನೆ ಅವಧಿಯುದ್ದಕ್ಕೂ ಇದೇ ನಿರ್ಣಯ ಗಂಟೆಗಂಟೆಗೆ ಹೇಗೆ ಬದಲಾಗುತ್ತದೆ ಎಂಬುದನ್ನು ಅನ್ವೇಷಿಸಿ — ಅದೇ ನಿರ್ಣಾಯಕ ಪ್ರಕ್ರಿಯೆಯನ್ನು ಮರುಚಲಾಯಿಸಲಾಗುತ್ತದೆ, ಎಂದಿಗೂ ಎರಡನೇ ಲೈವ್ ನಿರ್ಣಯವಲ್ಲ.",
+  "tour.route.title": "ಮಾರ್ಗ ಯೋಜನೆ",
+  "tour.route.body":
+    "ಮಾರ್ಗವನ್ನು ವಿನಂತಿಸಿದಾಗ, ORCA ಅದನ್ನು ನಿಜವಾದ ಜಿಯೋಫೆನ್ಸ್, ಸಂರಕ್ಷಿತ ಪ್ರದೇಶಗಳು ಮತ್ತು ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳ ವಿರುದ್ಧ ಯೋಜಿಸುತ್ತದೆ, ಮತ್ತು ಕಠಿಣ ಸುರಕ್ಷತಾ ಗಡಿಯನ್ನು ದಾಟುವ ಮಾರ್ಗವನ್ನು ನಿರಾಕರಿಸುತ್ತದೆ.",
+  "tour.evidence.title": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ಮೂಲ",
+  "tour.evidence.body":
+    "ಈ ನಿರ್ಣಯವನ್ನು ತಲುಪಲು ORCA ಬಳಸಿದ ಪ್ರತಿಯೊಂದು ಮೌಲ್ಯವನ್ನು ಇಲ್ಲಿ ಅದರ ಮೂಲ, ಹಂತ ಮತ್ತು ಸಿಂಧುತ್ವದೊಂದಿಗೆ ಪಟ್ಟಿ ಮಾಡಲಾಗಿದೆ, ಇದರಿಂದ ನಿರ್ಣಯವನ್ನು ಸ್ವತಂತ್ರವಾಗಿ ಪರಿಶೀಲಿಸಬಹುದು.",
+  "tour.environmental.title": "ಪರಿಸರ ಸಂಶೋಧನೆ",
+  "tour.environmental.body":
+    "ಸಂಶೋಧಕರಿಗಾಗಿ: ಸಮುದ್ರ-ಮೇಲ್ಮೈ ತಾಪಮಾನ, ಕ್ಲೋರೊಫಿಲ್-a ಮತ್ತು ಸಂಬಂಧಿತ ಸಂದರ್ಭ — ಕೇವಲ ವಿವರಣಾತ್ಮಕ, ಹಿಡಿತ ಊಹಿಸಲು ಅಥವಾ ಮೀನುಗಾರಿಕೆ ಫಲಿತಾಂಶದ ಖಾತರಿಗಾಗಿ ಎಂದಿಗೂ ಬಳಸಲಾಗುವುದಿಲ್ಲ.",
+  "tour.engineRoom.title": "ಎಂಜಿನ್ ಕೊಠಡಿ",
+  "tour.engineRoom.body":
+    "ORCA ದ ನಿಜವಾದ ವಾಸ್ತುಶಿಲ್ಪ, ಮತ್ತು ಕೊನೆಯ ಪ್ರಶ್ನೆಗಾಗಿ, ನಿಜವಾದ ಏಜೆಂಟ್ ಕಾರ್ಯಗತಗೊಳಿಸುವಿಕೆ ಜಾಡು — ಯಾವ ಹಂತಗಳು, ಯಾವ ಕ್ರಮದಲ್ಲಿ ಮತ್ತು ಪ್ರತಿಯೊಂದಕ್ಕೂ ಎಷ್ಟು ಸಮಯ ತೆಗೆದುಕೊಂಡಿತು ಎಂಬುದನ್ನು ನಿಖರವಾಗಿ ತೋರಿಸುತ್ತದೆ.",
+  "evidence.export": "ಸಾಕ್ಷ್ಯವನ್ನು ರಫ್ತು ಮಾಡಿ",
+  "evidence.export.success": "ಸಾಕ್ಷ್ಯ ರಫ್ತು ಮಾಡಲಾಗಿದೆ",
+  "evidence.export.failure": "ಸಾಕ್ಷ್ಯ ರಫ್ತು ವಿಫಲವಾಗಿದೆ",
+  "replay.title": "ನಿರ್ಣಯ ರಿಪ್ಲೇ",
+  "replay.emptyNote":
+    "ಮೊದಲು ಒಂದು ಮೌಲ್ಯಮಾಪನ ನಡೆಸಿ, ನಂತರ ಇಲ್ಲಿ ಲಭ್ಯವಿರುವ ಮುನ್ಸೂಚನೆ ಅವಧಿಯಲ್ಲಿ ನಿರ್ಣಯ ಹೇಗೆ ಬದಲಾಗುತ್ತದೆ ಎಂಬುದನ್ನು ಅನ್ವೇಷಿಸಿ.",
+  "replay.intro":
+    "ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳು, ಅಪಾಯ ಮತ್ತು ನಿರ್ಣಾಯಕ ನಿರ್ಣಯ ಲಭ್ಯವಿರುವ ಗಂಟೆವಾರು ಮುನ್ಸೂಚನೆಯಲ್ಲಿ ಹೇಗೆ ಬದಲಾಗುತ್ತವೆ ಎಂಬುದನ್ನು ನೋಡಿ — ಈ ಮೌಲ್ಯಮಾಪನಕ್ಕಾಗಿ ಈಗಾಗಲೇ ಪಡೆದ ಅದೇ ಮುನ್ಸೂಚನೆ ಡೇಟಾದಿಂದ ಪಡೆಯಲಾಗಿದೆ.",
+  "replay.explore": "ಸಮಯದೊಂದಿಗೆ ನಿರ್ಣಯವನ್ನು ಅನ್ವೇಷಿಸಿ →",
+  "replay.building": "ರಿಪ್ಲೇ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ...",
+  "replay.genericError": "ನಿರ್ಣಯ ರಿಪ್ಲೇ ಚಲಾಯಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+  "replay.noTimestamps": "ರಿಪ್ಲೇ ಮಾಡಲು ಯಾವುದೇ ಮುನ್ಸೂಚನೆ ಸಮಯಗಳು ಲಭ್ಯವಿರಲಿಲ್ಲ.",
+  "replay.bannerTitle": "ORCA ನಿರ್ಣಯ ರಿಪ್ಲೇ",
+  "replay.bannerSubtitle": "ಸಮುದ್ರ ನಿರ್ಣಯ ಸಮಯದೊಂದಿಗೆ ಹೇಗೆ ಬದಲಾಗುತ್ತದೆ",
+  "replay.windowLabel": "ಮುನ್ಸೂಚನೆ · {hours} ಗಂ",
+  "replay.howItWorks": "ಇದು ಹೇಗೆ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ",
+  "replay.howItWorksBody":
+    "ರಿಪ್ಲೇ ಪ್ರತಿ ಲಭ್ಯವಿರುವ ಮುನ್ಸೂಚನೆ ಗಂಟೆಯನ್ನು ಅದೇ ನಿರ್ಣಾಯಕ ರಿಸ್ಕ್ → ಸೇಫ್ಟಿ → ನಿರ್ಣಯ ಪ್ರಕ್ರಿಯೆಯ ಮೂಲಕ ಮೌಲ್ಯಮಾಪನ ಮಾಡುತ್ತದೆ. ಇದು ಎರಡನೇ ಲೈವ್ ನಿರ್ಣಯವನ್ನು ಸೃಷ್ಟಿಸುವುದಿಲ್ಲ.",
+  "replay.forecastAt": "ಮುನ್ಸೂಚನೆ · {time}",
+  "replay.timestampSlider": "ರಿಪ್ಲೇ ಸಮಯ",
+  "replay.trajectoryLabel": "ಗಂಟೆವಾರು ನಿರ್ಣಯ ಪಥ",
+  "replay.changeFromPrevious": "ಹಿಂದಿನ ಗಂಟೆಯಿಂದ ಬದಲಾವಣೆ",
+  "replay.baselineNote": "ಮೂಲ ಸಮಯ — ಯಾವುದೇ ಹಿಂದಿನ ಗಂಟೆ ಲಭ್ಯವಿಲ್ಲ.",
+  "replay.decisionStable": "ನಿರ್ಣಯ ಸ್ಥಿರವಾಗಿದೆ",
+  "replay.decisionStableBody": "ಈ ಅವಧಿಯಲ್ಲಿ ನಿರ್ಣಯ {decision} ಆಗಿಯೇ ಉಳಿದಿದೆ.",
+  "replay.whyChanged": "ನಿರ್ಣಯ ಏಕೆ ಬದಲಾಯಿತು?",
+  "replay.decisionChangedBadge": "ನಿರ್ಣಯ ಬದಲಾಗಿದೆ",
+  "replay.whatChanged": "ಏನು ಬದಲಾಯಿತು?",
+  "replay.riskDeltaLabel": "ಅಪಾಯ",
+  "replay.safetyTriggerLabel": "ಸಕ್ರಿಯ ಸುರಕ್ಷತಾ ನಿಯಮ:",
+  "replay.wave": "ಅಲೆ",
+  "replay.wind": "ಗಾಳಿ",
+  "replay.sst": "ಸಮುದ್ರ-ಮೇಲ್ಮೈ ತಾಪಮಾನ",
+  "replay.risk": "ಅಪಾಯ",
+  "replay.safety": "ಸುರಕ್ಷತೆ",
+  "replay.decisionRemains": "ನಿರ್ಣಯ {decision} ಆಗಿಯೇ ಉಳಿದಿದೆ",
+  "replay.riskFactorsAt": "ಅಪಾಯ ಅಂಶಗಳು — {time}",
+  "replay.total": "ಒಟ್ಟು",
+  "replay.safetyCheck": "ಸುರಕ್ಷತಾ ಪರಿಶೀಲನೆ",
+  "replay.deterministicSafety": "ನಿರ್ಣಾಯಕ ಸುರಕ್ಷತೆ",
+  "replay.safetyRuleSingular": "ಸುರಕ್ಷತಾ ನಿಯಮ",
+  "replay.safetyRulePlural": "ಸುರಕ್ಷತಾ ನಿಯಮಗಳು",
+  "replay.pipelineCaption": "ರಿಸ್ಕ್ ಎಂಜಿನ್ → ಸೇಫ್ಟಿ ಗಾರ್ಡ್ → ನಿರ್ಣಯ",
+  "replay.previous": "ಹಿಂದಿನ",
+  "replay.next": "ಮುಂದಿನ",
+  "replay.pause": "ವಿರಾಮ",
+  "replay.playLabel": "ರಿಪ್ಲೇ {hours} ಗಂ",
+  "replay.dataCoverage": "ಡೇಟಾ ವ್ಯಾಪ್ತಿ",
+  "replay.disclaimerBody":
+    "{label}. ಇದು ಈ ಮೌಲ್ಯಮಾಪನಕ್ಕಾಗಿ ಈಗಾಗಲೇ ಪಡೆದ ಮುನ್ಸೂಚನೆ ಡೇಟಾವನ್ನು ORCA ದ ನಿರ್ಣಾಯಕ ರಿಸ್ಕ್, ಸೇಫ್ಟಿ ಮತ್ತು ನಿರ್ಣಯ ಎಂಜಿನ್‌ಗಳ ಮೂಲಕ ನಡೆಸುತ್ತದೆ — ಇದು ಎರಡನೇ ಲೈವ್ ನಿರ್ಣಯವಲ್ಲ.",
+  "replay.noPreviousHour": "ಹಿಂದಿನ ಗಂಟೆ ಇಲ್ಲ",
+  "replay.vsPrev": "ಹಿಂದಿನದಕ್ಕೆ ಹೋಲಿಸಿದರೆ",
+  "replay.legendProceed": "ಮುಂದುವರಿಯಿರಿ",
+  "replay.legendCaution": "ಎಚ್ಚರಿಕೆ",
+  "replay.legendDoNotProceed": "ಮುಂದುವರಿಯಬೇಡಿ",
+  "replay.chartTitle": "ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳು ಮತ್ತು ಅಪಾಯ ಸಮಯದೊಂದಿಗೆ",
+  "replay.chartInsufficientData": "ಪ್ರವೃತ್ತಿ ತೋರಿಸಲು ಸಾಕಷ್ಟು ಮುನ್ಸೂಚನೆ ಗಂಟೆಗಳು ಸಿಗಲಿಲ್ಲ.",
+  "replay.previewSuffix": "(ಪೂರ್ವವೀಕ್ಷಣೆ)",
+  "replay.chartRowAria": "ರಿಪ್ಲೇ ಅವಧಿಯಲ್ಲಿ {label}",
   "common.expand": "ವಿಸ್ತರಿಸಿ",
   "common.collapse": "ಸಂಕುಚಿಸಿ",
   "common.print": "ಮುದ್ರಿಸಿ / ರಫ್ತು",

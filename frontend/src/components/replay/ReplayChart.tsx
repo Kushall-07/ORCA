@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../../i18n";
 import type { ReplaySnapshot } from "../../types/api";
 
 /**
@@ -113,6 +114,7 @@ function ChartRow({
   onHover: (i: number | null) => void;
   onSelect: (i: number) => void;
 }) {
+  const { t } = useI18n();
   const [lo, hi] = domainFor(row);
   const pts = buildPoints(row.values, lo, hi);
   const line = linePath(pts);
@@ -133,7 +135,7 @@ function ChartRow({
           preserveAspectRatio="none"
           className="replay-chart__svg"
           role="img"
-          aria-label={`${row.label} over the replay window`}
+          aria-label={t("replay.chartRowAria", { label: row.label })}
         >
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -222,16 +224,15 @@ export function ReplayChart({
   selectedIndex: number;
   onSelect: (i: number) => void;
 }) {
+  const { t } = useI18n();
   const [hover, setHover] = useState<number | null>(null);
   const n = snapshots.length;
 
   if (n < 2) {
     return (
       <div className="replay-chart">
-        <p className="replay__section-label">Marine conditions &amp; risk over time</p>
-        <p className="replay-chart__empty">
-          Not enough forecast hours were returned to plot a trend.
-        </p>
+        <p className="replay__section-label">{t("replay.chartTitle")}</p>
+        <p className="replay-chart__empty">{t("replay.chartInsufficientData")}</p>
       </div>
     );
   }
@@ -240,7 +241,7 @@ export function ReplayChart({
   const rows: SeriesRow[] = [
     {
       key: "wave",
-      label: "Wave",
+      label: t("replay.wave"),
       unit: "m",
       color: "#3bb2ff",
       decimals: 1,
@@ -248,7 +249,7 @@ export function ReplayChart({
     },
     {
       key: "wind",
-      label: "Wind",
+      label: t("replay.wind"),
       unit: "m/s",
       color: "#22b8cf",
       decimals: 1,
@@ -256,7 +257,7 @@ export function ReplayChart({
     },
     {
       key: "risk",
-      label: "Risk",
+      label: t("replay.risk"),
       unit: "/100",
       color: "#ffa94d",
       decimals: 0,
@@ -267,7 +268,7 @@ export function ReplayChart({
   if (hasSst) {
     rows.push({
       key: "sst",
-      label: "SST",
+      label: t("replay.sst"),
       unit: "°C",
       color: "#9775fa",
       decimals: 1,
@@ -281,7 +282,7 @@ export function ReplayChart({
 
   return (
     <div className="replay-chart">
-      <p className="replay__section-label">Marine conditions &amp; risk over time</p>
+      <p className="replay__section-label">{t("replay.chartTitle")}</p>
       <div className="replay-chart__rows">
         {rows.map((row) => (
           <ChartRow
@@ -307,7 +308,7 @@ export function ReplayChart({
       <div className="replay-chart__readout" aria-live="polite">
         <span className="replay-chart__readout-time">
           {hhmm(activeSnapshot.timestamp)}
-          {isPreview && <em> (preview)</em>}
+          {isPreview && <em> {t("replay.previewSuffix")}</em>}
         </span>
         {rows.map((row) => (
           <span key={row.key} className="replay-chart__readout-item">

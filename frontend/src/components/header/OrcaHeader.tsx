@@ -9,11 +9,13 @@ export function OrcaHeader({
   onStakeholder,
   health,
   latest,
+  onStartTour,
 }: {
   stakeholder: StakeholderId;
   onStakeholder: (id: StakeholderId) => void;
   health: HealthResult & { loading: boolean };
   latest: QueryResponse | null;
+  onStartTour: () => void;
 }) {
   const { t, lang, setLang } = useI18n();
 
@@ -34,6 +36,10 @@ export function OrcaHeader({
       </div>
 
       <div className="orca-topbar__controls">
+        <button type="button" className="btn btn--ghost btn--small orca-topbar__tour" onClick={onStartTour}>
+          <span aria-hidden>◎</span> {t("tour.start")}
+        </button>
+
         <label className="field">
           <span className="field__label">{t("header.stakeholder")}</span>
           <select

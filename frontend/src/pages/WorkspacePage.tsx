@@ -5,6 +5,7 @@ import { useHealth } from "../hooks/useHealth";
 import { useGisLayers } from "../hooks/useGisLayers";
 import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { useGeolocation } from "../hooks/useGeolocation";
+import { useTour } from "../hooks/useTour";
 import { getStakeholder, type StakeholderId } from "../stakeholders";
 import type { GeoJsonFeatureCollection } from "../types/api";
 import { fetchEnvironmentalSuitabilityLayer, fetchPfzLayer } from "../services/apiClient";
@@ -45,6 +46,7 @@ import {
   LayerControl,
 } from "../components/map/MapControls";
 import { Disclose } from "../components/common";
+import { TourOverlay } from "../components/tour/TourOverlay";
 
 const STATIC_LAYER_IDS = new Set<LayerId>(["coastline", "eez", "protected_areas"]);
 
@@ -69,6 +71,7 @@ export default function WorkspacePage() {
     language: lang,
   });
   const gps = useGeolocation();
+  const tour = useTour({ latest, setMode, setPage });
 
   const lastUserQuery = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -318,7 +321,9 @@ export default function WorkspacePage() {
         onStakeholder={setStakeholder}
         health={health}
         latest={latest}
+        onStartTour={tour.start}
       />
+      <TourOverlay tour={tour} />
 
       {mode === "workspace" ? (
         <div className="workspace__shell">
@@ -399,7 +404,7 @@ export default function WorkspacePage() {
                 // so a judge/user can immediately explore how the same
                 // decision evolves across the forecast window.
                 <>
-                  <DecisionCard resp={latest} />
+                  <DecisionCard resp={latest} query={lastUserQuery} />
                   {latest.decision && latest.status === "OK" && (
                     <ReplayPanel resp={latest} />
                   )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useI18n } from "../../i18n";
 import { ApiError, postReplay } from "../../services/apiClient";
 import type {
   DecisionChangeExplanation,
@@ -44,17 +45,15 @@ function riskDotColor(level: string): string {
  * component never computes a risk, safety or decision value itself.
  */
 export function ReplayPanel({ resp }: { resp: QueryResponse }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [res, setRes] = useState<ReplayResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   if (!resp.decision || resp.status !== "OK") {
     return (
-      <Panel title="Decision replay">
-        <EmptyNote>
-          Run an assessment first, then explore how the decision evolves over
-          the available forecast window here.
-        </EmptyNote>
+      <Panel title={t("replay.title")}>
+        <EmptyNote>{t("replay.emptyNote")}</EmptyNote>
       </Panel>
     );
   }
@@ -68,30 +67,24 @@ export function ReplayPanel({ resp }: { resp: QueryResponse }) {
       if (out.error) setErr(out.error.message);
       else setRes(out);
     } catch (e) {
-      setErr(
-        e instanceof ApiError ? e.message : "The decision replay could not be run.",
-      );
+      setErr(e instanceof ApiError ? e.message : t("replay.genericError"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Panel title="Decision replay">
+    <Panel title={t("replay.title")}>
       {!res?.data && !loading && (
         <>
-          <p className="replay__intro">
-            See how marine conditions, risk and the deterministic decision
-            evolve across the available hourly forecast - derived from the
-            same forecast data already fetched for this assessment.
-          </p>
+          <p className="replay__intro">{t("replay.intro")}</p>
           <button type="button" className="replay__explore" onClick={run}>
-            Explore decision over time →
+            {t("replay.explore")}
           </button>
         </>
       )}
 
-      {loading && <Spinner label="Building replay..." />}
+      {loading && <Spinner label={t("replay.building")} />}
       {err && <p className="replay__error" role="alert">{err}</p>}
 
       {res?.data && <ReplayView data={res.data} />}
@@ -100,6 +93,7 @@ export function ReplayPanel({ resp }: { resp: QueryResponse }) {
 }
 
 function ReplayView({ data }: { data: ReplayResult }) {
+  const { t } = useI18n();
   const snaps = data.snapshots;
   const [index, setIndex] = useState(() => {
     const cur = snaps.findIndex((s) => s.is_current);
@@ -126,7 +120,7 @@ function ReplayView({ data }: { data: ReplayResult }) {
   }, [playing, snaps.length]);
 
   if (snaps.length === 0) {
-    return <EmptyNote>No forecast timestamps were available to replay.</EmptyNote>;
+    return <EmptyNote>{t("replay.noTimestamps")}</EmptyNote>;
   }
 
   const selected = snaps[index];
@@ -139,26 +133,20 @@ function ReplayView({ data }: { data: ReplayResult }) {
         <div className="replay__banner-top">
           <span className="replay__banner-icon" aria-hidden>🌊</span>
           <div className="replay__banner-title">
-            <span className="replay__title">ORCA DECISION REPLAY</span>
-            <span className="replay__subtitle">How the marine decision evolves over time</span>
+            <span className="replay__title">{t("replay.bannerTitle")}</span>
+            <span className="replay__subtitle">{t("replay.bannerSubtitle")}</span>
           </div>
-          <span className="replay__window">FORECAST · {data.window_hours}H</span>
+          <span className="replay__window">{t("replay.windowLabel", { hours: data.window_hours })}</span>
           <button
             type="button"
             className="replay__how-toggle"
             aria-expanded={howOpen}
             onClick={() => setHowOpen((v) => !v)}
           >
-            How it works
+            {t("replay.howItWorks")}
           </button>
         </div>
-        {howOpen && (
-          <p className="replay__how-body">
-            Replay evaluates each available forecast hour through the same
-            deterministic Risk → Safety → Decision pipeline. It does not
-            create a second live decision.
-          </p>
-        )}
+        {howOpen && <p className="replay__how-body">{t("replay.howItWorksBody")}</p>}
 
         <div className="replay__timeline">
           <span className="replay__timeline-edge">{hhmm(snaps[0].timestamp)}</span>
@@ -172,12 +160,12 @@ function ReplayView({ data }: { data: ReplayResult }) {
               setPlaying(false);
               setIndex(Number(e.target.value));
             }}
-            aria-label="Replay timestamp"
+            aria-label={t("replay.timestampSlider")}
           />
           <span className="replay__timeline-edge">{hhmm(snaps[snaps.length - 1].timestamp)}</span>
         </div>
         <div className="replay__timeline-selected">
-          <span className="replay__timestamp">FORECAST · {hhmm(selected.timestamp)}</span>
+          <span className="replay__timestamp">{t("replay.forecastAt", { time: hhmm(selected.timestamp) })}</span>
           <span className="replay__timeline-date">{dateLabel(selected.timestamp)}</span>
         </div>
       </div>
@@ -186,7 +174,7 @@ function ReplayView({ data }: { data: ReplayResult }) {
 
       <ReplayChart snapshots={snaps} selectedIndex={index} onSelect={setIndex} />
 
-      <p className="replay__section-label">Hourly decision trajectory</p>
+      <p className="replay__section-label">{t("replay.trajectoryLabel")}</p>
       <Trajectory snapshots={snaps} selectedIndex={index} onSelect={setIndex} />
 
       <div className="replay__grid">
@@ -195,10 +183,8 @@ function ReplayView({ data }: { data: ReplayResult }) {
             <ChangeFromPrevious current={selected} previous={previous} />
           ) : (
             <div className="replay__delta">
-              <p className="replay__section-label">Change from previous hour</p>
-              <p className="replay__delta-baseline">
-                Baseline timestamp — no previous hour available.
-              </p>
+              <p className="replay__section-label">{t("replay.changeFromPrevious")}</p>
+              <p className="replay__delta-baseline">{t("replay.baselineNote")}</p>
             </div>
           )}
 
@@ -208,10 +194,10 @@ function ReplayView({ data }: { data: ReplayResult }) {
             index > 0 && (
               <div className="replay__stable">
                 <p className="replay__stable-title">
-                  <span aria-hidden>✓</span> Decision stable
+                  <span aria-hidden>✓</span> {t("replay.decisionStable")}
                 </p>
                 <p className="replay__no-change">
-                  Decision remains {decisionWord(selected.decision)} across this interval.
+                  {t("replay.decisionStableBody", { decision: decisionWord(selected.decision) })}
                 </p>
               </div>
             )
@@ -234,14 +220,14 @@ function ReplayView({ data }: { data: ReplayResult }) {
             setIndex((i) => Math.max(0, i - 1));
           }}
         >
-          Previous
+          {t("replay.previous")}
         </button>
         <button
           type="button"
           className="replay__play"
           onClick={() => setPlaying((p) => !p)}
         >
-          {playing ? "⏸ Pause" : `▶ REPLAY ${data.window_hours}H`}
+          {playing ? `⏸ ${t("replay.pause")}` : `▶ ${t("replay.playLabel", { hours: data.window_hours })}`}
         </button>
         <button
           type="button"
@@ -251,14 +237,14 @@ function ReplayView({ data }: { data: ReplayResult }) {
             setIndex((i) => Math.min(snaps.length - 1, i + 1));
           }}
         >
-          Next
+          {t("replay.next")}
         </button>
       </div>
 
       <div className="replay__foot">
         {Object.keys(data.data_coverage).length > 0 && (
           <div className="replay__coverage">
-            <p className="replay__section-label">Data coverage</p>
+            <p className="replay__section-label">{t("replay.dataCoverage")}</p>
             <ul className="replay__coverage-list">
               {Object.entries(data.data_coverage).map(([k, v]) => (
                 <li key={k}>
@@ -271,11 +257,7 @@ function ReplayView({ data }: { data: ReplayResult }) {
           </div>
         )}
 
-        <Disclaimer>
-          {data.label}. This walks forecast data already fetched for this
-          assessment through ORCA's deterministic Risk, Safety and Decision
-          engines - it is not a second live decision.
-        </Disclaimer>
+        <Disclaimer>{t("replay.disclaimerBody", { label: data.label })}</Disclaimer>
       </div>
     </div>
   );
@@ -304,29 +286,30 @@ function MetricCards({
   selected: ReplaySnapshot;
   previous: ReplaySnapshot | null;
 }) {
+  const { t } = useI18n();
   return (
     <div className={`replay__cards decision--${selected.decision.toLowerCase()}`}>
       <MetricCard
         icon="🌊"
-        label="Wave"
+        label={t("replay.wave")}
         value={selected.wave_height_m != null ? `${selected.wave_height_m.toFixed(1)} m` : "—"}
         delta={numericDelta(selected.wave_height_m, previous?.wave_height_m ?? null, "m", 1)}
       />
       <MetricCard
         icon="💨"
-        label="Wind"
+        label={t("replay.wind")}
         value={selected.wind_speed_ms != null ? `${selected.wind_speed_ms.toFixed(1)} m/s` : "—"}
         delta={numericDelta(selected.wind_speed_ms, previous?.wind_speed_ms ?? null, "m/s", 1)}
       />
       <MetricCard
         icon="🌡"
-        label="SST"
+        label={t("replay.sst")}
         value={selected.sst_c != null ? `${selected.sst_c.toFixed(1)}°C` : "—"}
         delta={numericDelta(selected.sst_c, previous?.sst_c ?? null, "°C", 1)}
       />
       <MetricCard
         icon="⚠"
-        label="Risk"
+        label={t("replay.risk")}
         value={
           <>
             {Math.round(selected.risk_score)}
@@ -339,7 +322,7 @@ function MetricCards({
       />
       <MetricCard
         icon="🛡"
-        label="Safety"
+        label={t("replay.safety")}
         value={selected.safety_status.replace(/_/g, " ")}
         sub={decisionWord(selected.decision)}
         tone={`sev-badge--safety-${selected.safety_status.toLowerCase()}`}
@@ -381,6 +364,7 @@ function MetricCard({
   tone?: string;
   emphasize?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className={`metric-card ${emphasize ? "metric-card--emphasize" : ""}`}>
       <span className="metric-card__label">
@@ -390,17 +374,11 @@ function MetricCard({
       <span className={`metric-card__value ${tone ?? ""}`}>{value}</span>
       {sub && <span className="metric-card__sub">{sub}</span>}
       <span className={`metric-card__delta metric-card__delta--${delta?.dir ?? "none"}`}>
-        {delta ? `${delta.text} vs prev` : "— no previous hour"}
+        {delta ? `${delta.text} ${t("replay.vsPrev")}` : `— ${t("replay.noPreviousHour")}`}
       </span>
     </div>
   );
 }
-
-const TRAJECTORY_LEGEND: { status: string; label: string; dot: string }[] = [
-  { status: "PROCEED", label: "Proceed", dot: "🟢" },
-  { status: "PROCEED_WITH_CAUTION", label: "Caution", dot: "🟡" },
-  { status: "DO_NOT_PROCEED", label: "Do not proceed", dot: "🔴" },
-];
 
 function Trajectory({
   snapshots,
@@ -411,6 +389,12 @@ function Trajectory({
   selectedIndex: number;
   onSelect: (i: number) => void;
 }) {
+  const { t } = useI18n();
+  const legend = [
+    { status: "PROCEED", label: t("replay.legendProceed"), dot: "🟢" },
+    { status: "PROCEED_WITH_CAUTION", label: t("replay.legendCaution"), dot: "🟡" },
+    { status: "DO_NOT_PROCEED", label: t("replay.legendDoNotProceed"), dot: "🔴" },
+  ];
   return (
     <div className="replay__trajectory-wrap">
       <ol className="replay__trajectory" role="list">
@@ -430,7 +414,7 @@ function Trajectory({
         ))}
       </ol>
       <ul className="replay__traj-legend">
-        {TRAJECTORY_LEGEND.map((l) => (
+        {legend.map((l) => (
           <li key={l.status}>
             <span aria-hidden>{l.dot}</span> {l.label}
           </li>
@@ -441,10 +425,11 @@ function Trajectory({
 }
 
 function ChangeExplanation({ transition }: { transition: DecisionChangeExplanation }) {
+  const { t } = useI18n();
   return (
     <div className="replay__change">
-      <p className="replay__section-label">Why did the decision change?</p>
-      <p className="replay__change-badge">⚠ DECISION CHANGED</p>
+      <p className="replay__section-label">{t("replay.whyChanged")}</p>
+      <p className="replay__change-badge">⚠ {t("replay.decisionChangedBadge")}</p>
       <p className="replay__change-time">
         {hhmm(transition.from_timestamp)} → {hhmm(transition.to_timestamp)}
       </p>
@@ -455,7 +440,7 @@ function ChangeExplanation({ transition }: { transition: DecisionChangeExplanati
       </p>
       {transition.changes.length > 0 && (
         <>
-          <p className="replay__change-label">What changed?</p>
+          <p className="replay__change-label">{t("replay.whatChanged")}</p>
           <ul className="replay__change-list">
             {transition.changes.map((c, i) => (
               <li key={i}>{c}</li>
@@ -464,12 +449,12 @@ function ChangeExplanation({ transition }: { transition: DecisionChangeExplanati
         </>
       )}
       <p className="replay__change-risk">
-        Risk: {transition.risk_score_delta >= 0 ? "+" : ""}
+        {t("replay.riskDeltaLabel")}: {transition.risk_score_delta >= 0 ? "+" : ""}
         {transition.risk_score_delta.toFixed(1)}
       </p>
       {transition.safety_trigger && (
         <p className="replay__change-trigger">
-          Safety rule triggered: <strong>{transition.safety_trigger}</strong>
+          {t("replay.safetyTriggerLabel")} <strong>{transition.safety_trigger}</strong>
         </p>
       )}
     </div>
@@ -489,34 +474,35 @@ function ChangeFromPrevious({
   current: ReplaySnapshot;
   previous: ReplaySnapshot;
 }) {
+  const { t } = useI18n();
   return (
     <div className="replay__delta">
-      <p className="replay__section-label">Change from previous hour</p>
+      <p className="replay__section-label">{t("replay.changeFromPrevious")}</p>
       <div className="replay__delta-grid">
         <span className="replay__delta-item">
-          🌊 Wave{" "}
+          🌊 {t("replay.wave")}{" "}
           {previous.wave_height_m != null && current.wave_height_m != null
             ? `${previous.wave_height_m.toFixed(1)} → ${current.wave_height_m.toFixed(1)} m`
             : "—"}
         </span>
         <span className="replay__delta-item">
-          💨 Wind{" "}
+          💨 {t("replay.wind")}{" "}
           {previous.wind_speed_ms != null && current.wind_speed_ms != null
             ? `${previous.wind_speed_ms.toFixed(1)} → ${current.wind_speed_ms.toFixed(1)} m/s`
             : "—"}
         </span>
         {previous.sst_c != null && current.sst_c != null && (
           <span className="replay__delta-item">
-            🌡 SST {previous.sst_c.toFixed(1)} → {current.sst_c.toFixed(1)} °C
+            🌡 {t("replay.sst")} {previous.sst_c.toFixed(1)} → {current.sst_c.toFixed(1)} °C
           </span>
         )}
         <span className="replay__delta-item">
-          ⚠ Risk {Math.round(previous.risk_score)} → {Math.round(current.risk_score)}
+          ⚠ {t("replay.risk")} {Math.round(previous.risk_score)} → {Math.round(current.risk_score)}
         </span>
       </div>
       {current.decision === previous.decision && (
         <p className="replay__delta-note">
-          <span aria-hidden>✓</span> Decision remains {decisionWord(current.decision)}
+          <span aria-hidden>✓</span> {t("replay.decisionRemains", { decision: decisionWord(current.decision) })}
         </p>
       )}
     </div>
@@ -532,12 +518,15 @@ function ChangeFromPrevious({
  * scanning - the numeric contribution stays the primary, unrounded value.
  */
 function RiskFactors({ snapshot }: { snapshot: ReplaySnapshot }) {
+  const { t } = useI18n();
   if (snapshot.factors.length === 0) return null;
   const total = snapshot.factors.reduce((sum, f) => sum + f.contribution, 0);
   const maxContrib = Math.max(...snapshot.factors.map((f) => f.contribution), 1);
   return (
     <div className="replay__factors">
-      <p className="replay__section-label">Risk factors — {hhmm(snapshot.timestamp)}</p>
+      <p className="replay__section-label">
+        {t("replay.riskFactorsAt", { time: hhmm(snapshot.timestamp) })}
+      </p>
       <ul className="replay__factors-list">
         {snapshot.factors.map((f) => (
           <li key={f.name}>
@@ -553,7 +542,7 @@ function RiskFactors({ snapshot }: { snapshot: ReplaySnapshot }) {
         ))}
       </ul>
       <p className="replay__factors-total">
-        <span>Total</span>
+        <span>{t("replay.total")}</span>
         <span>{total.toFixed(1)}</span>
       </p>
     </div>
@@ -566,18 +555,21 @@ function RiskFactors({ snapshot }: { snapshot: ReplaySnapshot }) {
  * SAFETY_TRIGGER_LABELS). Never inferred from the risk score client-side.
  */
 function SafetyRule({ snapshot }: { snapshot: ReplaySnapshot }) {
+  const { t } = useI18n();
   if (snapshot.triggered_rule_labels.length === 0) return null;
   const warn = snapshot.safety_status !== "ALLOWED";
   return (
     <div className={`replay__safety-rule ${warn ? "replay__safety-rule--warn" : ""}`}>
       <div className="replay__safety-rule-head">
         <span className="replay__safety-rule-title">
-          <span aria-hidden>🛡</span> Safety check
+          <span aria-hidden>🛡</span> {t("replay.safetyCheck")}
         </span>
-        <span className="replay__deterministic-badge">DETERMINISTIC SAFETY</span>
+        <span className="replay__deterministic-badge">{t("replay.deterministicSafety")}</span>
       </div>
       <p className="replay__section-label">
-        Safety rule{snapshot.triggered_rule_labels.length > 1 ? "s" : ""}
+        {snapshot.triggered_rule_labels.length > 1
+          ? t("replay.safetyRulePlural")
+          : t("replay.safetyRuleSingular")}
       </p>
       <ul className="replay__safety-rule-list">
         {snapshot.triggered_rule_labels.map((label, i) => (
@@ -588,7 +580,7 @@ function SafetyRule({ snapshot }: { snapshot: ReplaySnapshot }) {
         ))}
       </ul>
       <p className="replay__safety-pipeline" aria-hidden>
-        Risk Engine → Safety Guard → Decision
+        {t("replay.pipelineCaption")}
       </p>
     </div>
   );

@@ -376,4 +376,35 @@ describe("ReplayPanel", () => {
       await screen.findByText(/no forecast timestamps were available/i),
     ).toBeInTheDocument();
   });
+
+  it("renders the banner, controls and safety panel in Hindi without falling back to English", async () => {
+    postReplay.mockResolvedValue(makeReplayResponse());
+    localStorage.setItem("orca.language", "hi");
+    mount(makeResponse({ session_id: "sess-hi" }));
+
+    expect(screen.getByText("निर्णय रीप्ले")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /समय के साथ निर्णय देखें/ }));
+    await screen.findByRole("slider");
+
+    expect(screen.getByText("ORCA निर्णय रीप्ले")).toBeInTheDocument();
+    expect(screen.getByText("पिछला")).toBeInTheDocument();
+    expect(screen.getByText("अगला")).toBeInTheDocument();
+    expect(screen.getByText("डेटा कवरेज")).toBeInTheDocument();
+    localStorage.removeItem("orca.language");
+  });
+
+  it("renders the banner and controls in Kannada without falling back to English", async () => {
+    postReplay.mockResolvedValue(makeReplayResponse());
+    localStorage.setItem("orca.language", "kn");
+    mount(makeResponse({ session_id: "sess-kn" }));
+
+    expect(screen.getByText("ನಿರ್ಣಯ ರಿಪ್ಲೇ")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /ಸಮಯದೊಂದಿಗೆ ನಿರ್ಣಯವನ್ನು ಅನ್ವೇಷಿಸಿ/ }));
+    await screen.findByRole("slider");
+
+    expect(screen.getByText("ORCA ನಿರ್ಣಯ ರಿಪ್ಲೇ")).toBeInTheDocument();
+    expect(screen.getByText("ಹಿಂದಿನ")).toBeInTheDocument();
+    expect(screen.getByText("ಮುಂದಿನ")).toBeInTheDocument();
+    localStorage.removeItem("orca.language");
+  });
 });

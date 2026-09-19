@@ -1,6 +1,7 @@
 import { useI18n } from "../../i18n";
 import type { ProvNode, QueryResponse } from "../../types/api";
 import { Chips, EmptyNote, Panel } from "../common";
+import { ExportEvidenceButton } from "../evidence/ExportEvidenceButton";
 
 function riskFactorNodes(resp: QueryResponse): ProvNode[] {
   return (resp.provenance?.nodes ?? []).filter((n) => n.kind === "risk_factor");
@@ -40,7 +41,7 @@ function observedAt(resp: QueryResponse): string | null {
  * Detail (factor breakdown, full explanation, environmental context) lives in
  * collapsed sections below and must not compete with this card.
  */
-export function DecisionCard({ resp }: { resp: QueryResponse }) {
+export function DecisionCard({ resp, query = "" }: { resp: QueryResponse; query?: string }) {
   const { t, decisionLabel, riskLabel } = useI18n();
   const d = resp.decision;
 
@@ -90,6 +91,9 @@ export function DecisionCard({ resp }: { resp: QueryResponse }) {
 
   return (
     <section className={`panel verdict verdict--${status}`}>
+      <div className="verdict__toolbar">
+        <ExportEvidenceButton resp={resp} query={query} />
+      </div>
       <div className={`verdict__body decision decision--${status}`}>
         <span className="decision__headline verdict__decision">
           {decisionLabel(d.status)}
