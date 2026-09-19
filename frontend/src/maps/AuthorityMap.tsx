@@ -1,24 +1,11 @@
 import { useEffect } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { useI18n } from "../i18n";
-import type { LocationOverview, OperationalStatus } from "../types/authority";
+import { OPERATIONAL_STATUS_COLOR } from "../theme/severityColors";
+import type { LocationOverview } from "../types/authority";
 
 const DEFAULT_CENTER: [number, number] = [15.0, 76.0];
 const DEFAULT_ZOOM = 5;
-
-// Same semantic tokens as index.css --orca-safe/caution/high/extreme (and a
-// muted grey for the two non-numeric buckets) - Leaflet path styling can't
-// reference CSS custom properties, so these are kept in sync with those
-// tokens by hand, exactly like maps/MarineMap.tsx's own RISK_COLOR map.
-const STATUS_COLOR: Record<OperationalStatus, string> = {
-  SAFE: "#4cc38a",
-  CAUTION: "#f2b84b",
-  HIGH: "#e88945",
-  EXTREME: "#e05252",
-  BLOCKED: "#e05252",
-  NO_SAFE_RECOMMENDATION: "#9db7c2",
-  UNAVAILABLE: "#6f8d99",
-};
 
 function FitToLocations({ locations }: { locations: LocationOverview[] }) {
   const map = useMap();
@@ -76,7 +63,7 @@ export function AuthorityMap({
             pathOptions={{
               color: selected ? "#18b6d9" : "#ffffff",
               weight: selected ? 3 : 2,
-              fillColor: STATUS_COLOR[loc.status],
+              fillColor: OPERATIONAL_STATUS_COLOR[loc.status],
               fillOpacity: 0.9,
             }}
             eventHandlers={{ click: () => onSelect(loc.location_id) }}

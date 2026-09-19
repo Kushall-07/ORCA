@@ -206,6 +206,80 @@ describe("Authority / Operational Intelligence Dashboard (Milestone 5)", () => {
     expect(screen.queryByText("Coastal Operations")).not.toBeInTheDocument();
   });
 
+  it("View Evidence hands the selected location's response to the existing Evidence view directly", async () => {
+    render(<App />);
+    await openAuthority();
+    await screen.findByText("Coastal Operations");
+    await userEvent.click(screen.getByRole("cell", { name: "Mumbai" }));
+    await screen.findByRole("button", { name: /view evidence/i });
+
+    await userEvent.click(screen.getByRole("button", { name: /view evidence/i }));
+
+    // Lands directly on the existing Evidence page (not Decision), reusing
+    // the same open-external navigation "Open Today View" uses.
+    expect(await screen.findByText("Open-Meteo Marine")).toBeInTheDocument();
+    expect(screen.queryByText("Coastal Operations")).not.toBeInTheDocument();
+  });
+
+  it("View Replay hands the selected location's response to the existing Decision Replay panel directly", async () => {
+    render(<App />);
+    await openAuthority();
+    await screen.findByText("Coastal Operations");
+    await userEvent.click(screen.getByRole("cell", { name: "Mumbai" }));
+    await screen.findByRole("button", { name: /decision replay/i });
+
+    await userEvent.click(screen.getByRole("button", { name: /decision replay/i }));
+
+    // Decision Replay lives directly beneath the Decision card (see
+    // WorkspacePage) - reuses that existing panel, never a new one.
+    expect(await screen.findByText("Decision replay")).toBeInTheDocument();
+  });
+
+  it("does not offer View Replay when the location's response has no decision to replay", async () => {
+    fetchAuthorityOverview.mockResolvedValue(
+      makeOverview({
+        locations: [
+          {
+            location_id: "mangaluru",
+            name: "Mangaluru",
+            latitude: 12.87,
+            longitude: 74.84,
+            status: "UNAVAILABLE",
+            decision_status: null,
+            safety_status: null,
+            risk_level: null,
+            data_sufficiency: null,
+            wave_height_m: null,
+            wind_speed: null,
+            wind_speed_unit: null,
+            warnings: [],
+            advisory_available: false,
+            advisory_severity: null,
+            advisory_source: null,
+            geofence_status: null,
+            weather_tier: null,
+            ocean_tier: null,
+            evidence_count: 0,
+            grounded: false,
+            error: null,
+            detail: makeResponse({
+              status: "CLARIFICATION_NEEDED",
+              decision: null,
+              location: { latitude: 12.87, longitude: 74.84, name: "Mangaluru" },
+            }),
+          },
+        ],
+      }),
+    );
+    render(<App />);
+    await openAuthority();
+    await screen.findByText("Coastal Operations");
+    await userEvent.click(screen.getByRole("cell", { name: "Mangaluru" }));
+
+    await screen.findByRole("button", { name: /view evidence/i });
+    expect(screen.queryByRole("button", { name: /decision replay/i })).not.toBeInTheDocument();
+  });
+
   it("the Demo data toggle re-fetches with edition=demo", async () => {
     render(<App />);
     await openAuthority();
@@ -214,6 +288,34 @@ describe("Authority / Operational Intelligence Dashboard (Milestone 5)", () => {
     await userEvent.click(screen.getByRole("button", { name: /^demo data$/i }));
 
     await waitFor(() => expect(fetchAuthorityOverview).toHaveBeenCalledWith("demo", expect.anything()));
+  });
+
+  // Milestone 6 - P1: Authority Demo mode must never let a selected location
+  // read as though its conditions were actually evaluated live. See
+  // backend/app/api/authority.py's `_evaluate`: every demo-edition location
+  // is internally evaluated at the fixture's own coordinate/time, not the
+  // real one shown on the map/table.
+  it("discloses deterministic demo/fixture evaluation in Demo mode, and never in Live mode", async () => {
+    fetchAuthorityOverview.mockImplementation((edition: string) =>
+      Promise.resolve(makeOverview({ data_edition: edition === "demo" ? "DEMO" : "LIVE" })),
+    );
+    render(<App />);
+    await openAuthority();
+    await screen.findByText("Coastal Operations");
+
+    expect(screen.queryByText(/demo fixture/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^demo data$/i }));
+    await waitFor(() => expect(fetchAuthorityOverview).toHaveBeenCalledWith("demo", expect.anything()));
+
+    expect(await screen.findByText(/demo fixture data/i)).toBeInTheDocument();
+
+    // The per-location detail repeats the disclosure honestly for the
+    // selected location - a judge opening any non-Mangaluru Demo location
+    // must not mistake this for a live evaluation of that exact place.
+    await userEvent.click(screen.getByRole("cell", { name: "Mumbai" }));
+    const detail = screen.getByText("Mumbai", { selector: "h3" }).closest<HTMLElement>(".authority-detail")!;
+    expect(within(detail).getByText(/demo fixture/i)).toBeInTheDocument();
   });
 
   it("does not poll - fetches the overview only once per edition, not repeatedly", async () => {

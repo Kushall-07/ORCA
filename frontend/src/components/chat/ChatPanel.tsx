@@ -106,6 +106,17 @@ function MessageBubble({ msg, onRetry }: { msg: ChatMessage; onRetry: () => void
   );
 }
 
+// Milestone 6 - the /query request is a single non-streaming round trip (see
+// useOrcaQuery.run): the backend returns one QueryResponse at the end of its
+// whole pipeline, so there is no genuine per-agent stage event to surface
+// here. Rather than fabricate a "Weather 20% / Ocean 40% / Risk 80%" style
+// progress bar (which would claim stages completed before they actually
+// have), this only adds a truthful, time-based note once the wait has run
+// long enough to warrant one - it never names a specific stage or implies
+// anything finished early. The real post-response pipeline breakdown remains
+// Agent Trace (components/intel/AgentTrace.tsx), the one authoritative trace.
+const LONG_WAIT_MS = 4000;
+
 export function ChatPanel({
   messages,
   loading,
@@ -123,8 +134,18 @@ export function ChatPanel({
 }) {
   const { t, lang } = useI18n();
   const [draft, setDraft] = useState("");
+  const [longWait, setLongWait] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const suggestions = getStakeholder(stakeholder).suggestions[lang];
+
+  useEffect(() => {
+    if (!loading) {
+      setLongWait(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setLongWait(true), LONG_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
 
   // Speech-to-text: recognised text is appended to the draft only. The user
   // still reviews / edits and presses Send, so the normal ORCA pipeline
@@ -178,6 +199,11 @@ export function ChatPanel({
             <div className="msg__who">{t("chat.orca")}</div>
             <div className="msg__bubble">
               <Spinner label={t("chat.analyzing")} />
+              {longWait && (
+                <p className="chat__analyzing-note" role="status" aria-live="polite">
+                  {t("chat.analyzingLong")}
+                </p>
+              )}
             </div>
           </div>
         )}

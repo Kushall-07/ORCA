@@ -561,6 +561,7 @@ button { font-family: inherit; }
 .msg__bubble--error { border-color: var(--bad); background: rgba(224, 49, 49, 0.1); }
 .msg__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg__clarify { margin: 0.4rem 0 0; color: var(--orca-caution); font-size: 0.82rem; }
+.chat__analyzing-note { margin: 0.4rem 0 0; color: var(--orca-text-muted); font-size: 0.78rem; }
 .msg__status { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.45rem; }
 .msg__status-chip {
   font-size: 0.66rem;

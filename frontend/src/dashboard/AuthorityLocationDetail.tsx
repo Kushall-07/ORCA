@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n";
-import { DataTierBadge, KeyValue, SeverityBadge } from "../components/common";
+import { DataTierBadge, Disclaimer, KeyValue, SeverityBadge } from "../components/common";
 import { ExportEvidenceButton } from "../components/evidence/ExportEvidenceButton";
 import type { AssessmentSection } from "../components/nav/navItems";
 import type { LocationOverview } from "../types/authority";
@@ -14,15 +14,25 @@ const GEOFENCE_KEY: Record<string, "authority.geofence.clear" | "authority.geofe
  * Milestone 5 - the Authority dashboard's per-location summary (spec section
  * 19/20): a compact reuse of the SAME decision data already on
  * `location.detail`, never a second Risk/Decision explanation panel. "Open
- * Today View" / "Plan Trip" / "View System" / "View Execution Trace" hand
- * that same QueryResponse to the existing Milestone 1-4 views instead of
- * rebuilding them here.
+ * Today View" / "Plan Trip" / "View Evidence" / "View Replay" / "View
+ * System" / "View Execution Trace" hand that same QueryResponse to the
+ * existing Milestone 1-4/5 views instead of rebuilding them here. "View
+ * Replay" only appears when the existing Decision page would actually render
+ * Decision Replay for this response (see WorkspacePage's own
+ * `latest.decision && latest.status === "OK"` gate) so the action never
+ * promises a panel that will not be there.
  */
 export function AuthorityLocationDetail({
   location,
+  dataEdition,
   onOpen,
 }: {
   location: LocationOverview;
+  /** Milestone 6 - "DEMO" shows the fixture-evaluation disclosure below;
+   * "LIVE" never does (see AuthorityDashboard, which fetches this once per
+   * edition and passes it straight through - no separate per-location
+   * edition state). */
+  dataEdition: "LIVE" | "DEMO";
   onOpen: (page: AssessmentSection) => void;
 }) {
   const { t, statusLabel, decisionLabel, tierLabel } = useI18n();
@@ -34,6 +44,12 @@ export function AuthorityLocationDetail({
         <h3 className="authority-detail__name">{location.name}</h3>
         <SeverityBadge severity={location.status} label={statusLabel(location.status)} />
       </header>
+
+      {dataEdition === "DEMO" && (
+        <Disclaimer>
+          {t("authority.detail.demoFixtureNotice", { name: location.name })}
+        </Disclaimer>
+      )}
 
       {location.error ? (
         <p className="empty-note">{location.error}</p>
@@ -77,6 +93,14 @@ export function AuthorityLocationDetail({
           <button type="button" className="btn btn--ghost btn--small" onClick={() => onOpen("trip")}>
             {t("authority.detail.planTrip")}
           </button>
+          <button type="button" className="btn btn--ghost btn--small" onClick={() => onOpen("evidence")}>
+            {t("authority.detail.viewEvidence")}
+          </button>
+          {detail.decision && detail.status === "OK" && (
+            <button type="button" className="btn btn--ghost btn--small" onClick={() => onOpen("decision")}>
+              {t("authority.detail.viewReplay")}
+            </button>
+          )}
           <button type="button" className="btn btn--ghost btn--small" onClick={() => onOpen("system")}>
             {t("authority.detail.viewSystem")}
           </button>

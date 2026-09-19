@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   makeComparisonResponse,
@@ -284,6 +284,77 @@ describe("ORCA workspace", () => {
     ).toBeInTheDocument();
     resolve(makeResponse());
     await waitForResponse();
+  });
+
+  // Milestone 6 - ChatPanel's loading state must never fake pipeline
+  // progress: the backend /query call is one non-streaming round trip (see
+  // useOrcaQuery.run), so there is no genuine per-agent stage event to show.
+  it("never shows fabricated per-stage progress while a query is in flight", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    postQuery.mockImplementation(
+      () => new Promise((r) => { resolve = r as (v: unknown) => void; }),
+    );
+    render(<App />);
+    await sendQuery();
+    await screen.findByText(/ORCA is analyzing marine conditions/i);
+
+    // No fake stage names, checkmarks or percentages anywhere in the DOM.
+    const body = document.body.textContent ?? "";
+    expect(body).not.toMatch(/\b\d{1,3}%/);
+    expect(body).not.toMatch(/weather\s*(done|complete|✓)/i);
+    expect(body).not.toMatch(/ocean\s*(done|complete|✓)/i);
+    expect(body).not.toMatch(/risk\s*(done|complete|✓)/i);
+
+    resolve(makeResponse());
+    await waitForResponse();
+  });
+
+  it("adds a truthful still-working note only after a genuinely long wait, without claiming any stage finished", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    postQuery.mockImplementation(
+      () => new Promise((r) => { resolve = r as (v: unknown) => void; }),
+    );
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<App />);
+      await sendQuery();
+      await screen.findByText(/ORCA is analyzing marine conditions/i);
+
+      // Immediately: no long-wait note yet.
+      expect(screen.queryByText(/still working/i)).not.toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4500);
+      });
+
+      expect(await screen.findByText(/still working/i)).toBeInTheDocument();
+
+      resolve(makeResponse());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    await waitForResponse();
+    // Once the real response lands, the loading note is gone - it never
+    // lingers as a fake "stage complete" artifact.
+    expect(screen.queryByText(/still working/i)).not.toBeInTheDocument();
+  });
+
+  it("does not send a duplicate request while ORCA's answer is still loading", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    postQuery.mockImplementation(
+      () => new Promise((r) => { resolve = r as (v: unknown) => void; }),
+    );
+    render(<App />);
+    await sendQuery();
+    await screen.findByText(/ORCA is analyzing marine conditions/i);
+    expect(postQuery).toHaveBeenCalledTimes(1);
+
+    resolve(makeResponse());
+    await waitForResponse();
+    expect(postQuery).toHaveBeenCalledTimes(1);
   });
 
   it("switches UI language without touching backend response content", async () => {

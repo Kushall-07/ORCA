@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 import { ApiError, fetchAuthorityOverview } from "../services/apiClient";
 import { AuthorityMap } from "../maps/AuthorityMap";
-import { DataTierBadge, EmptyNote, SeverityBadge, Spinner } from "../components/common";
+import { DataTierBadge, Disclaimer, EmptyNote, SeverityBadge, Spinner } from "../components/common";
 import type { AssessmentSection } from "../components/nav/navItems";
 import type { AttentionItem, AuthorityOverview, LocationOverview } from "../types/authority";
 import type { QueryResponse } from "../types/api";
@@ -126,6 +126,10 @@ export function AuthorityDashboard({
           </button>
         </div>
       </header>
+
+      {overview?.data_edition === "DEMO" && (
+        <Disclaimer>{t("authority.demoFixtureNotice")}</Disclaimer>
+      )}
 
       {loading && !overview && <Spinner label={t("authority.loading")} />}
 
@@ -259,7 +263,11 @@ export function AuthorityDashboard({
 
           <section className="authority__detail" aria-live="polite">
             {selected ? (
-              <AuthorityLocationDetail location={selected} onOpen={onOpen} />
+              <AuthorityLocationDetail
+                location={selected}
+                dataEdition={overview.data_edition}
+                onOpen={onOpen}
+              />
             ) : (
               <EmptyNote>{t("authority.selectLocation")}</EmptyNote>
             )}

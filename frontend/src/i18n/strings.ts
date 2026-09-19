@@ -21,6 +21,7 @@ export type StringKey =
   | "chat.retry"
   | "chat.suggested"
   | "chat.analyzing"
+  | "chat.analyzingLong"
   | "chat.errorTitle"
   | "chat.emptyTitle"
   | "chat.emptyHint"
@@ -576,6 +577,8 @@ export type StringKey =
   | "authority.dataEdition.demo"
   | "authority.edition.live"
   | "authority.edition.demo"
+  | "authority.demoFixtureNotice"
+  | "authority.detail.demoFixtureNotice"
   | "authority.updated"
   | "authority.refresh"
   | "authority.loading"
@@ -614,6 +617,7 @@ export type StringKey =
   | "authority.detail.planTrip"
   | "authority.detail.viewSystem"
   | "authority.detail.viewTrace"
+  | "authority.detail.viewEvidence"
   | "authority.detail.viewReplay"
   | "authority.detail.exportEvidence"
   | "authority.detail.source"
@@ -648,6 +652,8 @@ const en: Table = {
   "chat.retry": "Retry",
   "chat.suggested": "Suggested questions",
   "chat.analyzing": "ORCA is analyzing marine conditions…",
+  "chat.analyzingLong":
+    "Still working — ORCA runs weather, ocean and risk reasoning before answering; some queries take a little longer.",
   "chat.errorTitle": "Request failed",
   "chat.emptyTitle": "Start a marine assessment",
   "chat.emptyHint": "Pick a context above, then ask a question or choose a suggestion.",
@@ -1243,6 +1249,10 @@ const en: Table = {
   "authority.subtitle": "Operational overview across monitored coastal locations",
   "authority.dataEdition.live": "LIVE",
   "authority.dataEdition.demo": "DEMO DATA",
+  "authority.demoFixtureNotice":
+    "DEMO FIXTURE DATA — every location's status below is generated from a deterministic demo fixture, not a live evaluation of that location right now. The map and table still show each location's real position.",
+  "authority.detail.demoFixtureNotice":
+    "DEMO FIXTURE — this status was evaluated from a deterministic demo fixture, not from live conditions at {name} right now.",
   "authority.edition.live": "Live",
   "authority.edition.demo": "Demo data",
   "authority.updated": "Updated {time}",
@@ -1283,6 +1293,7 @@ const en: Table = {
   "authority.detail.planTrip": "Plan Trip",
   "authority.detail.viewSystem": "View System",
   "authority.detail.viewTrace": "View Execution Trace",
+  "authority.detail.viewEvidence": "View Evidence",
   "authority.detail.viewReplay": "Decision Replay",
   "authority.detail.exportEvidence": "Export Evidence",
   "authority.detail.source": "Source",
@@ -1317,6 +1328,8 @@ const hi: Table = {
   "chat.retry": "फिर कोशिश करें",
   "chat.suggested": "सुझाए गए प्रश्न",
   "chat.analyzing": "ORCA समुद्री परिस्थितियों का विश्लेषण कर रहा है…",
+  "chat.analyzingLong":
+    "अभी भी काम जारी है — उत्तर देने से पहले ORCA मौसम, समुद्र और जोखिम विश्लेषण करता है; कुछ प्रश्नों में थोड़ा अधिक समय लग सकता है।",
   "chat.errorTitle": "अनुरोध विफल",
   "chat.emptyTitle": "समुद्री आकलन शुरू करें",
   "chat.emptyHint": "ऊपर एक संदर्भ चुनें, फिर प्रश्न पूछें या सुझाव चुनें।",
@@ -1910,6 +1923,10 @@ const hi: Table = {
   "authority.subtitle": "निगरानी किए गए तटीय स्थानों का परिचालन अवलोकन",
   "authority.dataEdition.live": "लाइव",
   "authority.dataEdition.demo": "डेमो डेटा",
+  "authority.demoFixtureNotice":
+    "डेमो फ़िक्सचर डेटा — नीचे प्रत्येक स्थान की स्थिति एक निश्चित डेमो फ़िक्सचर से बनाई गई है, न कि उस स्थान की अभी की वास्तविक (लाइव) स्थितियों से। मानचित्र और तालिका अब भी हर स्थान की वास्तविक स्थिति दिखाते हैं।",
+  "authority.detail.demoFixtureNotice":
+    "डेमो फ़िक्सचर — यह स्थिति एक निश्चित डेमो फ़िक्सचर से आंकी गई है, {name} की अभी की वास्तविक (लाइव) स्थितियों से नहीं।",
   "authority.edition.live": "लाइव",
   "authority.edition.demo": "डेमो डेटा",
   "authority.updated": "अद्यतन {time}",
@@ -1950,6 +1967,7 @@ const hi: Table = {
   "authority.detail.planTrip": "यात्रा योजना बनाएं",
   "authority.detail.viewSystem": "सिस्टम देखें",
   "authority.detail.viewTrace": "निष्पादन ट्रेस देखें",
+  "authority.detail.viewEvidence": "साक्ष्य देखें",
   "authority.detail.viewReplay": "निर्णय रीप्ले",
   "authority.detail.exportEvidence": "साक्ष्य निर्यात करें",
   "authority.detail.source": "स्रोत",
@@ -1984,6 +2002,8 @@ const kn: Table = {
   "chat.retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
   "chat.suggested": "ಸೂಚಿತ ಪ್ರಶ್ನೆಗಳು",
   "chat.analyzing": "ORCA ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ…",
+  "chat.analyzingLong":
+    "ಇನ್ನೂ ಕೆಲಸ ನಡೆಯುತ್ತಿದೆ — ಉತ್ತರಿಸುವ ಮೊದಲು ORCA ಹವಾಮಾನ, ಸಮುದ್ರ ಮತ್ತು ಅಪಾಯ ವಿಶ್ಲೇಷಣೆ ನಡೆಸುತ್ತದೆ; ಕೆಲವು ಪ್ರಶ್ನೆಗಳಿಗೆ ಸ್ವಲ್ಪ ಹೆಚ್ಚು ಸಮಯ ಬೇಕಾಗಬಹುದು.",
   "chat.errorTitle": "ವಿನಂತಿ ವಿಫಲವಾಗಿದೆ",
   "chat.emptyTitle": "ಸಮುದ್ರ ಮೌಲ್ಯಮಾಪನ ಪ್ರಾರಂಭಿಸಿ",
   "chat.emptyHint": "ಮೇಲೆ ಸಂದರ್ಭ ಆರಿಸಿ, ನಂತರ ಪ್ರಶ್ನೆ ಕೇಳಿ ಅಥವಾ ಸಲಹೆ ಆರಿಸಿ.",
@@ -2577,6 +2597,10 @@ const kn: Table = {
   "authority.subtitle": "ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡಿದ ಕರಾವಳಿ ಸ್ಥಳಗಳ ಕಾರ್ಯಾಚರಣಾ ಅವಲೋಕನ",
   "authority.dataEdition.live": "ನೈಜ",
   "authority.dataEdition.demo": "ಡೆಮೊ ಡೇಟಾ",
+  "authority.demoFixtureNotice":
+    "ಡೆಮೊ ಫಿಕ್ಸ್ಚರ್ ಡೇಟಾ — ಕೆಳಗಿನ ಪ್ರತಿ ಸ್ಥಳದ ಸ್ಥಿತಿಯನ್ನು ನಿಗದಿತ ಡೆಮೊ ಫಿಕ್ಸ್ಚರ್‌ನಿಂದ ರಚಿಸಲಾಗಿದೆ, ಆ ಸ್ಥಳದ ಈಗಿನ ನೈಜ (ಲೈವ್) ಪರಿಸ್ಥಿತಿಗಳಿಂದ ಅಲ್ಲ. ನಕ್ಷೆ ಮತ್ತು ಪಟ್ಟಿ ಇನ್ನೂ ಪ್ರತಿ ಸ್ಥಳದ ನೈಜ ಸ್ಥಾನವನ್ನು ತೋರಿಸುತ್ತವೆ.",
+  "authority.detail.demoFixtureNotice":
+    "ಡೆಮೊ ಫಿಕ್ಸ್ಚರ್ — ಈ ಸ್ಥಿತಿಯನ್ನು ನಿಗದಿತ ಡೆಮೊ ಫಿಕ್ಸ್ಚರ್‌ನಿಂದ ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗಿದೆ, {name} ನ ಈಗಿನ ನೈಜ (ಲೈವ್) ಪರಿಸ್ಥಿತಿಗಳಿಂದ ಅಲ್ಲ.",
   "authority.edition.live": "ನೈಜ",
   "authority.edition.demo": "ಡೆಮೊ ಡೇಟಾ",
   "authority.updated": "ನವೀಕರಿಸಲಾಗಿದೆ {time}",
@@ -2617,6 +2641,7 @@ const kn: Table = {
   "authority.detail.planTrip": "ಪ್ರಯಾಣ ಯೋಜಿಸಿ",
   "authority.detail.viewSystem": "ಸಿಸ್ಟಮ್ ವೀಕ್ಷಿಸಿ",
   "authority.detail.viewTrace": "ಎಕ್ಸಿಕ್ಯೂಶನ್ ಟ್ರೇಸ್ ವೀಕ್ಷಿಸಿ",
+  "authority.detail.viewEvidence": "ಪುರಾವೆ ವೀಕ್ಷಿಸಿ",
   "authority.detail.viewReplay": "ನಿರ್ಣಯ ರಿಪ್ಲೇ",
   "authority.detail.exportEvidence": "ಪುರಾವೆ ರಫ್ತು ಮಾಡಿ",
   "authority.detail.source": "ಮೂಲ",

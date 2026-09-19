@@ -11,11 +11,11 @@ import {
   useMap,
 } from "react-leaflet";
 import { useI18n } from "../i18n";
+import { RISK_LEVEL_COLOR, SEVERITY_HEX } from "../theme/severityColors";
 import type {
   BaselineRouteResult,
   GeoJsonFeatureCollection,
   QueryResponse,
-  RiskLevel,
 } from "../types/api";
 
 const DEFAULT_CENTER: [number, number] = [12.9, 74.8];
@@ -45,22 +45,12 @@ const CHL_CLASS_COLOR: Record<string, string> = {
   high: "#255d82",
 };
 
-// Same semantic tiers as --orca-safe/--orca-caution/--orca-high/--orca-extreme
-// in index.css - Leaflet path styling can't reference CSS custom properties,
-// so the hex values are kept in sync with those tokens by hand.
-const RISK_COLOR: Record<RiskLevel, string> = {
-  low: "#4cc38a",
-  moderate: "#f2b84b",
-  high: "#e88945",
-  severe: "#e05252",
-};
-
 const LAYER_STYLE: Record<string, PathOptions> = {
   coastline: { color: "#5c7cfa", weight: 1.5, fillOpacity: 0 },
   eez: { color: "#4da3d9", weight: 1.5, dashArray: "6 4", fillOpacity: 0.04 },
   protected_soft: { color: "#f59f00", weight: 1.5, fillOpacity: 0.08 },
   // Hard restriction = the same blocking severity as --orca-extreme.
-  protected_hard: { color: "#e05252", weight: 2.5, fillOpacity: 0.16 },
+  protected_hard: { color: SEVERITY_HEX.extreme, weight: 2.5, fillOpacity: 0.16 },
   // Official INCOIS PFZ reference - visually distinct (teal/dashed) from ORCA
   // Risk (red-orange), Route (accent) and Protected Areas (orange/red), so a
   // user never mistakes a fishing-potential reference for a safety layer.
@@ -381,8 +371,8 @@ export default function MarineMap({
           center={origin}
           radius={16}
           pathOptions={{
-            color: RISK_COLOR[riskLevel],
-            fillColor: RISK_COLOR[riskLevel],
+            color: RISK_LEVEL_COLOR[riskLevel],
+            fillColor: RISK_LEVEL_COLOR[riskLevel],
             fillOpacity: 0.28,
             weight: 2,
           }}
