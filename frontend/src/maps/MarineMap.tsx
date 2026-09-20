@@ -376,7 +376,12 @@ export default function MarineMap({
         </CircleMarker>
       ))}
 
-      {(pfzZones ?? []).map((zone) => (
+      {/* Ranked PFZ zone markers share the SAME "pfz" layer visibility flag as
+       * the raw INCOIS PFZ reference geometry above - one source of truth, so
+       * switching the "INCOIS PFZ Reference" layer off hides every PFZ
+       * marker on the map, ranked or raw, and switching it back on restores
+       * both together. */}
+      {activeLayers.has("pfz") && (pfzZones ?? []).map((zone) => (
         <Marker
           key={`pfz-zone-${zone.id}`}
           position={[zone.latitude, zone.longitude]}

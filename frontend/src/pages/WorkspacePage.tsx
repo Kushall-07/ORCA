@@ -18,6 +18,8 @@ import { nearestPointOnFeature } from "../maps/pfzGeometry";
 import MarineMap, { type LayerId } from "../maps/MarineMap";
 import { GpsControl, PfzSelectionCard, type SelectedPfz } from "../components/map/LocationControls";
 import { PfzRankedPanel } from "../components/map/PfzRankedPanel";
+import { RouteControls } from "../components/map/RouteControls";
+import { MapSidebar } from "../components/map/MapSidebar";
 import { OrcaHeader } from "../components/header/OrcaHeader";
 import { OrcaSidebar } from "../components/nav/OrcaSidebar";
 import { WorkspaceNav } from "../components/nav/WorkspaceNav";
@@ -321,6 +323,31 @@ export default function WorkspacePage() {
     });
   };
 
+  // Route Controls (Map + PFZ UX fix) - turns the RANKED PFZ zone selection
+  // (selectedPfzZoneId, shared with the numbered map markers) into an actual
+  // route request through the SAME existing route agent / send() path as
+  // onNavigateToPfz above, keyed by the zone's own coordinates rather than
+  // always the first zone - so PFZ #1, #2, #5 ... are all independently
+  // routable, and re-selecting a different zone and routing again replaces
+  // the destination instead of leaving the old route looking current.
+  const onRouteToZone = (zoneId: string) => {
+    const zone = pfzZones.find((z) => z.id === zoneId);
+    if (!zone || !navigateOrigin) return;
+    void send(t("route.myLocationToPfzZone", { n: zone.rank }), {
+      latitude: navigateOrigin.latitude,
+      longitude: navigateOrigin.longitude,
+      destinationLatitude: zone.latitude,
+      destinationLongitude: zone.longitude,
+    });
+  };
+
+  // "View Route" jumps straight to the Details tab, where RoutePanel already
+  // renders the full route result - never a second route display.
+  const onViewRoute = () => {
+    setPage("details");
+    setMode("assessment");
+  };
+
   // A typed chat message such as "Route me through all the selected PFZs in
   // Mangalore." must ALSO carry the current map selection - otherwise the
   // backend sees a route+PFZ request with no explicit destination and falls
@@ -434,30 +461,41 @@ export default function WorkspacePage() {
 
           <div className="workspace__content">
             <main className="workspace__map">
-              <MarineMap
-                resp={latest}
-                activeLayers={activeLayers}
-                layerData={layerData}
-                gpsLocation={gpsCoordinate ? [gpsCoordinate.latitude, gpsCoordinate.longitude] : null}
-                selectedPfz={
-                  selectedPfzs.length > 0
-                    ? [selectedPfzs[selectedPfzs.length - 1].lat, selectedPfzs[selectedPfzs.length - 1].lon]
-                    : null
-                }
-                selectedPfzs={selectedPfzs.map((p) => [p.lat, p.lon] as [number, number])}
-                onSelectPfz={onSelectPfz}
-                pfzZones={pfzZones}
-                selectedPfzZoneId={selectedPfzZoneId}
-                onSelectPfzZoneId={setSelectedPfzZoneId}
-                baselineRoute={baselineRoute}
-              />
-              <div className="workspace__map-overlay">
+              <div className="workspace__map-canvas">
+                <MarineMap
+                  resp={latest}
+                  activeLayers={activeLayers}
+                  layerData={layerData}
+                  gpsLocation={gpsCoordinate ? [gpsCoordinate.latitude, gpsCoordinate.longitude] : null}
+                  selectedPfz={
+                    selectedPfzs.length > 0
+                      ? [selectedPfzs[selectedPfzs.length - 1].lat, selectedPfzs[selectedPfzs.length - 1].lon]
+                      : null
+                  }
+                  selectedPfzs={selectedPfzs.map((p) => [p.lat, p.lon] as [number, number])}
+                  onSelectPfz={onSelectPfz}
+                  pfzZones={pfzZones}
+                  selectedPfzZoneId={selectedPfzZoneId}
+                  onSelectPfzZoneId={setSelectedPfzZoneId}
+                  baselineRoute={baselineRoute}
+                />
+                {health.state === "unavailable" && (
+                  <div className="workspace__map-banner">{t("conn.offline")}</div>
+                )}
+              </div>
+              <MapSidebar>
                 <LayerControl toggles={toggles} active={activeLayers} onToggle={onToggleLayer} />
                 {suitabilityInsufficient && (
                   <p className="layer-toggle__note">{t("env.suitability.insufficientData")}</p>
                 )}
-                <DataTierLegend />
-                <GpsControl gps={gps} />
+                {pfzZones.length > 0 && (
+                  <PfzRankedPanel
+                    zones={pfzZones}
+                    selectedZoneId={selectedPfzZoneId}
+                    onSelectZone={setSelectedPfzZoneId}
+                    layerVisible={activeLayers.has("pfz")}
+                  />
+                )}
                 {selectedPfzs.length > 0 && (
                   <PfzSelectionCard
                     selections={selectedPfzs}
@@ -469,16 +507,22 @@ export default function WorkspacePage() {
                   />
                 )}
                 {pfzZones.length > 0 && (
-                  <PfzRankedPanel
+                  <RouteControls
                     zones={pfzZones}
                     selectedZoneId={selectedPfzZoneId}
-                    onSelectZone={setSelectedPfzZoneId}
+                    resp={latest}
+                    loading={loading}
+                    canNavigate={!!navigateOrigin}
+                    onRouteToZone={onRouteToZone}
+                    onViewRoute={onViewRoute}
                   />
                 )}
-              </div>
-              {health.state === "unavailable" && (
-                <div className="workspace__map-banner">{t("conn.offline")}</div>
-              )}
+                <div className="map-sidebar__tools">
+                  <p className="map-sidebar__tools-title">{t("mapTools.title")}</p>
+                  <GpsControl gps={gps} />
+                  <DataTierLegend />
+                </div>
+              </MapSidebar>
             </main>
 
             <aside className="workspace__chat">

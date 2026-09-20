@@ -223,32 +223,27 @@ button { font-family: inherit; }
   display: flex;
 }
 
+/* Map pane: the leaflet canvas + the collapsible control sidebar sit SIDE BY
+   SIDE (flex row), not stacked on top of each other - the old design
+   floated every control (layers, provenance, ranked PFZ, GPS, PFZ
+   selection) as separate cards absolutely positioned over the map tiles,
+   which both hid map content underneath them and looked congested. Now
+   exactly one thing (.map-sidebar) sits beside the map, and it is the only
+   piece that can be collapsed away for more map space. */
 .workspace__map {
   position: relative;
   min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.workspace__map-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .orca-map { position: absolute; inset: 0; background: var(--orca-bg); }
-
-.workspace__map-overlay {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 500;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.4rem;
-  width: 15.5rem;
-  max-width: calc(100% - 1.5rem);
-  /* The overlay itself never scrolls — only .layer-control__body does — so
-     the compact legend strip always stays visible under the layer panel
-     instead of being pushed off / fought over for the same scroll region. */
-  max-height: calc(100% - 1.5rem);
-  overflow: hidden;
-}
-.workspace__map-overlay > .layer-control { flex: 0 1 auto; min-height: 0; }
-.workspace__map-overlay > .tier-legend { flex: none; }
 
 .workspace__map-banner {
   position: absolute;
@@ -263,31 +258,79 @@ button { font-family: inherit; }
   font-size: 0.8rem;
 }
 
-.workspace__map-overlay > .gps-control,
-.workspace__map-overlay > .pfz-selection-card,
-.workspace__map-overlay > .pfz-ranked-panel { flex: none; width: 100%; }
+/* ---------- map sidebar (Map + PFZ UX fix) ---------- */
+.map-sidebar {
+  flex: none;
+  width: 19rem;
+  max-width: 40vw;
+  display: flex;
+  border-left: 1px solid var(--orca-border);
+  background: var(--orca-bg-2);
+  transition: width 0.15s ease;
+}
+.map-sidebar.is-collapsed { width: 2.25rem; max-width: 2.25rem; }
+
+.map-sidebar__toggle {
+  flex: none;
+  width: 2.25rem;
+  border: none;
+  border-right: 1px solid var(--orca-border);
+  background: transparent;
+  color: var(--orca-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.map-sidebar__toggle:hover { color: var(--orca-text); background: var(--orca-panel-2); }
+.map-sidebar.is-collapsed .map-sidebar__toggle { border-right: none; width: 100%; }
+
+.map-sidebar__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.map-sidebar__tools {
+  background: var(--orca-panel-2);
+  border: 1px solid var(--orca-border-soft);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.map-sidebar__tools-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
 
 .gps-control {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  background: rgba(11, 18, 32, 0.94);
+  background: var(--orca-panel);
   border: 1px solid var(--orca-border);
   color: inherit;
   border-radius: 8px;
   padding: 0.45rem 0.6rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 .gps-control.is-active { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
 
 .pfz-selection-card {
-  background: rgba(11, 18, 32, 0.94);
+  background: var(--orca-panel);
   border: 1px solid var(--orca-border);
   border-radius: 8px;
   padding: 0.55rem 0.65rem;
   font-size: 0.78rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -308,14 +351,13 @@ button { font-family: inherit; }
 .pfz-selection-card__source { opacity: 0.6; margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.02em; }
 .pfz-selection-card__note { opacity: 0.75; margin: 0; font-size: 0.72rem; }
 
-/* ---------- ranked PFZ zones panel (map overlay) ---------- */
+/* ---------- ranked PFZ zones panel (map sidebar section) ---------- */
 .pfz-ranked-panel {
-  background: rgba(11, 18, 32, 0.94);
+  background: var(--orca-panel);
   border: 1px solid var(--orca-border);
   border-radius: 8px;
   padding: 0.55rem 0.65rem;
   font-size: 0.78rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -336,6 +378,44 @@ button { font-family: inherit; }
 .pfz-ranked-panel__empty { margin: 0; opacity: 0.75; }
 .pfz-ranked-panel__hint { margin: 0; font-size: 0.68rem; opacity: 0.65; }
 .pfz-ranked-panel__note { margin: 0; font-size: 0.68rem; opacity: 0.6; }
+.pfz-ranked-panel__hidden-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--orca-muted);
+  background: var(--orca-panel-2);
+  border: 1px dashed var(--orca-border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+
+/* ---------- route controls (map sidebar section) ---------- */
+.route-controls {
+  background: var(--orca-panel);
+  border: 1px solid var(--orca-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.route-controls__title { font-size: 0.8rem; }
+.route-controls__destination { margin: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.route-controls__restricted-badge { font-size: 0.68rem; }
+.route-controls__note { margin: 0; opacity: 0.75; font-size: 0.72rem; }
+.route-controls__result {
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.route-controls__result--ok { background: var(--orca-panel-2); border: 1px solid var(--orca-teal); }
+.route-controls__result--blocked { background: var(--orca-panel-2); border: 1px solid var(--orca-extreme); }
+.route-controls__status { margin: 0; font-weight: 600; font-size: 0.74rem; letter-spacing: 0.03em; }
+.route-controls__result--ok .route-controls__status { color: var(--orca-teal); }
+.route-controls__result--blocked .route-controls__status { color: var(--orca-extreme); }
+.route-controls__stat { margin: 0; font-size: 0.74rem; }
 
 .pfz-ranked-card {
   display: flex;
@@ -1727,7 +1807,7 @@ summary:focus-visible {
   .sidebar,
   .workspace__chat,
   .workspace__map,
-  .workspace__map-overlay { display: none; }
+  .map-sidebar { display: none; }
   .workspace,
   .workspace__shell,
   .workspace__content,
@@ -1778,6 +1858,32 @@ summary:focus-visible {
   }
   .sidebar__item { white-space: nowrap; }
   .assessment__content { padding: 0; }
+}
+
+/* Map sidebar (Map + PFZ UX fix) - narrow/mobile: a side column has no room,
+   so it becomes a compact bottom drawer instead, per the responsive
+   requirement (map stays primary, sidebar never a permanent full overlay). */
+@media (max-width: 640px) {
+  .workspace__map { flex-direction: column; }
+  .workspace__map-canvas { min-height: 200px; flex: 1 1 auto; }
+  .map-sidebar {
+    width: 100%;
+    max-width: 100%;
+    max-height: 48%;
+    flex-direction: column;
+    border-left: none;
+    border-top: 1px solid var(--orca-border);
+  }
+  .map-sidebar.is-collapsed { max-height: 2.25rem; }
+  .map-sidebar__toggle {
+    width: 100%;
+    height: 2.25rem;
+    border-right: none;
+    border-bottom: 1px solid var(--orca-border);
+  }
+  .map-sidebar.is-collapsed .map-sidebar__toggle { border-bottom: none; }
+  .map-sidebar__toggle span[aria-hidden] { display: inline-block; transform: rotate(90deg); }
+  .map-sidebar__body { overflow-y: auto; }
 }
 
 /* ---------- what-if / scenario-sensitivity simulation ---------- */

@@ -14,10 +14,18 @@ export function PfzRankedPanel({
   zones,
   selectedZoneId,
   onSelectZone,
+  layerVisible = true,
 }: {
   zones: PfzZoneInfo[];
   selectedZoneId: string | null;
   onSelectZone: (id: string) => void;
+  /** Whether the "INCOIS PFZ Reference" map layer is currently switched on -
+   * the same `activeLayers.has("pfz")` flag MarineMap uses to show/hide the
+   * numbered markers (single source of truth, see MarineMap.tsx). When the
+   * layer is off, the markers this list refers to are not on the map, so the
+   * list collapses to a plain "PFZ layer is hidden" notice instead of
+   * offering clickable cards for markers the user cannot see. */
+  layerVisible?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -25,6 +33,24 @@ export function PfzRankedPanel({
     return (
       <div className="pfz-ranked-panel">
         <p className="pfz-ranked-panel__empty">{t("pfz.ranked.empty")}</p>
+      </div>
+    );
+  }
+
+  if (!layerVisible) {
+    return (
+      <div className="pfz-ranked-panel">
+        <div className="pfz-ranked-panel__head">
+          <strong>{t("pfz.ranked.title")}</strong>
+          <span className="tier-badge tier-badge--reference">
+            <span className="tier-badge__mark" aria-hidden />
+            {t("pfz.officialSource")}
+          </span>
+        </div>
+        <p className="pfz-ranked-panel__subtitle">
+          {t("pfz.ranked.available", { count: zones.length })}
+        </p>
+        <p className="pfz-ranked-panel__hidden-note">{t("pfz.ranked.layerHidden")}</p>
       </div>
     );
   }

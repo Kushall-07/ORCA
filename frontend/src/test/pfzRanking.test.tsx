@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "../i18n";
 import { PfzRankedPanel } from "../components/map/PfzRankedPanel";
-import { makeResponse } from "./fixtures";
+import { makePfzReference, makeResponse } from "./fixtures";
 import type { PfzZoneInfo } from "../types/api";
 
 afterEach(() => cleanup());
@@ -129,7 +129,18 @@ vi.mock("../services/apiClient", async () => {
 
 const { default: App } = await import("../App");
 
+// A real PFZ-intent response carries `pfz_zones` (this ranked list) AND a
+// matched `pfz_reference` together, from the same INCOIS PFZ backend flow -
+// the latter is what WorkspacePage's auto-enable effect (isPfzIntentResponse
+// + isPfzLayerAvailable, see MapControls.tsx) uses to switch the "INCOIS PFZ
+// Reference" map layer on automatically, which in turn is what makes the
+// ranked panel/markers visible (see PfzRankedPanel's `layerVisible` prop and
+// MarineMap's `activeLayers.has("pfz")` gate - one shared visibility flag,
+// not two). Omitting `pfz_reference` here would desync this fixture from
+// what the backend actually sends.
 const RESPONSE_WITH_ZONES = makeResponse({
+  intent: "pfz_reference",
+  pfz_reference: makePfzReference({ area_matched: "KARNATAKA", zone_count: ZONES.length }),
   pfz_zones: {
     source: "INCOIS",
     availability: "available",

@@ -523,8 +523,26 @@ export type StringKey =
   | "pfz.ranked.selectHint"
   | "pfz.ranked.markerTooltip"
   | "pfz.ranked.empty"
+  | "pfz.ranked.available"
+  | "pfz.ranked.layerHidden"
   | "route.myLocationToPfz"
   | "route.myLocationToPfzs"
+  | "route.myLocationToPfzZone"
+  | "mapSidebar.toggleShow"
+  | "mapSidebar.toggleHide"
+  | "mapTools.title"
+  | "routeControls.title"
+  | "routeControls.noSelection"
+  | "routeControls.destination"
+  | "routeControls.pfzLabel"
+  | "routeControls.computing"
+  | "routeControls.notRoutedYet"
+  | "routeControls.statusAvailable"
+  | "routeControls.statusBlocked"
+  | "routeControls.statusUnavailable"
+  | "routeControls.waypoints"
+  | "routeControls.routeButton"
+  | "routeControls.viewRoute"
   | "env.interp"
   | "env.interp.limited"
   | "env.interp.limitedNote"
@@ -1243,8 +1261,26 @@ const en: Table = {
   "pfz.ranked.selectHint": "Select a zone to highlight it on the map",
   "pfz.ranked.markerTooltip": "PFZ zone {n} — {km} km",
   "pfz.ranked.empty": "No matched PFZ zones near this location",
+  "pfz.ranked.available": "{count} available",
+  "pfz.ranked.layerHidden": "PFZ layer is hidden — turn on INCOIS PFZ Reference in Map Layers to see and select these zones.",
   "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
   "route.myLocationToPfzs": "My Location → {count} selected INCOIS PFZ References",
+  "route.myLocationToPfzZone": "My Location → INCOIS PFZ #{n}",
+  "mapSidebar.toggleShow": "Show map sidebar",
+  "mapSidebar.toggleHide": "Hide map sidebar",
+  "mapTools.title": "Map Tools",
+  "routeControls.title": "Route Controls",
+  "routeControls.noSelection": "Select a ranked PFZ zone to route there.",
+  "routeControls.destination": "Destination",
+  "routeControls.pfzLabel": "INCOIS PFZ #{n}",
+  "routeControls.computing": "Computing route…",
+  "routeControls.notRoutedYet": "Not yet routed to this destination.",
+  "routeControls.statusAvailable": "ROUTE AVAILABLE",
+  "routeControls.statusBlocked": "BLOCKED",
+  "routeControls.statusUnavailable": "ROUTE UNAVAILABLE",
+  "routeControls.waypoints": "Waypoints",
+  "routeControls.routeButton": "Route to PFZ #{n}",
+  "routeControls.viewRoute": "View Route",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
   "env.interp.limitedNote":
@@ -1984,8 +2020,26 @@ const hi: Table = {
   "pfz.ranked.selectHint": "मानचित्र पर हाइलाइट करने के लिए एक क्षेत्र चुनें",
   "pfz.ranked.markerTooltip": "PFZ क्षेत्र {n} — {km} किमी",
   "pfz.ranked.empty": "इस स्थान के निकट कोई मिलान PFZ क्षेत्र नहीं",
+  "pfz.ranked.available": "{count} उपलब्ध",
+  "pfz.ranked.layerHidden": "PFZ परत छिपी है — इन क्षेत्रों को देखने और चुनने के लिए मानचित्र परतों में INCOIS PFZ संदर्भ चालू करें।",
   "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
   "route.myLocationToPfzs": "मेरा स्थान → {count} चयनित INCOIS PFZ संदर्भ",
+  "route.myLocationToPfzZone": "मेरा स्थान → INCOIS PFZ #{n}",
+  "mapSidebar.toggleShow": "मानचित्र साइडबार दिखाएं",
+  "mapSidebar.toggleHide": "मानचित्र साइडबार छिपाएं",
+  "mapTools.title": "मानचित्र उपकरण",
+  "routeControls.title": "मार्ग नियंत्रण",
+  "routeControls.noSelection": "वहां मार्ग बनाने के लिए एक क्रमबद्ध PFZ क्षेत्र चुनें।",
+  "routeControls.destination": "गंतव्य",
+  "routeControls.pfzLabel": "INCOIS PFZ #{n}",
+  "routeControls.computing": "मार्ग की गणना हो रही है…",
+  "routeControls.notRoutedYet": "अभी तक इस गंतव्य के लिए मार्ग नहीं बनाया गया।",
+  "routeControls.statusAvailable": "मार्ग उपलब्ध",
+  "routeControls.statusBlocked": "अवरुद्ध",
+  "routeControls.statusUnavailable": "मार्ग अनुपलब्ध",
+  "routeControls.waypoints": "वेपॉइंट",
+  "routeControls.routeButton": "PFZ #{n} की ओर मार्ग बनाएं",
+  "routeControls.viewRoute": "मार्ग देखें",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
   "env.interp.limitedNote":
@@ -2725,8 +2779,26 @@ const kn: Table = {
   "pfz.ranked.selectHint": "ನಕ್ಷೆಯಲ್ಲಿ ಹೈಲೈಟ್ ಮಾಡಲು ಒಂದು ವಲಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
   "pfz.ranked.markerTooltip": "PFZ ವಲಯ {n} — {km} ಕಿ.ಮೀ",
   "pfz.ranked.empty": "ಈ ಸ್ಥಳದ ಬಳಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾದ PFZ ವಲಯಗಳಿಲ್ಲ",
+  "pfz.ranked.available": "{count} ಲಭ್ಯವಿದೆ",
+  "pfz.ranked.layerHidden": "PFZ ಪದರ ಮರೆಯಾಗಿದೆ — ಈ ವಲಯಗಳನ್ನು ನೋಡಲು ಮತ್ತು ಆಯ್ಕೆಮಾಡಲು ನಕ್ಷೆ ಪದರಗಳಲ್ಲಿ INCOIS PFZ ಉಲ್ಲೇಖವನ್ನು ಆನ್ ಮಾಡಿ.",
   "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
   "route.myLocationToPfzs": "ನನ್ನ ಸ್ಥಳ → {count} ಆಯ್ಕೆಮಾಡಿದ INCOIS PFZ ಉಲ್ಲೇಖಗಳು",
+  "route.myLocationToPfzZone": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ #{n}",
+  "mapSidebar.toggleShow": "ನಕ್ಷೆ ಸೈಡ್‌ಬಾರ್ ತೋರಿಸಿ",
+  "mapSidebar.toggleHide": "ನಕ್ಷೆ ಸೈಡ್‌ಬಾರ್ ಮರೆಮಾಡಿ",
+  "mapTools.title": "ನಕ್ಷೆ ಪರಿಕರಗಳು",
+  "routeControls.title": "ಮಾರ್ಗ ನಿಯಂತ್ರಣಗಳು",
+  "routeControls.noSelection": "ಅಲ್ಲಿಗೆ ಮಾರ್ಗ ನಿರ್ದೇಶನಕ್ಕಾಗಿ ಶ್ರೇಣೀಕೃತ PFZ ವಲಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+  "routeControls.destination": "ಗಮ್ಯಸ್ಥಾನ",
+  "routeControls.pfzLabel": "INCOIS PFZ #{n}",
+  "routeControls.computing": "ಮಾರ್ಗವನ್ನು ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತಿದೆ…",
+  "routeControls.notRoutedYet": "ಈ ಗಮ್ಯಸ್ಥಾನಕ್ಕೆ ಇನ್ನೂ ಮಾರ್ಗ ನಿರ್ದೇಶನ ಮಾಡಿಲ್ಲ.",
+  "routeControls.statusAvailable": "ಮಾರ್ಗ ಲಭ್ಯವಿದೆ",
+  "routeControls.statusBlocked": "ನಿರ್ಬಂಧಿತ",
+  "routeControls.statusUnavailable": "ಮಾರ್ಗ ಲಭ್ಯವಿಲ್ಲ",
+  "routeControls.waypoints": "ವೇಪಾಯಿಂಟ್‌ಗಳು",
+  "routeControls.routeButton": "PFZ #{n} ಗೆ ಮಾರ್ಗ ನಿರ್ದೇಶನ",
+  "routeControls.viewRoute": "ಮಾರ್ಗ ವೀಕ್ಷಿಸಿ",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
   "env.interp.limitedNote":
