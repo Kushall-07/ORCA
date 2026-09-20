@@ -516,6 +516,13 @@ export type StringKey =
   | "pfz.forecast"
   | "pfz.validUntil"
   | "pfz.officialSource"
+  | "pfz.ranked.title"
+  | "pfz.ranked.subtitle"
+  | "pfz.ranked.distanceKm"
+  | "pfz.ranked.restricted"
+  | "pfz.ranked.selectHint"
+  | "pfz.ranked.markerTooltip"
+  | "pfz.ranked.empty"
   | "route.myLocationToPfz"
   | "route.myLocationToPfzs"
   | "env.interp"
@@ -1229,6 +1236,13 @@ const en: Table = {
   "pfz.forecast": "Forecast",
   "pfz.validUntil": "Valid until",
   "pfz.officialSource": "Official INCOIS reference",
+  "pfz.ranked.title": "Ranked PFZ zones",
+  "pfz.ranked.subtitle": "Nearest official INCOIS zones, ranked by distance",
+  "pfz.ranked.distanceKm": "{km} km away",
+  "pfz.ranked.restricted": "Restricted",
+  "pfz.ranked.selectHint": "Select a zone to highlight it on the map",
+  "pfz.ranked.markerTooltip": "PFZ zone {n} — {km} km",
+  "pfz.ranked.empty": "No matched PFZ zones near this location",
   "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
   "route.myLocationToPfzs": "My Location → {count} selected INCOIS PFZ References",
   "env.interp": "Productivity interpretation",
@@ -1963,6 +1977,13 @@ const hi: Table = {
   "pfz.forecast": "पूर्वानुमान",
   "pfz.validUntil": "मान्य तक",
   "pfz.officialSource": "आधिकारिक INCOIS संदर्भ",
+  "pfz.ranked.title": "क्रमबद्ध PFZ क्षेत्र",
+  "pfz.ranked.subtitle": "निकटतम आधिकारिक INCOIS क्षेत्र, दूरी के अनुसार क्रमबद्ध",
+  "pfz.ranked.distanceKm": "{km} किमी दूर",
+  "pfz.ranked.restricted": "प्रतिबंधित",
+  "pfz.ranked.selectHint": "मानचित्र पर हाइलाइट करने के लिए एक क्षेत्र चुनें",
+  "pfz.ranked.markerTooltip": "PFZ क्षेत्र {n} — {km} किमी",
+  "pfz.ranked.empty": "इस स्थान के निकट कोई मिलान PFZ क्षेत्र नहीं",
   "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
   "route.myLocationToPfzs": "मेरा स्थान → {count} चयनित INCOIS PFZ संदर्भ",
   "env.interp": "उत्पादकता व्याख्या",
@@ -2697,6 +2718,13 @@ const kn: Table = {
   "pfz.forecast": "ಮುನ್ಸೂಚನೆ",
   "pfz.validUntil": "ಮಾನ್ಯವಾಗಿರುವವರೆಗೆ",
   "pfz.officialSource": "ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ",
+  "pfz.ranked.title": "ಶ್ರೇಣೀಕೃತ PFZ ವಲಯಗಳು",
+  "pfz.ranked.subtitle": "ಹತ್ತಿರದ ಅಧಿಕೃತ INCOIS ವಲಯಗಳು, ದೂರದ ಆಧಾರದ ಮೇಲೆ ಶ್ರೇಣೀಕರಿಸಲಾಗಿದೆ",
+  "pfz.ranked.distanceKm": "{km} ಕಿ.ಮೀ ದೂರದಲ್ಲಿ",
+  "pfz.ranked.restricted": "ನಿರ್ಬಂಧಿತ",
+  "pfz.ranked.selectHint": "ನಕ್ಷೆಯಲ್ಲಿ ಹೈಲೈಟ್ ಮಾಡಲು ಒಂದು ವಲಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+  "pfz.ranked.markerTooltip": "PFZ ವಲಯ {n} — {km} ಕಿ.ಮೀ",
+  "pfz.ranked.empty": "ಈ ಸ್ಥಳದ ಬಳಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾದ PFZ ವಲಯಗಳಿಲ್ಲ",
   "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
   "route.myLocationToPfzs": "ನನ್ನ ಸ್ಥಳ → {count} ಆಯ್ಕೆಮಾಡಿದ INCOIS PFZ ಉಲ್ಲೇಖಗಳು",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",

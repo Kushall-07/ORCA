@@ -30,7 +30,7 @@ from app.models.fabric import MarineDataFabric
 from app.models.geo import GeofenceResult
 from app.gis.pfz_reference import MaritimeOriginResolution, PfzRouteDestination
 from app.models.gis_agent import GisQueryResult
-from app.models.pfz import PfzReferenceResult
+from app.models.pfz import PfzReferenceResult, PfzZoneRankingResult
 from app.models.provenance import ProvenanceGraph
 from app.models.query import QueryUnderstanding
 from app.models.research import ResearchResult
@@ -187,6 +187,12 @@ class OrcaGraphState(TypedDict, total=False):
     # isolated from risk / safety / decision / route - a fishing-potential
     # reference summary only. See app.services.incois_pfz.
     pfz_result: PfzReferenceResult | None
+
+    # Ranked list of individual official INCOIS PFZ zones near the resolved
+    # origin (additive companion to pfz_result, for the ranked PFZ panel/map
+    # markers). Same isolation posture as pfz_result. See
+    # app.gis.pfz_reference.build_pfz_zone_ranking.
+    pfz_zones_result: PfzZoneRankingResult | None
 
     # Deterministic hypothetical/"what-if" scenario (see
     # app.orchestration.nodes.whatif_node / app.whatif.engine.run_what_if).

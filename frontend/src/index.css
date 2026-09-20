@@ -11,7 +11,7 @@
   --orca-text-muted: #9db7c2;
   --orca-text-faint: #6f8d99;
   --orca-accent: #4ed0b0;
-  --orca-accent-2: #18b6d9;
+  --orca-accent-2: #31aaa9;
   --orca-safe: #4cc38a;
   --orca-caution: #f2b84b;
   --orca-high: #e88945;
@@ -264,7 +264,8 @@ button { font-family: inherit; }
 }
 
 .workspace__map-overlay > .gps-control,
-.workspace__map-overlay > .pfz-selection-card { flex: none; width: 100%; }
+.workspace__map-overlay > .pfz-selection-card,
+.workspace__map-overlay > .pfz-ranked-panel { flex: none; width: 100%; }
 
 .gps-control {
   display: flex;
@@ -306,6 +307,107 @@ button { font-family: inherit; }
 .pfz-selection-card__row dd { margin: 0; text-align: right; }
 .pfz-selection-card__source { opacity: 0.6; margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.02em; }
 .pfz-selection-card__note { opacity: 0.75; margin: 0; font-size: 0.72rem; }
+
+/* ---------- ranked PFZ zones panel (map overlay) ---------- */
+.pfz-ranked-panel {
+  background: rgba(11, 18, 32, 0.94);
+  border: 1px solid var(--orca-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.78rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 14rem;
+}
+.pfz-ranked-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap; }
+.pfz-ranked-panel__subtitle { margin: 0; opacity: 0.75; font-size: 0.7rem; }
+.pfz-ranked-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+.pfz-ranked-panel__empty { margin: 0; opacity: 0.75; }
+.pfz-ranked-panel__hint { margin: 0; font-size: 0.68rem; opacity: 0.65; }
+.pfz-ranked-panel__note { margin: 0; font-size: 0.68rem; opacity: 0.6; }
+
+.pfz-ranked-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: var(--orca-panel-2);
+  border: 1px solid var(--orca-border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.pfz-ranked-card:hover { border-color: var(--orca-teal); }
+.pfz-ranked-card.is-selected { border-color: var(--orca-teal); background: var(--orca-hover); }
+.pfz-ranked-card.is-top { border-left: 3px solid var(--orca-teal); }
+.pfz-ranked-card__rank {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--orca-teal);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+.pfz-ranked-card.is-top .pfz-ranked-card__rank { background: var(--orca-teal-dark); }
+.pfz-ranked-card__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.pfz-ranked-card__distance { font-weight: 600; }
+.pfz-ranked-card__state { opacity: 0.7; font-size: 0.72rem; }
+.pfz-ranked-card__restricted {
+  align-self: flex-start;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  background: var(--orca-burgundy);
+  color: #ffffff;
+}
+
+/* ---------- numbered PFZ zone map markers ---------- */
+.orca-pfz-zone-marker-wrap { background: transparent; border: none; }
+.orca-pfz-zone-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--orca-teal);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.72rem;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.orca-pfz-zone-marker--top {
+  background: var(--orca-teal-dark);
+  border-color: var(--orca-burgundy);
+  font-size: 0.85rem;
+}
+.orca-pfz-zone-marker--restricted { background: var(--orca-burgundy); }
+.orca-pfz-zone-marker--selected {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
 
 /* Assessment content area: the selected section gets the full remaining
    width, capped for readability instead of stretching edge-to-edge. */

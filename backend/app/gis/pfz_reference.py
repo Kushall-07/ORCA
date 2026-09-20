@@ -25,8 +25,16 @@ from pydantic import BaseModel, ConfigDict
 from app.agents.marine_area import lookup as lookup_marine_area
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.gis.geofencing import check_geofences
+from app.models.geo import Geofence
 from app.models.common import Coordinate
-from app.models.pfz import PfzAvailability, PfzLandingCentreRef, PfzReferenceResult
+from app.models.pfz import (
+    PfzAvailability,
+    PfzLandingCentreRef,
+    PfzReferenceResult,
+    PfzZoneRankingResult,
+    PfzZoneRef,
+)
 from app.routing.land_mask import LandBackend
 from app.services import incois_pfz
 from app.services.cache import JsonCache, time_bucket
@@ -257,6 +265,104 @@ async def build_pfz_reference(
         issued_at=issued_at,
         retrieved_at=retrieved_at,
         source_url=source_url,
+    )
+
+
+_MAX_RANKED_ZONES = 10
+
+
+async def build_pfz_zone_ranking(
+    coordinate: Coordinate,
+    *,
+    settings: Settings,
+    cache: JsonCache,
+    hard_geofences: tuple[Geofence, ...] = (),
+    client: httpx.AsyncClient | None = None,
+) -> PfzZoneRankingResult:
+    """Ranked list of official INCOIS PFZ zones near ``coordinate`` (additive
+    companion to :func:`build_pfz_reference`, for the ranked PFZ panel / map
+    markers). Reuses the SAME cached fetch and matching as
+    :func:`build_pfz_reference` - never a second dataset, never a second
+    matching algorithm. Ranking is by real distance only
+    (:func:`app.services.incois_pfz.rank_matched_lines`); ``restricted`` is a
+    display-only reuse of the existing hard-geofence check the route planner
+    and Safety Guard already use - PFZ never feeds either of them, and
+    neither of them feeds this ranking (safety-isolation preserved).
+
+    Never raises: any failure resolves to an explicit UNAVAILABLE result,
+    the same posture as :func:`build_pfz_reference`.
+    """
+    area = lookup_marine_area(coordinate)
+    retrieved_at = _utcnow()
+
+    try:
+        bucket = time_bucket(retrieved_at, "day")
+        lines_fc, _landing_fc, _source_url = await _fetch_pfz_feature_collections(
+            area.state_name if area else None,
+            bucket=bucket, settings=settings, cache=cache, client=client,
+        )
+    except incois_pfz.IncoisPfzError:
+        logger.warning(
+            "INCOIS PFZ zone ranking unavailable on both official channels",
+            extra={"source": "incois_pfz"},
+        )
+        return PfzZoneRankingResult(
+            availability=PfzAvailability.UNAVAILABLE,
+            area_matched=area.state_name if area else None,
+            retrieved_at=retrieved_at,
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("INCOIS PFZ zone ranking unexpected error: %s", type(exc).__name__)
+        return PfzZoneRankingResult(
+            availability=PfzAvailability.UNAVAILABLE,
+            area_matched=area.state_name if area else None,
+            retrieved_at=retrieved_at,
+        )
+
+    ranked = incois_pfz.rank_matched_lines(
+        lines_fc, coordinate,
+        state_name=area.state_name if area else None,
+        max_distance_km=settings.incois_pfz_match_radius_km,
+        max_features=settings.incois_pfz_max_features,
+    )[:_MAX_RANKED_ZONES]
+
+    hard = tuple(g for g in hard_geofences if g.is_hard)
+    zones: list[PfzZoneRef] = []
+    for rank, (feature, distance_km, lat, lon) in enumerate(ranked, start=1):
+        props = feature.get("properties", {})
+        restricted = False
+        nearest_hard_m = None
+        if hard:
+            gf_result = check_geofences(Coordinate(latitude=lat, longitude=lon), hard)
+            restricted = gf_result.inside_hard
+            nearest_hard_m = gf_result.nearest_hard_distance_m
+        zones.append(
+            PfzZoneRef(
+                id=str(feature.get("id") or f"pfz-zone-{rank}"),
+                rank=rank,
+                latitude=lat,
+                longitude=lon,
+                distance_km=distance_km,
+                state_matched=_to_str(props.get("State_Name")),
+                forecast_day=_to_str(props.get("Julian_day")),
+                restricted=restricted,
+                nearest_hard_geofence_m=nearest_hard_m,
+            )
+        )
+
+    availability = (
+        PfzAvailability.AVAILABLE
+        if zones
+        else PfzAvailability.NO_LOCATION_MATCH
+        if area is None
+        else PfzAvailability.UNAVAILABLE
+    )
+
+    return PfzZoneRankingResult(
+        availability=availability,
+        area_matched=area.state_name if area else None,
+        zones=tuple(zones),
+        retrieved_at=retrieved_at,
     )
 
 

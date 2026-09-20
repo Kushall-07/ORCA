@@ -45,6 +45,54 @@ class PfzLandingCentreRef(BaseModel):
     updated_at: str | None = None
 
 
+class PfzZoneRef(BaseModel):
+    """One ranked official INCOIS PFZ zone (matched line geometry), for the
+    ranked PFZ panel/map markers. ``rank`` is 1-based, nearest-first, by real
+    geodesic distance from the query coordinate - never a fabricated
+    suitability/catch score (PFZ carries no such score; see module docstring).
+    ``restricted`` / ``nearest_hard_geofence_m`` come from the same
+    :func:`app.gis.geofencing.check_geofences` the route planner and Safety
+    Guard use - reused for display only, never fed back into either."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    rank: int
+    latitude: float
+    longitude: float
+    distance_km: float
+    state_matched: str | None = None
+    forecast_day: str | None = None
+    restricted: bool = False
+    nearest_hard_geofence_m: float | None = None
+
+
+class PfzZoneRankingResult(BaseModel):
+    """Ranked list of official INCOIS PFZ zones near one query coordinate.
+
+    Additive companion to :class:`PfzReferenceResult` (which only carries a
+    zone *count* and the nearest landing centre) - this carries each matched
+    zone individually, ranked by distance, for the ranked PFZ map/side-panel.
+    Still never a safety zone, never ORCA risk, never a guarantee of fish
+    presence."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str = "INCOIS"
+    layer_type: str = "PFZ_ZONE_RANKING"
+    availability: PfzAvailability = PfzAvailability.UNAVAILABLE
+    area_matched: str | None = None
+    zones: tuple[PfzZoneRef, ...] = ()
+    retrieved_at: datetime | None = None
+    source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    disclaimer: str = (
+        "Official INCOIS Potential Fishing Zone reference geometry, ranked by "
+        "distance from the query location. Not a safety zone, not an ORCA "
+        "risk assessment, not a guarantee of fish presence, and not a "
+        "recommendation to enter the sea."
+    )
+
+
 class PfzReferenceResult(BaseModel):
     """Official PFZ reference summary for one query coordinate.
 

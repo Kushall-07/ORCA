@@ -61,7 +61,7 @@ export function AuthorityMap({
             center={[loc.latitude, loc.longitude]}
             radius={selected ? 13 : 9}
             pathOptions={{
-              color: selected ? "#18b6d9" : "#ffffff",
+              color: selected ? "#31aaa9" : "#ffffff",
               weight: selected ? 3 : 2,
               fillColor: OPERATIONAL_STATUS_COLOR[loc.status],
               fillOpacity: 0.9,

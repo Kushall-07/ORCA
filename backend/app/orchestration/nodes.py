@@ -920,7 +920,7 @@ async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unty
     failure."""
     coord = state.get("resolved_origin")
     if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None:
-        return {"pfz_result": None, "agent_trace": ["pfz:skip"]}
+        return {"pfz_result": None, "pfz_zones_result": None, "agent_trace": ["pfz:skip"]}
     try:
         from app.gis.pfz_reference import build_pfz_reference
 
@@ -929,9 +929,24 @@ async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unty
         )
     except Exception as exc:  # noqa: BLE001 - the node must never raise
         logger.warning("pfz node error: %s", type(exc).__name__)
-        return {"pfz_result": None, "agent_trace": ["pfz:skip"]}
+        return {"pfz_result": None, "pfz_zones_result": None, "agent_trace": ["pfz:skip"]}
+
+    # Additive: ranked individual zones for the ranked PFZ panel/map markers.
+    # Reuses the same cached fetch as build_pfz_reference above; failure here
+    # must never affect the pfz_result already computed.
+    zones_result = None
+    try:
+        from app.gis.pfz_reference import build_pfz_zone_ranking
+
+        zones_result = await build_pfz_zone_ranking(
+            coord, settings=deps.settings, cache=deps.pfz_cache,
+            hard_geofences=deps.hard_geofences,
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("pfz zone ranking error: %s", type(exc).__name__)
+
     token = "pfz" if result.zone_count > 0 or result.nearest_landing_centre else "pfz:skip"
-    return {"pfz_result": result, "agent_trace": [token]}
+    return {"pfz_result": result, "pfz_zones_result": zones_result, "agent_trace": [token]}
 
 
 _ENV_VARS = ("sea_surface_temperature", "chlorophyll_a")

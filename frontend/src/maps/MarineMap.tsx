@@ -1,10 +1,12 @@
 import { useEffect, useMemo } from "react";
 import type { Feature, Geometry } from "geojson";
+import { divIcon } from "leaflet";
 import type { Layer, PathOptions } from "leaflet";
 import {
   CircleMarker,
   GeoJSON,
   MapContainer,
+  Marker,
   Polyline,
   TileLayer,
   Tooltip,
@@ -15,6 +17,7 @@ import { RISK_LEVEL_COLOR, SEVERITY_HEX } from "../theme/severityColors";
 import type {
   BaselineRouteResult,
   GeoJsonFeatureCollection,
+  PfzZoneInfo,
   QueryResponse,
 } from "../types/api";
 
@@ -68,6 +71,31 @@ function suitabilityFillColor(index: number): string {
 }
 
 const SUITABILITY_CELL_STYLE: PathOptions = { weight: 0.5, color: "#ffffff", fillOpacity: 0.55 };
+
+// Ranked PFZ zone markers - a numbered badge, visually distinct from every
+// other marker on the map (white-bordered circles for origin/destination,
+// dashed teal outline for the PFZ reference layer, translucent risk halo).
+// Brand teal fill; the top-ranked zone gets a slightly larger badge and a
+// burgundy ring so it reads as "best by distance" without implying a
+// suitability/catch score (PFZ carries none - see PfzZoneInfo).
+function pfzZoneIcon(rank: number, restricted: boolean, selected: boolean) {
+  const isTop = rank === 1;
+  const size = isTop ? 30 : 24;
+  const classes = [
+    "orca-pfz-zone-marker",
+    isTop ? "orca-pfz-zone-marker--top" : "",
+    restricted ? "orca-pfz-zone-marker--restricted" : "",
+    selected ? "orca-pfz-zone-marker--selected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return divIcon({
+    html: `<span class="${classes}">${rank}</span>`,
+    className: "orca-pfz-zone-marker-wrap",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 function FitController({ resp }: { resp: QueryResponse | null }) {
   const map = useMap();
@@ -165,6 +193,16 @@ export interface MarineMapProps {
   selectedPfzs?: [number, number][] | null;
   /** Fired when a PFZ feature is clicked. */
   onSelectPfz?: (feature: Feature<Geometry, Record<string, unknown>>, clickLatLng: [number, number]) => void;
+  /** Ranked official INCOIS PFZ zones (see `pfz_zones` on the query
+   * response) - rendered as numbered markers, distinct from the plain
+   * reference-layer geometry above and from the user's own click
+   * selections. Null/empty when unavailable. */
+  pfzZones?: PfzZoneInfo[] | null;
+  /** The zone id selected via either a numbered marker or the ranked side
+   * panel - single source of truth, lifted to WorkspacePage. */
+  selectedPfzZoneId?: string | null;
+  /** Fired when a numbered PFZ zone marker is clicked. */
+  onSelectPfzZoneId?: (id: string) => void;
   /** Milestone 4 - Fisher Operations Suite: the straight-line comparison
    * reference for the current route, when fetched. Rendered as a clearly
    * distinct muted/neutral (or extreme, if it crosses a hard geofence) line
@@ -180,6 +218,9 @@ export default function MarineMap({
   selectedPfz = null,
   selectedPfzs = null,
   onSelectPfz,
+  pfzZones = null,
+  selectedPfzZoneId = null,
+  onSelectPfzZoneId,
   baselineRoute = null,
 }: MarineMapProps) {
   const { t } = useI18n();
@@ -236,7 +277,7 @@ export default function MarineMap({
       {activeLayers.has("route") && route.length >= 2 && (
         <Polyline
           positions={route as [number, number][]}
-          pathOptions={{ color: "#18b6d9", weight: 4, opacity: 0.9 }}
+          pathOptions={{ color: "#31aaa9", weight: 4, opacity: 0.9 }}
         >
           <Tooltip sticky>
             {t("map.orcaRoute")}
@@ -273,7 +314,7 @@ export default function MarineMap({
         <CircleMarker
           center={origin}
           radius={7}
-          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#18b6d9", fillOpacity: 1 }}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#31aaa9", fillOpacity: 1 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("map.origin")}
@@ -314,7 +355,7 @@ export default function MarineMap({
         <CircleMarker
           center={gpsLocation}
           radius={7}
-          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#18b6d9", fillOpacity: 1 }}
+          pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#31aaa9", fillOpacity: 1 }}
         >
           <Tooltip permanent direction="top" offset={[0, -8]}>
             {t("gps.markerLabel")}
@@ -333,6 +374,22 @@ export default function MarineMap({
             {all.length > 1 ? t("pfz.selectedMarkerLabelMulti", { n: i + 1 }) : t("pfz.selectedMarkerLabel")}
           </Tooltip>
         </CircleMarker>
+      ))}
+
+      {(pfzZones ?? []).map((zone) => (
+        <Marker
+          key={`pfz-zone-${zone.id}`}
+          position={[zone.latitude, zone.longitude]}
+          icon={pfzZoneIcon(zone.rank, zone.restricted, selectedPfzZoneId === zone.id)}
+          eventHandlers={{
+            click: () => onSelectPfzZoneId?.(zone.id),
+          }}
+        >
+          <Tooltip>
+            {t("pfz.ranked.markerTooltip", { n: zone.rank, km: zone.distance_km.toFixed(1) })}
+            {zone.restricted ? ` — ${t("pfz.ranked.restricted")}` : ""}
+          </Tooltip>
+        </Marker>
       ))}
 
       {activeLayers.has("environmental") &&

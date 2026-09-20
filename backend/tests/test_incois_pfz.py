@@ -11,8 +11,9 @@ import pytest
 
 from app.agents.marine_area import lookup as lookup_area
 from app.core.config import Settings
-from app.gis.pfz_reference import build_pfz_reference, fetch_matched_lines
+from app.gis.pfz_reference import build_pfz_reference, build_pfz_zone_ranking, fetch_matched_lines
 from app.models.common import Coordinate
+from app.models.geo import Geofence, GeofenceSeverity, GeofenceType
 from app.models.pfz import PfzAvailability
 from app.services import incois_pfz
 from app.services.cache import InMemoryCache, JsonCache
@@ -440,3 +441,84 @@ async def test_fetch_matched_lines_falls_back_to_textdata_on_wfs_403(monkeypatch
     assert fc["features"]
     assert all(f["geometry"]["type"] == "Point" for f in fc["features"])
     assert "Text Data" in fc["orca_meta"]["source"]
+
+
+# ---- 15. ranked individual PFZ zones (additive to build_pfz_reference) ----
+def test_rank_matched_lines_sorts_by_real_distance() -> None:
+    """match_nearby_lines' same-sector branch is dataset order, not distance
+    order - rank_matched_lines must re-sort by real nearest-point distance
+    regardless, so "PFZ zone 1" is genuinely the closest one."""
+    area = lookup_area(MANGALORE)
+    ranked = incois_pfz.rank_matched_lines(
+        _LINES_FC, MANGALORE, state_name=area.state_name,
+        max_distance_km=250.0, max_features=40,
+    )
+    assert len(ranked) == 2
+    distances = [d for _f, d, _lat, _lon in ranked]
+    assert distances == sorted(distances)
+
+
+async def test_build_pfz_zone_ranking_available_with_ranked_zones(monkeypatch) -> None:
+    async def _lines(*a, **k):
+        return _LINES_FC
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_zone_ranking(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert result.area_matched == "KARNATAKA"
+    assert [z.rank for z in result.zones] == [1, 2]
+    assert result.zones[0].distance_km <= result.zones[1].distance_km
+    assert len({z.id for z in result.zones}) == len(result.zones)  # ids unique
+    assert all(z.restricted is False for z in result.zones)
+
+
+async def test_build_pfz_zone_ranking_flags_restricted_zone_from_hard_geofence(
+    monkeypatch,
+) -> None:
+    """restricted / nearest_hard_geofence_m reuse the SAME check_geofences the
+    route planner and Safety Guard use - display only, never fed back into
+    either (safety-isolation preserved)."""
+    async def _lines(*a, **k):
+        return _LINES_FC
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+
+    # Covers only the first Karnataka line's geometry (lon 74.83-74.90, lat
+    # 12.88-12.97), not the second (lat 12.70-12.75).
+    hard_fence = Geofence(
+        id="test-hard-1", name="Test hard restriction",
+        geofence_type=GeofenceType.RESTRICTED, severity=GeofenceSeverity.HARD,
+        geometry_wkt="POLYGON((74.83 12.88, 74.83 12.97, 74.90 12.97, 74.90 12.88, 74.83 12.88))",
+    )
+    result = await build_pfz_zone_ranking(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache()),
+        hard_geofences=(hard_fence,),
+    )
+    assert result.availability is PfzAvailability.AVAILABLE
+    restricted_flags = {z.rank: z.restricted for z in result.zones}
+    assert any(restricted_flags.values())
+    assert not all(restricted_flags.values())
+
+
+async def test_build_pfz_zone_ranking_unavailable_on_transport_error(monkeypatch) -> None:
+    async def _boom(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("simulated outage")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _boom)
+    result = await build_pfz_zone_ranking(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.availability is PfzAvailability.UNAVAILABLE
+    assert result.zones == ()

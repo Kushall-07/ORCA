@@ -496,6 +496,31 @@ export interface PfzReferenceInfo {
   disclaimer: string;
 }
 
+// Ranked individual official INCOIS PFZ zones (additive companion to
+// PfzReferenceInfo, which only carries a zone count). ``rank`` is 1-based,
+// nearest-first by real distance - never a fabricated suitability score.
+export interface PfzZoneInfo {
+  id: string;
+  rank: number;
+  latitude: number;
+  longitude: number;
+  distance_km: number;
+  state_matched: string | null;
+  forecast_day: string | null;
+  restricted: boolean;
+  nearest_hard_geofence_m: number | null;
+}
+
+export interface PfzZoneRankingInfo {
+  source: string;
+  availability: PfzAvailability | string;
+  area_matched: string | null;
+  zones: PfzZoneInfo[];
+  retrieved_at: string | null;
+  source_url: string;
+  disclaimer: string;
+}
+
 export interface ReferenceInfo {
   kind: "PFZ" | "RSMC" | "OTHER";
   title: string;
@@ -612,6 +637,7 @@ export interface QueryResponse {
   reference: ReferenceInfo[];
   advisory?: AdvisoryInfo | null;
   pfz_reference?: PfzReferenceInfo | null;
+  pfz_zones?: PfzZoneRankingInfo | null;
   alerts: AlertItem[];
   conflicts: ConflictItem[];
   evidence: EvidenceItem[];

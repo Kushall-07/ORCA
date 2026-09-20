@@ -502,6 +502,46 @@ def nearest_pfz_zone_point(
     return Coordinate(latitude=lat, longitude=lon), feature, round(dist_m / 1000.0, 2)
 
 
+def rank_matched_lines(
+    lines_fc: dict[str, Any],
+    coordinate: Coordinate,
+    *,
+    state_name: str | None,
+    max_distance_km: float,
+    max_features: int,
+) -> list[tuple[dict[str, Any], float, float, float]]:
+    """Same candidate set as :func:`match_nearby_lines`, each paired with its
+    real geodesic nearest-point distance (km) and its nearest point's own
+    lat/lon, sorted nearest-first.
+
+    ``match_nearby_lines`` itself is NOT distance-ordered when a same-sector
+    match exists (it returns the sector's features in dataset order, since it
+    is built for map display, not ranking) - so a truthful "PFZ zone 1, 2, 3
+    ..." ranking needs its own real-distance sort. This reuses the exact same
+    official geometry and the exact same nearest-point/geodesic math already
+    used by :func:`nearest_pfz_zone_point` for routing - no new spatial
+    algorithm, no fabricated score. Returns
+    ``(feature, distance_km, lat, lon)`` tuples."""
+    candidates = match_nearby_lines(
+        lines_fc, coordinate, state_name=state_name,
+        max_distance_km=max_distance_km, max_features=max_features,
+    )
+    scored: list[tuple[float, int, float, float, dict[str, Any]]] = []
+    for idx, f in enumerate(candidates):
+        geom = f.get("geometry")
+        if not geom:
+            continue
+        try:
+            shp = shape(geom)
+            lat, lon = nearest_point_on_geometry(coordinate.latitude, coordinate.longitude, shp)
+            dist_m = geodesic_distance_m(coordinate.latitude, coordinate.longitude, lat, lon)
+        except Exception:  # noqa: BLE001 - a malformed single feature must not fail the whole ranking
+            continue
+        scored.append((dist_m, idx, lat, lon, f))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return [(f, round(dist_m / 1000.0, 2), lat, lon) for dist_m, _idx, lat, lon, f in scored]
+
+
 def nearest_landing_centre(
     landing_fc: dict[str, Any],
     coordinate: Coordinate,

@@ -568,6 +568,39 @@ class PfzReferenceInfo(BaseModel):
     disclaimer: str = ""
 
 
+class PfzZoneInfo(BaseModel):
+    """One ranked official INCOIS PFZ zone, for the ranked PFZ panel/map
+    markers (see app.models.pfz.PfzZoneRef). ``rank`` is 1-based,
+    nearest-first, by real distance - never a fabricated suitability score."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    rank: int
+    latitude: float
+    longitude: float
+    distance_km: float
+    state_matched: str | None = None
+    forecast_day: str | None = None
+    restricted: bool = False
+    nearest_hard_geofence_m: float | None = None
+
+
+class PfzZoneRankingInfo(BaseModel):
+    """Ranked list of individual official INCOIS PFZ zones (additive
+    companion to PfzReferenceInfo, which only carries a zone count)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str = "INCOIS"
+    availability: str = "unavailable"
+    area_matched: str | None = None
+    zones: list[PfzZoneInfo] = Field(default_factory=list)
+    retrieved_at: str | None = None
+    source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    disclaimer: str = ""
+
+
 class WhatIfInfo(BaseModel):
     """Deterministic hypothetical/"what-if" scenario summary (see
     app.orchestration.nodes.whatif_node / app.whatif.engine.run_what_if).
@@ -646,6 +679,10 @@ class QueryResponse(BaseModel):
     # Official INCOIS PFZ reference (B) - fishing-potential reference only,
     # never safety. Null when no coordinate was resolved.
     pfz_reference: PfzReferenceInfo | None = None
+    # Ranked individual official INCOIS PFZ zones (additive companion to
+    # pfz_reference) - for the ranked PFZ panel/map markers. Same isolation
+    # posture: never safety, never a fabricated suitability/catch score.
+    pfz_zones: PfzZoneRankingInfo | None = None
     # Deterministic hypothetical/"what-if" scenario - only for intent == what_if.
     whatif: WhatIfInfo | None = None
 

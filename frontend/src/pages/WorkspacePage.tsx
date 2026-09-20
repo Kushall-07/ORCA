@@ -17,6 +17,7 @@ import {
 import { nearestPointOnFeature } from "../maps/pfzGeometry";
 import MarineMap, { type LayerId } from "../maps/MarineMap";
 import { GpsControl, PfzSelectionCard, type SelectedPfz } from "../components/map/LocationControls";
+import { PfzRankedPanel } from "../components/map/PfzRankedPanel";
 import { OrcaHeader } from "../components/header/OrcaHeader";
 import { OrcaSidebar } from "../components/nav/OrcaSidebar";
 import { WorkspaceNav } from "../components/nav/WorkspaceNav";
@@ -226,6 +227,14 @@ export default function WorkspacePage() {
   // new one appends it, preserving selection order for deterministic
   // multi-leg routing (see app.agents.route.RouteAgent.plan_multi).
   const [selectedPfzs, setSelectedPfzs] = useState<SelectedPfz[]>([]);
+
+  // Ranked PFZ zones (`pfz_zones` on the response) - independent of the
+  // click-to-select flow above. One selected-zone id, shared between the
+  // numbered map markers and the ranked side panel (see MarineMap /
+  // PfzRankedPanel) - never duplicated state.
+  const [selectedPfzZoneId, setSelectedPfzZoneId] = useState<string | null>(null);
+  const pfzZones = latest?.pfz_zones?.zones ?? [];
+
   const onSelectPfz = (
     feature: Feature<Geometry, Record<string, unknown>>,
     clickLatLng: [number, number],
@@ -437,6 +446,9 @@ export default function WorkspacePage() {
                 }
                 selectedPfzs={selectedPfzs.map((p) => [p.lat, p.lon] as [number, number])}
                 onSelectPfz={onSelectPfz}
+                pfzZones={pfzZones}
+                selectedPfzZoneId={selectedPfzZoneId}
+                onSelectPfzZoneId={setSelectedPfzZoneId}
                 baselineRoute={baselineRoute}
               />
               <div className="workspace__map-overlay">
@@ -454,6 +466,13 @@ export default function WorkspacePage() {
                     onNavigate={onNavigateToPfz}
                     onRemove={(i) => setSelectedPfzs((prev) => prev.filter((_, idx) => idx !== i))}
                     onClear={() => setSelectedPfzs([])}
+                  />
+                )}
+                {pfzZones.length > 0 && (
+                  <PfzRankedPanel
+                    zones={pfzZones}
+                    selectedZoneId={selectedPfzZoneId}
+                    onSelectZone={setSelectedPfzZoneId}
                   />
                 )}
               </div>

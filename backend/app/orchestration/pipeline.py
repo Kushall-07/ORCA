@@ -34,6 +34,8 @@ from app.models.api import (
     NodeTraceItem,
     PfzLandingCentreInfo,
     PfzReferenceInfo,
+    PfzZoneInfo,
+    PfzZoneRankingInfo,
     ProtectedAreaInfo,
     QueryResponse,
     ReferenceInfo,
@@ -239,6 +241,27 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             retrieved_at=pfz.retrieved_at.isoformat() if pfz.retrieved_at else None,
             source_url=pfz.source_url,
             disclaimer=pfz.disclaimer,
+        )
+
+    pfz_zones = state.get("pfz_zones_result")
+    pfz_zones_info = None
+    if pfz_zones is not None:
+        pfz_zones_info = PfzZoneRankingInfo(
+            source=pfz_zones.source,
+            availability=pfz_zones.availability.value,
+            area_matched=pfz_zones.area_matched,
+            zones=[
+                PfzZoneInfo(
+                    id=z.id, rank=z.rank, latitude=z.latitude, longitude=z.longitude,
+                    distance_km=z.distance_km, state_matched=z.state_matched,
+                    forecast_day=z.forecast_day, restricted=z.restricted,
+                    nearest_hard_geofence_m=z.nearest_hard_geofence_m,
+                )
+                for z in pfz_zones.zones
+            ],
+            retrieved_at=pfz_zones.retrieved_at.isoformat() if pfz_zones.retrieved_at else None,
+            source_url=pfz_zones.source_url,
+            disclaimer=pfz_zones.disclaimer,
         )
 
     whatif_result = state.get("whatif_result")
@@ -730,6 +753,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         reference=references,
         advisory=advisory_info,
         pfz_reference=pfz_info,
+        pfz_zones=pfz_zones_info,
         whatif=whatif_info,
         alerts=alerts,
         conflicts=conflicts,
