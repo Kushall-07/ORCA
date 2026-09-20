@@ -1,26 +1,45 @@
 :root {
-  /* ---- Deep Ocean Instrument palette (canonical tokens) ---- */
-  --orca-bg: #071a24;
-  --orca-bg-2: #0b2531;
-  --orca-surface: #102f3d;
-  --orca-surface-2: #143b4a;
-  --orca-border: #234b5a;
-  --orca-border-strong: #2f6172;
-  --orca-hover: #1c4657;
-  --orca-text: #e8f4f8;
-  --orca-text-muted: #9db7c2;
-  --orca-text-faint: #6f8d99;
-  --orca-accent: #4ed0b0;
-  --orca-accent-2: #31aaa9;
-  --orca-safe: #4cc38a;
-  --orca-caution: #f2b84b;
-  --orca-high: #e88945;
-  --orca-extreme: #e05252;
-  --orca-info: #4da3d9;
+  /* ---- Workspace palette: warm cream through pale periwinkle to muted
+     lavender/purple (replaces the earlier "Deep Ocean Instrument" dark
+     navy/teal palette below). Surfaces get progressively cooler/more
+     saturated with elevation: page bg (cream) -> secondary bg (periwinkle)
+     -> card/panel surface (light lavender) -> raised surface (soft
+     blue-lavender), so hierarchy reads from color alone, not just shadow. ---- */
+  --orca-bg: #f7f3ea;
+  --orca-bg-2: #eff0f9;
+  --orca-surface: #e9e8f5;
+  --orca-surface-2: #dedbf0;
+  --orca-border: #c9c3e3;
+  --orca-border-strong: #a79fd4;
+  --orca-hover: #e2def5;
+  --orca-text: #2b2740;
+  --orca-text-muted: #5c5780;
+  --orca-text-faint: #837fa6;
+
+  /* Primary brand accent - a muted lavender/purple (never saturated/neon),
+     used for links, active nav/sidebar items, buttons, focus rings and the
+     ranked-PFZ "selected"/"top" emphasis that used to be brand teal. */
+  --orca-primary: #6c63b8;
+  --orca-primary-dark: #4f4794;
+  --orca-primary-soft: #edeafb;
+  --orca-accent: #8078cc;
+  --orca-accent-2: var(--orca-primary);
+
+  /* Severity/risk tiers - same hues as before (green/amber/orange/red/blue),
+     deepened so each still reads at a legible contrast as TEXT on the new
+     light surfaces (the old values were tuned for light-on-dark-navy and
+     nearly vanish on cream/lavender). Keep frontend/src/theme/severityColors.ts
+     equal to these - see that file's own comment. */
+  --orca-safe: #1f9d65;
+  --orca-caution: #b9790b;
+  --orca-high: #c2540c;
+  --orca-extreme: #c43b3b;
+  --orca-info: #2b72b8;
 
   /* ---- Competition palette (landing page + PFZ zone-rank accents only -
-     see index.css bottom section and PfzRanking; the in-app dark workspace
-     theme above stays as-is per M1-M6, this is additive, not a retheme). ---- */
+     see index.css bottom section and PfzRanking; the landing page keeps its
+     own distinct warm cream/teal "front door" branding, unrelated to the
+     workspace retheme above - see the ".landing" section's own comment). ---- */
   --orca-teal: #31aaa9;
   --orca-teal-dark: #1f7a79;
   --orca-cream: #f6efdd;
@@ -35,14 +54,14 @@
      directly instead of these. ---- */
   --orca-panel: var(--orca-surface);
   --orca-panel-2: var(--orca-surface-2);
-  --orca-border-soft: #0d222c;
+  --orca-border-soft: #dfdcf0;
   --orca-muted: var(--orca-text-muted);
   --orca-faint: var(--orca-text-faint);
   --ok: var(--orca-safe);
   --warn: var(--orca-caution);
   --bad: var(--orca-extreme);
   --severe: var(--orca-extreme);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -363,13 +382,12 @@ button { font-family: inherit; }
   gap: 0.35rem;
   max-height: 14rem;
 }
-.pfz-ranked-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap; }
 .pfz-ranked-panel__toggle {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex: 1;
-  min-width: 0;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
   border: none;
   background: transparent;
   color: inherit;
@@ -378,6 +396,11 @@ button { font-family: inherit; }
   padding: 0;
   text-align: left;
 }
+/* Title always yields space to the chevron rather than pushing it out: it
+   can shrink and wrap onto multiple lines (min-width: 0 lets it shrink below
+   its own line-box), while the chevron keeps a fixed, never-shrinking slot -
+   see RouteControls' matching accordion header for the same pattern. */
+.pfz-ranked-panel__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; }
 .pfz-ranked-panel__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
 .pfz-ranked-panel__chevron.is-open { transform: rotate(180deg); }
 .pfz-ranked-panel__body {
@@ -426,7 +449,7 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.35rem;
+  gap: 0.5rem;
   width: 100%;
   border: none;
   background: transparent;
@@ -444,7 +467,7 @@ button { font-family: inherit; }
   gap: 0.35rem;
 }
 .route-controls__body[hidden] { display: none; }
-.route-controls__title { font-size: 0.8rem; }
+.route-controls__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; }
 .route-controls__destination { margin: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .route-controls__restricted-badge { font-size: 0.68rem; }
 .route-controls__note { margin: 0; opacity: 0.75; font-size: 0.72rem; }
@@ -455,10 +478,10 @@ button { font-family: inherit; }
   flex-direction: column;
   gap: 0.15rem;
 }
-.route-controls__result--ok { background: var(--orca-panel-2); border: 1px solid var(--orca-teal); }
+.route-controls__result--ok { background: var(--orca-panel-2); border: 1px solid var(--orca-primary); }
 .route-controls__result--blocked { background: var(--orca-panel-2); border: 1px solid var(--orca-extreme); }
 .route-controls__status { margin: 0; font-weight: 600; font-size: 0.74rem; letter-spacing: 0.03em; }
-.route-controls__result--ok .route-controls__status { color: var(--orca-teal); }
+.route-controls__result--ok .route-controls__status { color: var(--orca-primary-dark); }
 .route-controls__result--blocked .route-controls__status { color: var(--orca-extreme); }
 .route-controls__stat { margin: 0; font-size: 0.74rem; }
 
@@ -476,9 +499,9 @@ button { font-family: inherit; }
   color: inherit;
   font: inherit;
 }
-.pfz-ranked-card:hover { border-color: var(--orca-teal); }
-.pfz-ranked-card.is-selected { border-color: var(--orca-teal); background: var(--orca-hover); }
-.pfz-ranked-card.is-top { border-left: 3px solid var(--orca-teal); }
+.pfz-ranked-card:hover { border-color: var(--orca-primary); }
+.pfz-ranked-card.is-selected { border-color: var(--orca-primary); background: var(--orca-hover); }
+.pfz-ranked-card.is-top { border-left: 3px solid var(--orca-primary); }
 .pfz-ranked-card__rank {
   flex: none;
   display: inline-flex;
@@ -487,12 +510,12 @@ button { font-family: inherit; }
   width: 1.35rem;
   height: 1.35rem;
   border-radius: 50%;
-  background: var(--orca-teal);
+  background: var(--orca-primary);
   color: #ffffff;
   font-weight: 700;
   font-size: 0.7rem;
 }
-.pfz-ranked-card.is-top .pfz-ranked-card__rank { background: var(--orca-teal-dark); }
+.pfz-ranked-card.is-top .pfz-ranked-card__rank { background: var(--orca-primary-dark); }
 .pfz-ranked-card__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .pfz-ranked-card__distance { font-weight: 600; }
 .pfz-ranked-card__state { opacity: 0.7; font-size: 0.72rem; }
@@ -516,7 +539,7 @@ button { font-family: inherit; }
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: var(--orca-teal);
+  background: var(--orca-primary);
   color: #ffffff;
   font-weight: 700;
   font-size: 0.72rem;
@@ -525,7 +548,7 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .orca-pfz-zone-marker--top {
-  background: var(--orca-teal-dark);
+  background: var(--orca-primary-dark);
   border-color: var(--orca-burgundy);
   font-size: 0.85rem;
 }
@@ -700,7 +723,7 @@ button { font-family: inherit; }
 .tier-badge--live .tier-badge__mark { background: var(--ok); border-radius: 50%; }
 .tier-badge--cache .tier-badge__mark { background: var(--warn); border-radius: 50%; }
 .tier-badge--reference .tier-badge__mark { background: var(--orca-accent-2); }
-.tier-badge--derived .tier-badge__mark { background: #9775fa; transform: rotate(45deg); }
+.tier-badge--derived .tier-badge__mark { background: #9b4fc2; transform: rotate(45deg); }
 .tier-badge--demo .tier-badge__mark { background: var(--orca-faint); border-radius: 2px; opacity: 0.7; }
 .tier-badge--missing .tier-badge__mark { background: transparent; border: 1px solid var(--orca-faint); }
 
@@ -1316,7 +1339,7 @@ summary:focus-visible {
 
 .env-anom__spark-wrap { position: relative; }
 .env-anom__spark { display: block; width: 100%; height: 118px; }
-.env-anom__spark-iqr { fill: rgba(24, 182, 217, 0.13); }
+.env-anom__spark-iqr { fill: rgba(108, 99, 184, 0.13); }
 .env-anom__spark-median { stroke: var(--orca-muted); stroke-width: 1; stroke-dasharray: 2 2; }
 .env-anom__spark-line { fill: none; stroke: var(--orca-accent-2); stroke-width: 1.6; }
 .env-anom__spark-connector { stroke: var(--orca-accent-2); stroke-width: 1; stroke-dasharray: 2 2; opacity: 0.6; }
@@ -1508,7 +1531,7 @@ summary:focus-visible {
 .activity-step__row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .activity-step__detail { font-size: 0.7rem; color: var(--orca-faint); overflow-wrap: anywhere; }
 .activity-step__kind { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.02rem 0.3rem; border-radius: 3px; border: 1px solid var(--orca-border); color: var(--orca-muted); }
-.activity-step__kind--llm { border-color: #9775fa; color: #b7a3f7; }
+.activity-step__kind--llm { border-color: #9b4fc2; color: #7c3aa0; }
 .activity-step__kind--deterministic { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
 .activity-step__kind--data { border-color: var(--orca-border-strong); color: var(--orca-muted); }
 .activity-step__ms { font-size: 0.68rem; color: var(--orca-faint); font-variant-numeric: tabular-nums; }
@@ -1547,7 +1570,7 @@ summary:focus-visible {
 .engine-agent { border: 1px solid var(--orca-border); border-radius: 6px; padding: 0.45rem 0.5rem; background: var(--orca-panel-2); display: flex; flex-direction: column; gap: 0.2rem; }
 .engine-agent__head { display: flex; align-items: center; justify-content: space-between; gap: 0.3rem; }
 .engine-agent__kind { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.02rem 0.3rem; border-radius: 3px; border: 1px solid var(--orca-border); color: var(--orca-muted); }
-.engine-agent__kind--llm { border-color: #9775fa; color: #b7a3f7; }
+.engine-agent__kind--llm { border-color: #9b4fc2; color: #7c3aa0; }
 .engine-agent__kind--deterministic { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
 .engine-agent__kind--data { border-color: var(--orca-border-strong); color: var(--orca-muted); }
 .engine-agent__status { font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--orca-faint); }
@@ -1581,7 +1604,7 @@ summary:focus-visible {
   gap: 0.1rem;
 }
 .prov__node:hover { border-color: var(--orca-accent-2); }
-.prov__node.is-selected { border-color: var(--orca-accent-2); background: rgba(24, 182, 217, 0.18); }
+.prov__node.is-selected { border-color: var(--orca-accent-2); background: rgba(108, 99, 184, 0.18); }
 .prov__node--decision, .prov__node--policy { border-left: 3px solid var(--warn); }
 .prov__node--risk, .prov__node--risk_factor { border-left: 3px solid var(--orca-high); }
 .prov__node--conflict { border-left: 3px solid var(--bad); }
@@ -1709,7 +1732,7 @@ summary:focus-visible {
   font-size: 0.6rem;
   font-weight: 600;
   color: var(--orca-accent-2);
-  background: rgba(24, 182, 217, 0.14);
+  background: rgba(108, 99, 184, 0.14);
   border: 1px solid var(--orca-accent-2);
   border-radius: 999px;
   padding: 0.06rem 0.4rem;
@@ -1786,7 +1809,7 @@ summary:focus-visible {
 }
 .layer-toggle__badge--live { color: var(--ok); border-color: var(--ok); }
 .layer-toggle__badge--reference { color: var(--orca-accent-2); border-color: var(--orca-accent-2); }
-.layer-toggle__badge--derived { color: #b7a2fb; border-color: #9775fa; }
+.layer-toggle__badge--derived { color: #7c3aa0; border-color: #9b4fc2; }
 .layer-toggle__note {
   margin: -0.05rem 0 0.15rem 1.6rem;
   font-size: 0.66rem;
@@ -1817,7 +1840,7 @@ summary:focus-visible {
 .tier-legend__swatch { width: 0.6rem; height: 0.6rem; flex: none; border-radius: 2px; }
 .tier-legend__swatch--live { background: var(--ok); border-radius: 50%; }
 .tier-legend__swatch--reference { background: var(--orca-accent-2); }
-.tier-legend__swatch--derived { background: #9775fa; transform: rotate(45deg); }
+.tier-legend__swatch--derived { background: #9b4fc2; transform: rotate(45deg); }
 .tier-legend__swatch--demo { background: var(--orca-faint); opacity: 0.7; }
 .tier-legend__swatch--missing { background: transparent; border: 1px solid var(--orca-faint); }
 
@@ -2005,7 +2028,7 @@ summary:focus-visible {
   font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
   color: var(--orca-info); border: 1px solid var(--orca-accent-2); border-radius: 3px;
   padding: 0.2rem 0.45rem; flex: none; align-self: flex-start;
-  background: rgba(24, 182, 217, 0.14);
+  background: rgba(108, 99, 184, 0.14);
 }
 .replay__how-toggle {
   flex: none; align-self: flex-start; font-size: 0.68rem; padding: 0.2rem 0.5rem;
@@ -2255,7 +2278,7 @@ summary:focus-visible {
   position: fixed;
   border-radius: 10px;
   border: 2px solid var(--orca-accent-2);
-  box-shadow: 0 0 0 4px rgba(24, 182, 217, 0.22), 0 0 24px rgba(24, 182, 217, 0.35);
+  box-shadow: 0 0 0 4px rgba(108, 99, 184, 0.22), 0 0 24px rgba(108, 99, 184, 0.35);
   pointer-events: none;
   transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
 }

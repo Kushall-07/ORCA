@@ -44,6 +44,12 @@ export function PfzRankedPanel({
     );
   }
 
+  // The header row is ONLY the title + chevron (a single full-width button,
+  // same shape as RouteControls' accordion header) so the collapse control
+  // always has a fixed, predictable slot at the trailing edge - it can never
+  // be pushed out or clipped by the (variable-width, sometimes-wrapping)
+  // "OFFICIAL INCOIS REFERENCE" badge, which now lives below the header
+  // inside the collapsible body instead of competing with it on one row.
   const toggle = (
     <button
       type="button"
@@ -53,24 +59,26 @@ export function PfzRankedPanel({
       title={t(expanded ? "pfz.ranked.collapse" : "pfz.ranked.expand")}
       onClick={() => setExpanded((v) => !v)}
     >
-      <strong>{t("pfz.ranked.title")}</strong>
+      <strong className="pfz-ranked-panel__title">{t("pfz.ranked.title")}</strong>
       <span className={`pfz-ranked-panel__chevron ${expanded ? "is-open" : ""}`} aria-hidden="true">
         ▾
       </span>
     </button>
   );
 
+  const badge = (
+    <span className="tier-badge tier-badge--reference">
+      <span className="tier-badge__mark" aria-hidden />
+      {t("pfz.officialSource")}
+    </span>
+  );
+
   if (!layerVisible) {
     return (
       <div className="pfz-ranked-panel">
-        <div className="pfz-ranked-panel__head">
-          {toggle}
-          <span className="tier-badge tier-badge--reference">
-            <span className="tier-badge__mark" aria-hidden />
-            {t("pfz.officialSource")}
-          </span>
-        </div>
+        {toggle}
         <div id="pfz-ranked-panel-body" className="pfz-ranked-panel__body" hidden={!expanded}>
+          {badge}
           <p className="pfz-ranked-panel__subtitle">
             {t("pfz.ranked.available", { count: zones.length })}
           </p>
@@ -82,14 +90,9 @@ export function PfzRankedPanel({
 
   return (
     <div className="pfz-ranked-panel">
-      <div className="pfz-ranked-panel__head">
-        {toggle}
-        <span className="tier-badge tier-badge--reference">
-          <span className="tier-badge__mark" aria-hidden />
-          {t("pfz.officialSource")}
-        </span>
-      </div>
+      {toggle}
       <div id="pfz-ranked-panel-body" className="pfz-ranked-panel__body" hidden={!expanded}>
+        {badge}
         <p className="pfz-ranked-panel__subtitle">{t("pfz.ranked.subtitle")}</p>
         <ol className="pfz-ranked-panel__list">
           {zones.map((z) => (

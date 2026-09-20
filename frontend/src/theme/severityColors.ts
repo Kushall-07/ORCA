@@ -11,12 +11,12 @@ import type { OperationalStatus } from "../types/authority";
  * Keep this file's values equal to index.css's tokens; do not fork them.
  */
 export const SEVERITY_HEX = {
-  safe: "#4cc38a",
-  caution: "#f2b84b",
-  high: "#e88945",
-  extreme: "#e05252",
-  muted: "#9db7c2",
-  faint: "#6f8d99",
+  safe: "#1f9d65",
+  caution: "#b9790b",
+  high: "#c2540c",
+  extreme: "#c43b3b",
+  muted: "#5c5780",
+  faint: "#837fa6",
 } as const;
 
 /** low -> severe, matching --orca-safe/caution/high/extreme. */

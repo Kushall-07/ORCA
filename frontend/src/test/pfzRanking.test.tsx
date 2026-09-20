@@ -105,6 +105,21 @@ describe("PfzRankedPanel (direct component test)", () => {
     );
   });
 
+  it("keeps the collapse chevron out of the header's official-reference badge (regression: badge used to crowd the chevron off the header row)", () => {
+    render(
+      <I18nProvider>
+        <PfzRankedPanel zones={ZONES} selectedZoneId={null} onSelectZone={() => {}} />
+      </I18nProvider>,
+    );
+    const toggle = screen.getByRole("button", { name: /ranked pfz zones/i });
+    // The header button contains ONLY the title and chevron - never the
+    // "OFFICIAL INCOIS REFERENCE" badge, which now renders below the header
+    // inside the collapsible body instead of sharing its row.
+    expect(toggle).not.toHaveTextContent(/official/i);
+    expect(screen.getByText(/official incois reference/i)).toBeInTheDocument();
+    expect(toggle.querySelector(".pfz-ranked-panel__chevron")).toBeInTheDocument();
+  });
+
   it("keeps the collapse toggle usable (aria-controls) while the PFZ layer is hidden", async () => {
     render(
       <I18nProvider>
