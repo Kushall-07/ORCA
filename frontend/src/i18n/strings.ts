@@ -525,6 +525,8 @@ export type StringKey =
   | "pfz.ranked.empty"
   | "pfz.ranked.available"
   | "pfz.ranked.layerHidden"
+  | "pfz.ranked.expand"
+  | "pfz.ranked.collapse"
   | "route.myLocationToPfz"
   | "route.myLocationToPfzs"
   | "route.myLocationToPfzZone"
@@ -543,6 +545,8 @@ export type StringKey =
   | "routeControls.waypoints"
   | "routeControls.routeButton"
   | "routeControls.viewRoute"
+  | "routeControls.expand"
+  | "routeControls.collapse"
   | "env.interp"
   | "env.interp.limited"
   | "env.interp.limitedNote"
@@ -1263,6 +1267,8 @@ const en: Table = {
   "pfz.ranked.empty": "No matched PFZ zones near this location",
   "pfz.ranked.available": "{count} available",
   "pfz.ranked.layerHidden": "PFZ layer is hidden — turn on INCOIS PFZ Reference in Map Layers to see and select these zones.",
+  "pfz.ranked.expand": "Show ranked PFZ zones",
+  "pfz.ranked.collapse": "Hide ranked PFZ zones",
   "route.myLocationToPfz": "My Location → INCOIS PFZ Reference",
   "route.myLocationToPfzs": "My Location → {count} selected INCOIS PFZ References",
   "route.myLocationToPfzZone": "My Location → INCOIS PFZ #{n}",
@@ -1281,6 +1287,8 @@ const en: Table = {
   "routeControls.waypoints": "Waypoints",
   "routeControls.routeButton": "Route to PFZ #{n}",
   "routeControls.viewRoute": "View Route",
+  "routeControls.expand": "Show route controls",
+  "routeControls.collapse": "Hide route controls",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
   "env.interp.limitedNote":
@@ -2022,6 +2030,8 @@ const hi: Table = {
   "pfz.ranked.empty": "इस स्थान के निकट कोई मिलान PFZ क्षेत्र नहीं",
   "pfz.ranked.available": "{count} उपलब्ध",
   "pfz.ranked.layerHidden": "PFZ परत छिपी है — इन क्षेत्रों को देखने और चुनने के लिए मानचित्र परतों में INCOIS PFZ संदर्भ चालू करें।",
+  "pfz.ranked.expand": "क्रमबद्ध PFZ क्षेत्र दिखाएं",
+  "pfz.ranked.collapse": "क्रमबद्ध PFZ क्षेत्र छिपाएं",
   "route.myLocationToPfz": "मेरा स्थान → INCOIS PFZ संदर्भ",
   "route.myLocationToPfzs": "मेरा स्थान → {count} चयनित INCOIS PFZ संदर्भ",
   "route.myLocationToPfzZone": "मेरा स्थान → INCOIS PFZ #{n}",
@@ -2040,6 +2050,8 @@ const hi: Table = {
   "routeControls.waypoints": "वेपॉइंट",
   "routeControls.routeButton": "PFZ #{n} की ओर मार्ग बनाएं",
   "routeControls.viewRoute": "मार्ग देखें",
+  "routeControls.expand": "मार्ग नियंत्रण दिखाएं",
+  "routeControls.collapse": "मार्ग नियंत्रण छिपाएं",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
   "env.interp.limitedNote":
@@ -2781,6 +2793,8 @@ const kn: Table = {
   "pfz.ranked.empty": "ಈ ಸ್ಥಳದ ಬಳಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾದ PFZ ವಲಯಗಳಿಲ್ಲ",
   "pfz.ranked.available": "{count} ಲಭ್ಯವಿದೆ",
   "pfz.ranked.layerHidden": "PFZ ಪದರ ಮರೆಯಾಗಿದೆ — ಈ ವಲಯಗಳನ್ನು ನೋಡಲು ಮತ್ತು ಆಯ್ಕೆಮಾಡಲು ನಕ್ಷೆ ಪದರಗಳಲ್ಲಿ INCOIS PFZ ಉಲ್ಲೇಖವನ್ನು ಆನ್ ಮಾಡಿ.",
+  "pfz.ranked.expand": "ಶ್ರೇಣೀಕೃತ PFZ ವಲಯಗಳನ್ನು ತೋರಿಸಿ",
+  "pfz.ranked.collapse": "ಶ್ರೇಣೀಕೃತ PFZ ವಲಯಗಳನ್ನು ಮರೆಮಾಡಿ",
   "route.myLocationToPfz": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ ಉಲ್ಲೇಖ",
   "route.myLocationToPfzs": "ನನ್ನ ಸ್ಥಳ → {count} ಆಯ್ಕೆಮಾಡಿದ INCOIS PFZ ಉಲ್ಲೇಖಗಳು",
   "route.myLocationToPfzZone": "ನನ್ನ ಸ್ಥಳ → INCOIS PFZ #{n}",
@@ -2799,6 +2813,8 @@ const kn: Table = {
   "routeControls.waypoints": "ವೇಪಾಯಿಂಟ್‌ಗಳು",
   "routeControls.routeButton": "PFZ #{n} ಗೆ ಮಾರ್ಗ ನಿರ್ದೇಶನ",
   "routeControls.viewRoute": "ಮಾರ್ಗ ವೀಕ್ಷಿಸಿ",
+  "routeControls.expand": "ಮಾರ್ಗ ನಿಯಂತ್ರಣಗಳನ್ನು ತೋರಿಸಿ",
+  "routeControls.collapse": "ಮಾರ್ಗ ನಿಯಂತ್ರಣಗಳನ್ನು ಮರೆಮಾಡಿ",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
   "env.interp.limitedNote":

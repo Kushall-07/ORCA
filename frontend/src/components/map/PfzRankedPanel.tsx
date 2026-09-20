@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type { PfzZoneInfo } from "../../types/api";
 
@@ -28,6 +29,12 @@ export function PfzRankedPanel({
   layerVisible?: boolean;
 }) {
   const { t } = useI18n();
+  // Collapsing/expanding this section is purely a local display concern - it
+  // never touches `selectedZoneId` (owned by WorkspacePage and shared with
+  // the map's numbered markers), so collapsing can never clear a selection
+  // or the route it drives. Defaults to expanded whenever there is ranked
+  // PFZ data to show, since fishermen rely on this list.
+  const [expanded, setExpanded] = useState(zones.length > 0);
 
   if (zones.length === 0) {
     return (
@@ -37,20 +44,38 @@ export function PfzRankedPanel({
     );
   }
 
+  const toggle = (
+    <button
+      type="button"
+      className="pfz-ranked-panel__toggle"
+      aria-expanded={expanded}
+      aria-controls="pfz-ranked-panel-body"
+      title={t(expanded ? "pfz.ranked.collapse" : "pfz.ranked.expand")}
+      onClick={() => setExpanded((v) => !v)}
+    >
+      <strong>{t("pfz.ranked.title")}</strong>
+      <span className={`pfz-ranked-panel__chevron ${expanded ? "is-open" : ""}`} aria-hidden="true">
+        ▾
+      </span>
+    </button>
+  );
+
   if (!layerVisible) {
     return (
       <div className="pfz-ranked-panel">
         <div className="pfz-ranked-panel__head">
-          <strong>{t("pfz.ranked.title")}</strong>
+          {toggle}
           <span className="tier-badge tier-badge--reference">
             <span className="tier-badge__mark" aria-hidden />
             {t("pfz.officialSource")}
           </span>
         </div>
-        <p className="pfz-ranked-panel__subtitle">
-          {t("pfz.ranked.available", { count: zones.length })}
-        </p>
-        <p className="pfz-ranked-panel__hidden-note">{t("pfz.ranked.layerHidden")}</p>
+        <div id="pfz-ranked-panel-body" className="pfz-ranked-panel__body" hidden={!expanded}>
+          <p className="pfz-ranked-panel__subtitle">
+            {t("pfz.ranked.available", { count: zones.length })}
+          </p>
+          <p className="pfz-ranked-panel__hidden-note">{t("pfz.ranked.layerHidden")}</p>
+        </div>
       </div>
     );
   }
@@ -58,46 +83,48 @@ export function PfzRankedPanel({
   return (
     <div className="pfz-ranked-panel">
       <div className="pfz-ranked-panel__head">
-        <strong>{t("pfz.ranked.title")}</strong>
+        {toggle}
         <span className="tier-badge tier-badge--reference">
           <span className="tier-badge__mark" aria-hidden />
           {t("pfz.officialSource")}
         </span>
       </div>
-      <p className="pfz-ranked-panel__subtitle">{t("pfz.ranked.subtitle")}</p>
-      <ol className="pfz-ranked-panel__list">
-        {zones.map((z) => (
-          <li key={z.id}>
-            <button
-              type="button"
-              className={`pfz-ranked-card ${selectedZoneId === z.id ? "is-selected" : ""} ${
-                z.rank === 1 ? "is-top" : ""
-              }`}
-              onClick={() => onSelectZone(z.id)}
-              aria-pressed={selectedZoneId === z.id}
-            >
-              <span className="pfz-ranked-card__rank" aria-hidden>
-                {z.rank}
-              </span>
-              <span className="pfz-ranked-card__body">
-                <span className="pfz-ranked-card__distance">
-                  {t("pfz.ranked.distanceKm", { km: z.distance_km.toFixed(1) })}
+      <div id="pfz-ranked-panel-body" className="pfz-ranked-panel__body" hidden={!expanded}>
+        <p className="pfz-ranked-panel__subtitle">{t("pfz.ranked.subtitle")}</p>
+        <ol className="pfz-ranked-panel__list">
+          {zones.map((z) => (
+            <li key={z.id}>
+              <button
+                type="button"
+                className={`pfz-ranked-card ${selectedZoneId === z.id ? "is-selected" : ""} ${
+                  z.rank === 1 ? "is-top" : ""
+                }`}
+                onClick={() => onSelectZone(z.id)}
+                aria-pressed={selectedZoneId === z.id}
+              >
+                <span className="pfz-ranked-card__rank" aria-hidden>
+                  {z.rank}
                 </span>
-                {z.state_matched && (
-                  <span className="pfz-ranked-card__state">{z.state_matched}</span>
-                )}
-                {z.restricted && (
-                  <span className="pfz-ranked-card__restricted">
-                    {t("pfz.ranked.restricted")}
+                <span className="pfz-ranked-card__body">
+                  <span className="pfz-ranked-card__distance">
+                    {t("pfz.ranked.distanceKm", { km: z.distance_km.toFixed(1) })}
                   </span>
-                )}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <p className="pfz-ranked-panel__hint">{t("pfz.ranked.selectHint")}</p>
-      <p className="pfz-ranked-panel__note">{t("pfz.notSafetyNote")}</p>
+                  {z.state_matched && (
+                    <span className="pfz-ranked-card__state">{z.state_matched}</span>
+                  )}
+                  {z.restricted && (
+                    <span className="pfz-ranked-card__restricted">
+                      {t("pfz.ranked.restricted")}
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <p className="pfz-ranked-panel__hint">{t("pfz.ranked.selectHint")}</p>
+        <p className="pfz-ranked-panel__note">{t("pfz.notSafetyNote")}</p>
+      </div>
     </div>
   );
 }

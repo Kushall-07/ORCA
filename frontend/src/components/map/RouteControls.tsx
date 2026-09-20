@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type { PfzZoneInfo, QueryResponse } from "../../types/api";
 
@@ -43,6 +44,11 @@ export function RouteControls({
 }) {
   const { t } = useI18n();
   const zone = zones.find((z) => z.id === selectedZoneId) ?? null;
+  // Local, purely-visual collapse state - it never reads or writes the route
+  // request, the destination, or `selectedZoneId`, so collapsing/expanding
+  // this section can never cancel a route, change the destination, or touch
+  // the selected PFZ (all owned by WorkspacePage). Defaults to expanded.
+  const [expanded, setExpanded] = useState(true);
 
   if (!zone) {
     return (
@@ -64,63 +70,77 @@ export function RouteControls({
 
   return (
     <div className="route-controls">
-      <strong className="route-controls__title">{t("routeControls.title")}</strong>
-      <p className="route-controls__destination">
-        {t("routeControls.destination")}: {t("routeControls.pfzLabel", { n: zone.rank })}
-        {zone.restricted && (
-          <span className="pfz-ranked-card__restricted route-controls__restricted-badge">
-            {t("pfz.ranked.restricted")}
-          </span>
-        )}
-      </p>
-
-      {loading ? (
-        <p className="route-controls__note">{t("routeControls.computing")}</p>
-      ) : !routeMatchesZone ? (
-        <p className="route-controls__note">{t("routeControls.notRoutedYet")}</p>
-      ) : ROUTE_OK.has(route!.status) ? (
-        <div className="route-controls__result route-controls__result--ok">
-          <p className="route-controls__status">{t("routeControls.statusAvailable")}</p>
-          {route!.total_distance_m != null && (
-            <p className="route-controls__stat">
-              {t("route.distance")}: {(route!.total_distance_m / 1000).toFixed(1)} km
-            </p>
-          )}
-          {route!.waypoint_count != null && (
-            <p className="route-controls__stat">
-              {t("routeControls.waypoints")}: {route!.waypoint_count}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="route-controls__result route-controls__result--blocked">
-          <p className="route-controls__status">
-            {ROUTE_BLOCKED.has(route!.status)
-              ? t("routeControls.statusBlocked")
-              : t("routeControls.statusUnavailable")}
-          </p>
-          {route!.reasons.length > 0 && (
-            <p className="route-controls__stat">
-              {t("route.reason")}: {route!.reasons[0]}
-            </p>
-          )}
-        </div>
-      )}
-
       <button
         type="button"
-        className="btn btn--primary btn--small"
-        onClick={() => onRouteToZone(zone.id)}
-        disabled={!canNavigate || loading}
+        className="route-controls__toggle"
+        aria-expanded={expanded}
+        aria-controls="route-controls-body"
+        title={t(expanded ? "routeControls.collapse" : "routeControls.expand")}
+        onClick={() => setExpanded((v) => !v)}
       >
-        {t("routeControls.routeButton", { n: zone.rank })}
+        <strong className="route-controls__title">{t("routeControls.title")}</strong>
+        <span className={`route-controls__chevron ${expanded ? "is-open" : ""}`} aria-hidden="true">
+          ▾
+        </span>
       </button>
-      {!canNavigate && <p className="route-controls__note">{t("gps.unavailable")}</p>}
-      {routeMatchesZone && ROUTE_OK.has(route!.status) && (
-        <button type="button" className="btn btn--ghost btn--small" onClick={onViewRoute}>
-          {t("routeControls.viewRoute")}
+      <div id="route-controls-body" className="route-controls__body" hidden={!expanded}>
+        <p className="route-controls__destination">
+          {t("routeControls.destination")}: {t("routeControls.pfzLabel", { n: zone.rank })}
+          {zone.restricted && (
+            <span className="pfz-ranked-card__restricted route-controls__restricted-badge">
+              {t("pfz.ranked.restricted")}
+            </span>
+          )}
+        </p>
+
+        {loading ? (
+          <p className="route-controls__note">{t("routeControls.computing")}</p>
+        ) : !routeMatchesZone ? (
+          <p className="route-controls__note">{t("routeControls.notRoutedYet")}</p>
+        ) : ROUTE_OK.has(route!.status) ? (
+          <div className="route-controls__result route-controls__result--ok">
+            <p className="route-controls__status">{t("routeControls.statusAvailable")}</p>
+            {route!.total_distance_m != null && (
+              <p className="route-controls__stat">
+                {t("route.distance")}: {(route!.total_distance_m / 1000).toFixed(1)} km
+              </p>
+            )}
+            {route!.waypoint_count != null && (
+              <p className="route-controls__stat">
+                {t("routeControls.waypoints")}: {route!.waypoint_count}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="route-controls__result route-controls__result--blocked">
+            <p className="route-controls__status">
+              {ROUTE_BLOCKED.has(route!.status)
+                ? t("routeControls.statusBlocked")
+                : t("routeControls.statusUnavailable")}
+            </p>
+            {route!.reasons.length > 0 && (
+              <p className="route-controls__stat">
+                {t("route.reason")}: {route!.reasons[0]}
+              </p>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="btn btn--primary btn--small"
+          onClick={() => onRouteToZone(zone.id)}
+          disabled={!canNavigate || loading}
+        >
+          {t("routeControls.routeButton", { n: zone.rank })}
         </button>
-      )}
+        {!canNavigate && <p className="route-controls__note">{t("gps.unavailable")}</p>}
+        {routeMatchesZone && ROUTE_OK.has(route!.status) && (
+          <button type="button" className="btn btn--ghost btn--small" onClick={onViewRoute}>
+            {t("routeControls.viewRoute")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

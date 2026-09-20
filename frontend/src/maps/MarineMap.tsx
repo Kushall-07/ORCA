@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import type { Feature, Geometry } from "geojson";
-import { divIcon } from "leaflet";
-import type { Layer, PathOptions } from "leaflet";
+import { circleMarker, divIcon } from "leaflet";
+import type { LatLng, Layer, PathOptions } from "leaflet";
 import {
   CircleMarker,
   GeoJSON,
@@ -97,6 +97,24 @@ function pfzZoneIcon(rank: number, restricted: boolean, selected: boolean) {
   });
 }
 
+// The raw "pfz" reference layer's GeoJSON sometimes carries Point geometry
+// (the INCOIS Text Data fallback projects each forecast row onto a Point -
+// see textdata_to_feature_collections on the backend) rather than the
+// primary WFS's LineStrings. react-leaflet's <GeoJSON> renders any Point
+// feature as a full `L.Marker`, which - with no icon override - falls back
+// to Leaflet's own default blue-pin image. Those points are the SAME
+// coordinates the ranked/numbered PFZ zone markers already render below, so
+// left alone this doubles up as a blue pin sitting on/next to every numbered
+// circle. There must be only ONE visible marker per PFZ zone (the numbered
+// circle), so raw "pfz" Point features render as a fully invisible
+// (zero-opacity) circle marker instead - keeping their click-to-select and
+// tooltip behaviour (bound in onEachFeature below) without ever painting a
+// second marker. LineString/Polygon "pfz" features are unaffected: Leaflet
+// only calls pointToLayer for Point/MultiPoint geometry.
+function invisiblePfzPointLayer(_feature: Feature<Geometry, Record<string, unknown>>, latlng: LatLng) {
+  return circleMarker(latlng, { radius: 6, opacity: 0, fillOpacity: 0 });
+}
+
 function FitController({ resp }: { resp: QueryResponse | null }) {
   const map = useMap();
   useEffect(() => {
@@ -171,7 +189,15 @@ function StaticLayer({
     );
   };
   // `key` forces re-mount when the data reference changes.
-  return <GeoJSON key={id} data={fc as never} style={styleFn} onEachFeature={onEach} />;
+  return (
+    <GeoJSON
+      key={id}
+      data={fc as never}
+      style={styleFn}
+      onEachFeature={onEach}
+      pointToLayer={id === "pfz" ? invisiblePfzPointLayer : undefined}
+    />
+  );
 }
 
 export interface MarineMapProps {

@@ -78,6 +78,47 @@ describe("PfzRankedPanel (direct component test)", () => {
     );
     expect(screen.getByText(/no matched pfz zones/i)).toBeInTheDocument();
   });
+
+  it("defaults to expanded when zones are available, and collapsing/expanding never touches the selection", async () => {
+    render(
+      <I18nProvider>
+        <PfzRankedPanel zones={ZONES} selectedZoneId="zone-2" onSelectZone={() => {}} />
+      </I18nProvider>,
+    );
+    const toggle = screen.getByRole("button", { name: /ranked pfz zones/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/28\.7 km away/i)).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // The collapsed body uses the `hidden` attribute (like the existing Map
+    // Layers section), never conditional unmounting, so content stays in the
+    // DOM - just not visible - and nothing inside it loses state.
+    expect(screen.getByText(/28\.7 km away/i)).not.toBeVisible();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Selection survives the round-trip - it lives in the `selectedZoneId`
+    // prop owned by WorkspacePage, never in this component's collapse state.
+    expect(screen.getByText(/28\.7 km away/i).closest("button")).toHaveAttribute(
+      "aria-pressed", "true",
+    );
+  });
+
+  it("keeps the collapse toggle usable (aria-controls) while the PFZ layer is hidden", async () => {
+    render(
+      <I18nProvider>
+        <PfzRankedPanel zones={ZONES} selectedZoneId={null} onSelectZone={() => {}} layerVisible={false} />
+      </I18nProvider>,
+    );
+    const toggle = screen.getByRole("button", { name: /ranked pfz zones/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/pfz layer is hidden/i)).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText(/pfz layer is hidden/i)).not.toBeVisible();
+  });
 });
 
 // ---- Map <-> ranked-card selection sync (WorkspacePage lifts one shared
