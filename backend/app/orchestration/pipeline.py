@@ -240,6 +240,8 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             issued_at=pfz.issued_at,
             retrieved_at=pfz.retrieved_at.isoformat() if pfz.retrieved_at else None,
             source_url=pfz.source_url,
+            is_stale=pfz.is_stale,
+            data_retrieved_at=pfz.data_retrieved_at.isoformat() if pfz.data_retrieved_at else None,
             disclaimer=pfz.disclaimer,
         )
 
@@ -261,6 +263,10 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             ],
             retrieved_at=pfz_zones.retrieved_at.isoformat() if pfz_zones.retrieved_at else None,
             source_url=pfz_zones.source_url,
+            is_stale=pfz_zones.is_stale,
+            data_retrieved_at=(
+                pfz_zones.data_retrieved_at.isoformat() if pfz_zones.data_retrieved_at else None
+            ),
             disclaimer=pfz_zones.disclaimer,
         )
 

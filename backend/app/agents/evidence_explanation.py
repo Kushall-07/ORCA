@@ -728,9 +728,20 @@ def _render_pfz_intent(language, understanding, pfz, decision, route, pfz_route_
             generated_via="template", grounded=True,
         )
 
+    origin_name = understanding.origin.name if understanding is not None and understanding.origin is not None else None
+
     has_pfz = pfz is not None and (pfz.zone_count > 0 or pfz.nearest_landing_centre is not None)
     if has_pfz:
-        parts.append(frag(language, "pfz_reference_available"))
+        if pfz.is_stale:
+            date = pfz.data_retrieved_at.strftime("%d %b %Y") if pfz.data_retrieved_at else "an earlier date"
+            if origin_name:
+                parts.append(frag(language, "pfz_reference_available_stale_near", place=origin_name, date=date))
+            else:
+                parts.append(frag(language, "pfz_reference_available_stale", date=date))
+        elif origin_name:
+            parts.append(frag(language, "pfz_reference_available_near", place=origin_name))
+        else:
+            parts.append(frag(language, "pfz_reference_available"))
         if pfz.zone_count:
             parts.append(frag(language, "pfz_reference_zone_count", count=pfz.zone_count))
         lc = pfz.nearest_landing_centre
@@ -746,7 +757,10 @@ def _render_pfz_intent(language, understanding, pfz, decision, route, pfz_route_
                 bits.append(f"valid until {lc.valid_until}")
             parts.append(frag(language, "pfz_reference_landing_centre", detail=", ".join(bits)))
     else:
-        parts.append(frag(language, "pfz_reference_unavailable"))
+        if origin_name:
+            parts.append(frag(language, "pfz_reference_unavailable_near", place=origin_name))
+        else:
+            parts.append(frag(language, "pfz_reference_unavailable"))
     parts.append(frag(language, "pfz_reference_is_not_safety"))
 
     # The auto-resolved-PFZ-destination case (no distinct second place named)

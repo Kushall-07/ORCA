@@ -277,14 +277,43 @@ button { font-family: inherit; }
   font-size: 0.8rem;
 }
 
-/* ---------- map sidebar (Map + PFZ UX fix) ---------- */
+/* ---------- map sidebar (Map + PFZ UX fix) ----------
+   A deliberate, self-contained deep-ocean navy control panel - distinct from
+   the light cream/lavender workspace around it (the "instrument panel beside
+   the chart" identity) - rather than the previous mix of one dark card (Map
+   Layers) awkwardly sitting inside otherwise-light cards (ranked PFZ, route
+   controls, GPS...), which is what produced the low-contrast, inconsistent
+   look. Every row/card in the sidebar now shares ONE dark surface + a single
+   high-contrast text scale, defined once here and inherited by every
+   descendant: primary labels near-white (--sb-text), secondary/helper text
+   muted blue-gray (--sb-text-muted / --sb-text-faint), section headings a
+   lighter blue (--sb-heading), and active/selected states teal/cyan
+   (--sb-accent) - never the site's purple brand accent, which stays
+   reserved for the numbered PFZ rank badge so it still visually pairs with
+   the matching numbered marker on the map. */
 .map-sidebar {
+  --sb-bg: #0a1a2c;
+  --sb-bg-2: #0f2338;
+  --sb-surface: #142c46;
+  --sb-surface-2: #1a3552;
+  --sb-border: #26445f;
+  --sb-border-strong: #35597a;
+  --sb-text: #f3f6fa;
+  --sb-text-muted: #9fb4c9;
+  --sb-text-faint: #74899d;
+  --sb-accent: #3fd8c9;
+  --sb-accent-dark: #22a99b;
+  --sb-accent-ink: #072420;
+  --sb-heading: #bcd8ee;
+  --sb-danger: #ff8080;
+
   flex: none;
   width: 19rem;
   max-width: 40vw;
   display: flex;
-  border-left: 1px solid var(--orca-border);
-  background: var(--orca-bg-2);
+  border-left: 1px solid var(--sb-border);
+  background: var(--sb-bg);
+  color: var(--sb-text);
   transition: width 0.15s ease;
 }
 .map-sidebar.is-collapsed { width: 2.25rem; max-width: 2.25rem; }
@@ -293,13 +322,13 @@ button { font-family: inherit; }
   flex: none;
   width: 2.25rem;
   border: none;
-  border-right: 1px solid var(--orca-border);
+  border-right: 1px solid var(--sb-border);
   background: transparent;
-  color: var(--orca-muted);
+  color: var(--sb-text-muted);
   cursor: pointer;
   font-size: 1.1rem;
 }
-.map-sidebar__toggle:hover { color: var(--orca-text); background: var(--orca-panel-2); }
+.map-sidebar__toggle:hover { color: var(--sb-text); background: var(--sb-surface); }
 .map-sidebar.is-collapsed .map-sidebar__toggle { border-right: none; width: 100%; }
 
 .map-sidebar__body {
@@ -307,28 +336,28 @@ button { font-family: inherit; }
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.6rem;
+  padding: 0.65rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .map-sidebar__tools {
-  background: var(--orca-panel-2);
-  border: 1px solid var(--orca-border-soft);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
   border-radius: 8px;
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.65rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 .map-sidebar__tools-title {
   margin: 0;
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.7;
+  letter-spacing: 0.05em;
+  color: var(--sb-heading);
 }
 
 .gps-control {
@@ -336,50 +365,50 @@ button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  background: var(--orca-panel);
-  border: 1px solid var(--orca-border);
-  color: inherit;
+  background: var(--sb-surface-2);
+  border: 1px solid var(--sb-border-strong);
+  color: var(--sb-text);
   border-radius: 8px;
   padding: 0.45rem 0.6rem;
 }
-.gps-control.is-active { border-color: var(--orca-accent-2); color: var(--orca-accent-2); }
+.gps-control.is-active { border-color: var(--sb-accent); color: var(--sb-accent); }
 
 .pfz-selection-card {
-  background: var(--orca-panel);
-  border: 1px solid var(--orca-border);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
   border-radius: 8px;
-  padding: 0.55rem 0.65rem;
+  padding: 0.6rem 0.7rem;
   font-size: 0.78rem;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.35rem;
 }
 .pfz-selection-card__head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
-.pfz-selection-card__meta { opacity: 0.75; margin: 0; }
+.pfz-selection-card__meta { color: var(--sb-text-muted); margin: 0; }
 .pfz-selection-card__coords { margin: 0; font-variant-numeric: tabular-nums; }
 .pfz-selection-card__details {
   margin: 0.15rem 0;
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 0.5rem;
-  row-gap: 0.15rem;
+  row-gap: 0.2rem;
 }
 .pfz-selection-card__row { display: contents; }
-.pfz-selection-card__row dt { opacity: 0.7; }
+.pfz-selection-card__row dt { color: var(--sb-text-muted); }
 .pfz-selection-card__row dd { margin: 0; text-align: right; }
-.pfz-selection-card__source { opacity: 0.6; margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.02em; }
-.pfz-selection-card__note { opacity: 0.75; margin: 0; font-size: 0.72rem; }
+.pfz-selection-card__source { color: var(--sb-text-faint); margin: 0; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.pfz-selection-card__note { color: var(--sb-text-muted); margin: 0; font-size: 0.72rem; }
 
 /* ---------- ranked PFZ zones panel (map sidebar section) ---------- */
 .pfz-ranked-panel {
-  background: var(--orca-panel);
-  border: 1px solid var(--orca-border);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
   border-radius: 8px;
-  padding: 0.55rem 0.65rem;
+  padding: 0.6rem 0.7rem;
   font-size: 0.78rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   max-height: 14rem;
 }
 .pfz-ranked-panel__toggle {
@@ -400,50 +429,50 @@ button { font-family: inherit; }
    can shrink and wrap onto multiple lines (min-width: 0 lets it shrink below
    its own line-box), while the chevron keeps a fixed, never-shrinking slot -
    see RouteControls' matching accordion header for the same pattern. */
-.pfz-ranked-panel__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; }
-.pfz-ranked-panel__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
+.pfz-ranked-panel__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; color: var(--sb-heading); font-weight: 600; }
+.pfz-ranked-panel__chevron { flex: none; font-size: 0.7rem; color: var(--sb-text-muted); transition: transform 0.15s ease; }
 .pfz-ranked-panel__chevron.is-open { transform: rotate(180deg); }
 .pfz-ranked-panel__body {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   min-height: 0;
 }
 .pfz-ranked-panel__body[hidden] { display: none; }
-.pfz-ranked-panel__subtitle { margin: 0; opacity: 0.75; font-size: 0.7rem; }
+.pfz-ranked-panel__subtitle { margin: 0; color: var(--sb-text-muted); font-size: 0.7rem; }
 .pfz-ranked-panel__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
   overflow-y: auto;
   min-height: 0;
 }
-.pfz-ranked-panel__empty { margin: 0; opacity: 0.75; }
-.pfz-ranked-panel__hint { margin: 0; font-size: 0.68rem; opacity: 0.65; }
-.pfz-ranked-panel__note { margin: 0; font-size: 0.68rem; opacity: 0.6; }
+.pfz-ranked-panel__empty { margin: 0; color: var(--sb-text-muted); }
+.pfz-ranked-panel__hint { margin: 0; font-size: 0.68rem; color: var(--sb-text-faint); }
+.pfz-ranked-panel__note { margin: 0; font-size: 0.68rem; color: var(--sb-text-faint); }
 .pfz-ranked-panel__hidden-note {
   margin: 0;
   font-size: 0.72rem;
-  color: var(--orca-muted);
-  background: var(--orca-panel-2);
-  border: 1px dashed var(--orca-border);
+  color: var(--sb-text-muted);
+  background: var(--sb-bg-2);
+  border: 1px dashed var(--sb-border-strong);
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
 }
 
 /* ---------- route controls (map sidebar section) ---------- */
 .route-controls {
-  background: var(--orca-panel);
-  border: 1px solid var(--orca-border);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
   border-radius: 8px;
-  padding: 0.55rem 0.65rem;
+  padding: 0.6rem 0.7rem;
   font-size: 0.78rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 .route-controls__toggle {
   display: flex;
@@ -459,31 +488,31 @@ button { font-family: inherit; }
   padding: 0;
   text-align: left;
 }
-.route-controls__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
+.route-controls__chevron { flex: none; font-size: 0.7rem; color: var(--sb-text-muted); transition: transform 0.15s ease; }
 .route-controls__chevron.is-open { transform: rotate(180deg); }
 .route-controls__body {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 .route-controls__body[hidden] { display: none; }
-.route-controls__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; }
+.route-controls__title { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; color: var(--sb-heading); font-weight: 600; }
 .route-controls__destination { margin: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .route-controls__restricted-badge { font-size: 0.68rem; }
-.route-controls__note { margin: 0; opacity: 0.75; font-size: 0.72rem; }
+.route-controls__note { margin: 0; color: var(--sb-text-muted); font-size: 0.72rem; }
 .route-controls__result {
   border-radius: 6px;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
-.route-controls__result--ok { background: var(--orca-panel-2); border: 1px solid var(--orca-primary); }
-.route-controls__result--blocked { background: var(--orca-panel-2); border: 1px solid var(--orca-extreme); }
-.route-controls__status { margin: 0; font-weight: 600; font-size: 0.74rem; letter-spacing: 0.03em; }
-.route-controls__result--ok .route-controls__status { color: var(--orca-primary-dark); }
-.route-controls__result--blocked .route-controls__status { color: var(--orca-extreme); }
-.route-controls__stat { margin: 0; font-size: 0.74rem; }
+.route-controls__result--ok { background: var(--sb-surface-2); border: 1px solid var(--sb-accent); }
+.route-controls__result--blocked { background: var(--sb-surface-2); border: 1px solid var(--sb-danger); }
+.route-controls__status { margin: 0; font-weight: 700; font-size: 0.74rem; letter-spacing: 0.03em; }
+.route-controls__result--ok .route-controls__status { color: var(--sb-accent); }
+.route-controls__result--blocked .route-controls__status { color: var(--sb-danger); }
+.route-controls__stat { margin: 0; font-size: 0.74rem; color: var(--sb-text); }
 
 .pfz-ranked-card {
   display: flex;
@@ -491,17 +520,17 @@ button { font-family: inherit; }
   gap: 0.5rem;
   width: 100%;
   text-align: left;
-  background: var(--orca-panel-2);
-  border: 1px solid var(--orca-border);
+  background: var(--sb-surface-2);
+  border: 1px solid var(--sb-border-strong);
   border-radius: 6px;
-  padding: 0.35rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   cursor: pointer;
-  color: inherit;
+  color: var(--sb-text);
   font: inherit;
 }
-.pfz-ranked-card:hover { border-color: var(--orca-primary); }
-.pfz-ranked-card.is-selected { border-color: var(--orca-primary); background: var(--orca-hover); }
-.pfz-ranked-card.is-top { border-left: 3px solid var(--orca-primary); }
+.pfz-ranked-card:hover { border-color: var(--sb-accent); }
+.pfz-ranked-card.is-selected { border-color: var(--sb-accent); background: rgba(63, 216, 201, 0.16); }
+.pfz-ranked-card.is-top { border-left: 3px solid var(--sb-accent); }
 .pfz-ranked-card__rank {
   flex: none;
   display: inline-flex;
@@ -510,6 +539,9 @@ button { font-family: inherit; }
   width: 1.35rem;
   height: 1.35rem;
   border-radius: 50%;
+  /* Matches the numbered marker's fill on the map (orca-pfz-zone-marker) -
+     deliberately the brand purple, not the sidebar's teal accent, so the
+     list row and its marker stay visually paired. */
   background: var(--orca-primary);
   color: #ffffff;
   font-weight: 700;
@@ -517,8 +549,8 @@ button { font-family: inherit; }
 }
 .pfz-ranked-card.is-top .pfz-ranked-card__rank { background: var(--orca-primary-dark); }
 .pfz-ranked-card__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-.pfz-ranked-card__distance { font-weight: 600; }
-.pfz-ranked-card__state { opacity: 0.7; font-size: 0.72rem; }
+.pfz-ranked-card__distance { font-weight: 600; color: var(--sb-text); }
+.pfz-ranked-card__state { color: var(--sb-text-muted); font-size: 0.72rem; }
 .pfz-ranked-card__restricted {
   align-self: flex-start;
   font-size: 0.64rem;
@@ -1682,14 +1714,19 @@ summary:focus-visible {
 .route-compare__explanation { margin: 0; font-size: 0.8rem; color: var(--orca-text); background: var(--orca-panel-2, var(--orca-surface-2)); border-radius: 6px; padding: 0.5rem 0.6rem; }
 .route-analytics { display: flex; flex-direction: column; gap: 0.2rem; }
 
-/* ---------- map controls ---------- */
+/* ---------- map controls ----------
+   Lives inside .map-sidebar (see that rule's comment) - uses the SAME --sb-*
+   navy tokens rather than its own hardcoded dark color, which is what
+   previously left this one card dark navy while every other sidebar card
+   was still the light workspace lavender (var(--orca-panel*)): one card
+   readable, the rest inconsistent, and - because its text colors were the
+   light-theme dark-purple values (--orca-text/--orca-muted), never updated
+   when this component's own background stayed dark - very low contrast. */
 .layer-control, .tier-legend {
-  background: rgba(11, 18, 32, 0.94);
-  border: 1px solid var(--orca-border);
+  background: var(--sb-surface);
+  border: 1px solid var(--sb-border);
   border-radius: 8px;
   font-size: 0.78rem;
-  backdrop-filter: blur(3px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
   width: 100%;
 }
 
@@ -1713,41 +1750,41 @@ summary:focus-visible {
   flex: none;
   border: none;
   background: transparent;
-  color: var(--orca-text);
+  color: var(--sb-heading);
   cursor: pointer;
   font: inherit;
-  padding: 0.55rem 0.6rem;
+  padding: 0.6rem 0.65rem;
   text-align: left;
 }
 .layer-control__header-title {
   flex: 1;
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--orca-text);
+  color: var(--sb-heading);
 }
 .layer-control__count {
   flex: none;
   font-size: 0.6rem;
-  font-weight: 600;
-  color: var(--orca-accent-2);
-  background: rgba(108, 99, 184, 0.14);
-  border: 1px solid var(--orca-accent-2);
+  font-weight: 700;
+  color: var(--sb-accent-ink);
+  background: var(--sb-accent);
+  border: 1px solid var(--sb-accent);
   border-radius: 999px;
   padding: 0.06rem 0.4rem;
 }
-.layer-control__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
+.layer-control__chevron { flex: none; font-size: 0.7rem; color: var(--sb-text-muted); transition: transform 0.15s ease; }
 .layer-control__chevron.is-open { transform: rotate(180deg); }
-.layer-control.is-open .layer-control__header { border-bottom: 1px solid var(--orca-border-soft); }
+.layer-control.is-open .layer-control__header { border-bottom: 1px solid var(--sb-border); }
 .layer-control__body {
   overflow-y: auto;
   min-height: 0;
   max-height: min(26rem, 60vh);
-  padding: 0.5rem 0.5rem 0.55rem 0.6rem;
+  padding: 0.55rem 0.55rem 0.6rem 0.65rem;
 }
 .layer-control__body[hidden] { display: none; }
-.layer-control__group + .layer-control__group { margin-top: 0.5rem; }
+.layer-control__group + .layer-control__group { margin-top: 0.65rem; }
 .layer-control__group-header {
   position: sticky;
   top: 0;
@@ -1755,10 +1792,10 @@ summary:focus-visible {
   align-items: center;
   gap: 0.3rem;
   width: 100%;
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.35rem;
   padding: 0.15rem 0;
   border: none;
-  background: rgba(11, 18, 32, 0.97);
+  background: var(--sb-surface);
   color: inherit;
   cursor: pointer;
   font: inherit;
@@ -1767,26 +1804,26 @@ summary:focus-visible {
 .layer-control__group-title {
   flex: 1;
   font-size: 0.6rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--orca-muted);
+  color: var(--sb-text-muted);
 }
-.layer-control__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.layer-control__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
 /* `.layer-control__list` sets `display: flex` unconditionally, which — at
    equal specificity — beats the browser default `[hidden]{display:none}`
    rule (an author rule wins a specificity tie against a UA rule). Without
    this, a collapsed group's `hidden` attribute would stop being
    accessible/focusable but stay visually expanded. */
 .layer-control__list[hidden] { display: none; }
-.layer-control__item + .layer-control__item { margin-top: 0.05rem; }
+.layer-control__item + .layer-control__item { margin-top: 0.15rem; }
 
-.layer-toggle { display: flex; align-items: center; gap: 0.45rem; cursor: pointer; padding: 0.2rem 0; }
+.layer-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.3rem 0; color: var(--sb-text); }
 .layer-toggle.is-disabled { cursor: not-allowed; }
 /* Unavailable rows stay legible: dim the interactive parts, not the text. */
-.layer-toggle.is-disabled .layer-toggle__label { color: var(--orca-muted); }
+.layer-toggle.is-disabled .layer-toggle__label { color: var(--sb-text-muted); }
 .layer-toggle.is-disabled .layer-toggle__icon { opacity: 0.4; }
-.layer-toggle input[type="checkbox"] { flex: none; accent-color: var(--orca-accent-2); }
+.layer-toggle input[type="checkbox"] { flex: none; accent-color: var(--sb-accent); width: 1rem; height: 1rem; }
 .layer-toggle__icon {
   display: flex;
   align-items: center;
@@ -1795,27 +1832,27 @@ summary:focus-visible {
   width: 1.15rem;
   height: 1rem;
 }
-.layer-toggle__label { flex: 1; }
+.layer-toggle__label { flex: 1; color: var(--sb-text); }
 .layer-toggle__badge {
   flex: none;
   font-size: 0.6rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.03em;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  color: var(--orca-muted);
-  background: var(--orca-panel-2);
-  border: 1px solid var(--orca-border);
+  color: var(--sb-text-muted);
+  background: var(--sb-surface-2);
+  border: 1px solid var(--sb-border-strong);
 }
-.layer-toggle__badge--live { color: var(--ok); border-color: var(--ok); }
-.layer-toggle__badge--reference { color: var(--orca-accent-2); border-color: var(--orca-accent-2); }
-.layer-toggle__badge--derived { color: #7c3aa0; border-color: #9b4fc2; }
+.layer-toggle__badge--live { color: #4fe0a8; border-color: #4fe0a8; }
+.layer-toggle__badge--reference { color: var(--sb-accent); border-color: var(--sb-accent); }
+.layer-toggle__badge--derived { color: #cfa6f5; border-color: #cfa6f5; }
 .layer-toggle__note {
-  margin: -0.05rem 0 0.15rem 1.6rem;
+  margin: -0.05rem 0 0.15rem 1.65rem;
   font-size: 0.66rem;
-  color: var(--orca-faint);
+  color: var(--sb-text-faint);
 }
-.layer-toggle__note--info { color: var(--orca-muted); }
+.layer-toggle__note--info { color: var(--sb-text-muted); }
 
 /* Compact collapsible provenance legend. */
 .tier-legend { padding: 0; overflow: hidden; }
@@ -1826,23 +1863,38 @@ summary:focus-visible {
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--orca-text);
+  color: var(--sb-heading);
   cursor: pointer;
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.65rem;
   font: inherit;
 }
 .tier-legend__strip { display: flex; gap: 0.2rem; flex: none; }
-.tier-legend__title { flex: 1; text-align: left; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--orca-faint); }
-.tier-legend__chevron { flex: none; font-size: 0.7rem; color: var(--orca-faint); transition: transform 0.15s ease; }
+.tier-legend__title { flex: 1; text-align: left; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--sb-text-muted); }
+.tier-legend__chevron { flex: none; font-size: 0.7rem; color: var(--sb-text-muted); transition: transform 0.15s ease; }
 .tier-legend__chevron.is-open { transform: rotate(180deg); }
-.tier-legend__list { list-style: none; margin: 0; padding: 0 0.6rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.tier-legend__row { display: flex; align-items: center; gap: 0.4rem; }
+.tier-legend__list { list-style: none; margin: 0; padding: 0 0.65rem 0.55rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.tier-legend__row { display: flex; align-items: center; gap: 0.4rem; color: var(--sb-text); }
 .tier-legend__swatch { width: 0.6rem; height: 0.6rem; flex: none; border-radius: 2px; }
 .tier-legend__swatch--live { background: var(--ok); border-radius: 50%; }
-.tier-legend__swatch--reference { background: var(--orca-accent-2); }
-.tier-legend__swatch--derived { background: #9b4fc2; transform: rotate(45deg); }
-.tier-legend__swatch--demo { background: var(--orca-faint); opacity: 0.7; }
-.tier-legend__swatch--missing { background: transparent; border: 1px solid var(--orca-faint); }
+.tier-legend__swatch--reference { background: var(--sb-accent); }
+.tier-legend__swatch--derived { background: #cfa6f5; transform: rotate(45deg); }
+.tier-legend__swatch--demo { background: var(--sb-text-faint); opacity: 0.7; }
+.tier-legend__swatch--missing { background: transparent; border: 1px solid var(--sb-text-faint); }
+
+/* ---------- shared components re-themed for the dark sidebar ----------
+   `.tier-badge` and `.btn` are used elsewhere in the light workspace too
+   (evidence/advisory panels, forms), so their base rules stay tuned for the
+   light theme - only override them here, scoped to the sidebar. */
+.map-sidebar .tier-badge { color: var(--sb-text-muted); border-color: var(--sb-border-strong); background: var(--sb-surface-2); }
+.map-sidebar .tier-badge__mark { background: var(--sb-text-faint); }
+.map-sidebar .tier-badge--reference { color: var(--sb-accent); border-color: var(--sb-accent); }
+.map-sidebar .tier-badge--reference .tier-badge__mark { background: var(--sb-accent); }
+
+.map-sidebar .btn { background: var(--sb-surface-2); border-color: var(--sb-border-strong); color: var(--sb-text); }
+.map-sidebar .btn:hover { border-color: var(--sb-accent); }
+.map-sidebar .btn--primary { background: var(--sb-accent); border-color: var(--sb-accent); color: var(--sb-accent-ink); }
+.map-sidebar .btn--ghost { background: transparent; color: var(--sb-text-muted); }
+.map-sidebar .btn--ghost:hover { color: var(--sb-text); }
 
 /* ---------- report ---------- */
 .report-page {
@@ -1940,14 +1992,14 @@ summary:focus-visible {
     max-height: 48%;
     flex-direction: column;
     border-left: none;
-    border-top: 1px solid var(--orca-border);
+    border-top: 1px solid var(--sb-border);
   }
   .map-sidebar.is-collapsed { max-height: 2.25rem; }
   .map-sidebar__toggle {
     width: 100%;
     height: 2.25rem;
     border-right: none;
-    border-bottom: 1px solid var(--orca-border);
+    border-bottom: 1px solid var(--sb-border);
   }
   .map-sidebar.is-collapsed .map-sidebar__toggle { border-bottom: none; }
   .map-sidebar__toggle span[aria-hidden] { display: inline-block; transform: rotate(90deg); }

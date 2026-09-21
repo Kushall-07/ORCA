@@ -69,6 +69,13 @@ export function isPfzIntentResponse(resp: QueryResponse | null): boolean {
 export function buildLayerToggles(
   resp: QueryResponse | null,
   manifest: GisLayerMeta[],
+  opts?: {
+    /** True while a new query that could change PFZ availability is
+     * in-flight (see WorkspacePage's `loading`) - shows an honest "checking"
+     * state on the PFZ row instead of stale unavailable/no-geometry text
+     * left over from the previous query, never a silent/blank failure. */
+    pfzLoading?: boolean;
+  },
 ): LayerToggle[] {
   const has = (id: string) => manifest.some((m) => m.id === id);
   const protectedMeta = manifest.find((m) => m.id === "protected_areas");
@@ -184,7 +191,13 @@ export function buildLayerToggles(
       badgeKey: "layer.badge.incois",
       descKey: "layer.desc.pfz",
       sourceTitleKey: "layer.source.incois",
-      noteKey: pfzGeometryAvailable ? undefined : "layer.pfz.noGeometry",
+      noteKey: pfzGeometryAvailable
+        ? undefined
+        : opts?.pfzLoading
+          ? "layer.pfz.checking"
+          : pfzRef?.availability === "no_location_match"
+            ? "layer.pfz.noLocationMatch"
+            : "layer.pfz.noGeometry",
       zoneCount: pfzRef?.zone_count,
     },
     {

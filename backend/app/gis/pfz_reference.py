@@ -17,7 +17,7 @@ layer or re-running a query does not re-fetch INCOIS on every call.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 from pydantic import BaseModel, ConfigDict
@@ -44,6 +44,7 @@ logger = get_logger(__name__)
 _LINES_CACHE_KEY = "incois-pfz:lines:{bucket}"
 _LANDING_CACHE_KEY = "incois-pfz:landing:{bucket}"
 _TEXTDATA_CACHE_KEY = "incois-pfz-textdata:{state}:{bucket}"
+_LAST_GOOD_CACHE_KEY = "incois-pfz-last-good:{state}"
 
 _WFS_SOURCE_URL = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
 _TEXTDATA_SOURCE_URL = "https://incois.gov.in/MarineFisheries/TextDataHome?mfid=1&request="
@@ -92,6 +93,69 @@ async def _cached_textdata_feature_collections(
     return incois_pfz.textdata_to_feature_collections(textdata, state_name=state_name)
 
 
+class PfzFeedResult(NamedTuple):
+    """Result of :func:`_fetch_pfz_feature_collections`. ``is_stale`` /
+    ``data_retrieved_at`` are only ever set by the tier-3 last-known-good
+    path below - a live WFS or Text Data hit is never stale."""
+
+    lines_fc: dict[str, Any]
+    landing_fc: dict[str, Any]
+    source_url: str
+    is_stale: bool = False
+    data_retrieved_at: datetime | None = None
+
+
+async def _save_last_good(
+    cache: JsonCache,
+    state_name: str,
+    lines_fc: dict[str, Any],
+    landing_fc: dict[str, Any],
+    source_url: str,
+    *,
+    settings: Settings,
+    fetched_at: datetime,
+) -> None:
+    """Snapshot the last successfully-fetched official PFZ data for one
+    sector, so a later query can still serve it (clearly labelled stale) if
+    BOTH live official channels fail. Best-effort: a cache write failure must
+    never affect the live result already being returned to the caller."""
+    await cache.set_json(
+        _LAST_GOOD_CACHE_KEY.format(state=state_name),
+        {
+            "lines_fc": lines_fc,
+            "landing_fc": landing_fc,
+            "source_url": source_url,
+            "fetched_at": fetched_at.isoformat(),
+        },
+        settings.incois_pfz_cache_max_age_seconds,
+    )
+
+
+async def _load_last_good(
+    cache: JsonCache, state_name: str
+) -> tuple[dict[str, Any], dict[str, Any], str, datetime] | None:
+    """The most recent successfully-fetched official PFZ snapshot for one
+    sector, or ``None`` when there isn't one (e.g. no query for this sector
+    has ever succeeded, or it aged out past ``incois_pfz_cache_max_age_seconds``
+    - the cache backend's own TTL already enforces that expiry)."""
+    cached = await cache.get_json(_LAST_GOOD_CACHE_KEY.format(state=state_name))
+    if cached is None:
+        return None
+    lines_fc, landing_fc, source_url, fetched_at_raw = (
+        cached.get("lines_fc"), cached.get("landing_fc"),
+        cached.get("source_url"), cached.get("fetched_at"),
+    )
+    if not isinstance(lines_fc, dict) or not isinstance(landing_fc, dict):
+        return None
+    if not isinstance(source_url, str) or not isinstance(fetched_at_raw, str):
+        return None
+    try:
+        fetched_at = datetime.fromisoformat(fetched_at_raw)
+    except ValueError:
+        return None
+    return lines_fc, landing_fc, source_url, fetched_at
+
+
 async def _fetch_pfz_feature_collections(
     area_state_name: str | None,
     *,
@@ -99,14 +163,23 @@ async def _fetch_pfz_feature_collections(
     settings: Settings,
     cache: JsonCache,
     client: httpx.AsyncClient | None,
-) -> tuple[dict[str, Any], dict[str, Any], str]:
+    allow_last_good: bool = True,
+) -> PfzFeedResult:
     """Fetch the full lines + landing-centre FeatureCollections from the
     primary INCOIS GeoServer WFS, falling back to the official INCOIS PFZ
     Text Data service (same authority, different dissemination channel) only
-    when the WFS denies access. Returns ``(lines_fc, landing_fc, source_url)``.
-    Raises :class:`incois_pfz.IncoisPfzError` when both official channels are
-    unavailable - callers must treat that as an honest "unavailable", never
-    synthesise geometry."""
+    when the WFS denies access, and - only when ``allow_last_good`` is true
+    and a matched sector exists - falling back further to the most recent
+    successfully-fetched snapshot for that sector when BOTH live channels
+    fail (``PfzFeedResult.is_stale=True``). ``allow_last_good=False`` is used
+    by the routing-facing callers (:func:`resolve_maritime_origin`,
+    :func:`resolve_pfz_route_destination`) - staleness is acceptable for a
+    reference/display query but never for silently reusing a possibly-dated
+    zone position as an actual routing destination.
+
+    Raises :class:`incois_pfz.IncoisPfzError` when no official data at all
+    (live or last-known-good) is available - callers must treat that as an
+    honest "unavailable", never synthesise geometry."""
     try:
         lines_fc = await _cached_fetch(
             cache, _LINES_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_lines,
@@ -116,7 +189,12 @@ async def _fetch_pfz_feature_collections(
             cache, _LANDING_CACHE_KEY.format(bucket=bucket), incois_pfz.fetch_pfz_landing_centres,
             settings=settings, client=client,
         )
-        return lines_fc, landing_fc, _WFS_SOURCE_URL
+        if area_state_name is not None:
+            await _save_last_good(
+                cache, area_state_name, lines_fc, landing_fc, _WFS_SOURCE_URL,
+                settings=settings, fetched_at=_utcnow(),
+            )
+        return PfzFeedResult(lines_fc, landing_fc, _WFS_SOURCE_URL)
     except incois_pfz.IncoisPfzError:
         if area_state_name is None:
             raise
@@ -124,10 +202,27 @@ async def _fetch_pfz_feature_collections(
             "INCOIS PFZ WFS unavailable, trying official Text Data fallback",
             extra={"source": "incois_pfz", "area": area_state_name},
         )
-        lines_fc, landing_fc = await _cached_textdata_feature_collections(
-            area_state_name, bucket=bucket, cache=cache, settings=settings, client=client,
-        )
-        return lines_fc, landing_fc, _TEXTDATA_SOURCE_URL
+        try:
+            lines_fc, landing_fc = await _cached_textdata_feature_collections(
+                area_state_name, bucket=bucket, cache=cache, settings=settings, client=client,
+            )
+            await _save_last_good(
+                cache, area_state_name, lines_fc, landing_fc, _TEXTDATA_SOURCE_URL,
+                settings=settings, fetched_at=_utcnow(),
+            )
+            return PfzFeedResult(lines_fc, landing_fc, _TEXTDATA_SOURCE_URL)
+        except incois_pfz.IncoisPfzError:
+            if allow_last_good:
+                last_good = await _load_last_good(cache, area_state_name)
+                if last_good is not None:
+                    lines_fc, landing_fc, source_url, fetched_at = last_good
+                    logger.warning(
+                        "INCOIS PFZ both live channels unavailable, serving "
+                        "last-known-good sector snapshot",
+                        extra={"source": "incois_pfz", "area": area_state_name},
+                    )
+                    return PfzFeedResult(lines_fc, landing_fc, source_url, True, fetched_at)
+            raise
 
 
 async def fetch_matched_lines(
@@ -142,21 +237,23 @@ async def fetch_matched_lines(
     the caller (the GIS endpoint) turns that into "layer unavailable"."""
     bucket = time_bucket(_utcnow(), "day")
     area = lookup_marine_area(coordinate)
-    lines_fc, _landing_fc, source_url = await _fetch_pfz_feature_collections(
+    feed = await _fetch_pfz_feature_collections(
         area.state_name if area else None,
         bucket=bucket, settings=settings, cache=cache, client=client,
     )
     matched = incois_pfz.match_nearby_lines(
-        lines_fc, coordinate,
+        feed.lines_fc, coordinate,
         state_name=area.state_name if area else None,
         max_distance_km=settings.incois_pfz_match_radius_km,
         max_features=settings.incois_pfz_max_features,
     )
     source = (
         "INCOIS PFZ WebGIS (official GeoServer WFS)"
-        if source_url == _WFS_SOURCE_URL
+        if feed.source_url == _WFS_SOURCE_URL
         else "INCOIS PFZ Text Data (official; GeoServer WFS unavailable)"
     )
+    if feed.is_stale:
+        source += " - last known good snapshot, INCOIS currently unavailable"
     return {
         "type": "FeatureCollection",
         "orca_meta": {
@@ -169,6 +266,10 @@ async def fetch_matched_lines(
             ),
             "generated_at": _utcnow().isoformat(),
             "area_matched": area.state_name if area else None,
+            "is_stale": feed.is_stale,
+            "data_retrieved_at": (
+                feed.data_retrieved_at.isoformat() if feed.data_retrieved_at else None
+            ),
         },
         "features": matched,
     }
@@ -187,16 +288,26 @@ async def build_pfz_reference(
     """
     area = lookup_marine_area(coordinate)
     retrieved_at = _utcnow()
+    # Internal-only diagnostics (never surfaced to the end user) so an
+    # "unavailable" outcome can be told apart from a genuine INCOIS outage vs
+    # a location/sector resolution problem at a glance.
+    logger.debug(
+        "PFZ reference query: coordinate=(%.4f,%.4f) sector=%s date=%s",
+        coordinate.latitude, coordinate.longitude,
+        area.state_name if area else None, retrieved_at.date().isoformat(),
+        extra={"source": "incois_pfz"},
+    )
 
     try:
         bucket = time_bucket(retrieved_at, "day")
-        lines_fc, landing_fc, source_url = await _fetch_pfz_feature_collections(
+        feed = await _fetch_pfz_feature_collections(
             area.state_name if area else None,
             bucket=bucket, settings=settings, cache=cache, client=client,
         )
     except incois_pfz.IncoisPfzError:
         logger.warning(
-            "INCOIS PFZ unavailable on both official channels", extra={"source": "incois_pfz"}
+            "INCOIS PFZ unavailable on both official channels (no last-known-good either)",
+            extra={"source": "incois_pfz"},
         )
         return PfzReferenceResult(
             availability=PfzAvailability.UNAVAILABLE,
@@ -211,6 +322,7 @@ async def build_pfz_reference(
             retrieved_at=retrieved_at,
         )
 
+    lines_fc, landing_fc, source_url = feed.lines_fc, feed.landing_fc, feed.source_url
     matched = incois_pfz.match_nearby_lines(
         lines_fc, coordinate,
         state_name=area.state_name if area else None,
@@ -256,6 +368,13 @@ async def build_pfz_reference(
         if area is None
         else PfzAvailability.UNAVAILABLE
     )
+    logger.debug(
+        "PFZ reference result: availability=%s source=%s stale=%s "
+        "records_before_filter=%d zone_count=%d",
+        availability.value, source_url, feed.is_stale,
+        len(lines_fc.get("features", [])), len(matched),
+        extra={"source": "incois_pfz"},
+    )
 
     return PfzReferenceResult(
         availability=availability,
@@ -265,6 +384,8 @@ async def build_pfz_reference(
         issued_at=issued_at,
         retrieved_at=retrieved_at,
         source_url=source_url,
+        is_stale=feed.is_stale,
+        data_retrieved_at=feed.data_retrieved_at,
     )
 
 
@@ -297,13 +418,14 @@ async def build_pfz_zone_ranking(
 
     try:
         bucket = time_bucket(retrieved_at, "day")
-        lines_fc, _landing_fc, _source_url = await _fetch_pfz_feature_collections(
+        feed = await _fetch_pfz_feature_collections(
             area.state_name if area else None,
             bucket=bucket, settings=settings, cache=cache, client=client,
         )
     except incois_pfz.IncoisPfzError:
         logger.warning(
-            "INCOIS PFZ zone ranking unavailable on both official channels",
+            "INCOIS PFZ zone ranking unavailable on both official channels "
+            "(no last-known-good either)",
             extra={"source": "incois_pfz"},
         )
         return PfzZoneRankingResult(
@@ -320,7 +442,7 @@ async def build_pfz_zone_ranking(
         )
 
     ranked = incois_pfz.rank_matched_lines(
-        lines_fc, coordinate,
+        feed.lines_fc, coordinate,
         state_name=area.state_name if area else None,
         max_distance_km=settings.incois_pfz_match_radius_km,
         max_features=settings.incois_pfz_max_features,
@@ -363,6 +485,8 @@ async def build_pfz_zone_ranking(
         area_matched=area.state_name if area else None,
         zones=tuple(zones),
         retrieved_at=retrieved_at,
+        is_stale=feed.is_stale,
+        data_retrieved_at=feed.data_retrieved_at,
     )
 
 
@@ -466,9 +590,13 @@ async def resolve_maritime_origin(
     area = lookup_marine_area(coordinate)
     try:
         bucket = time_bucket(_utcnow(), "day")
-        _lines_fc, landing_fc, source_url = await _fetch_pfz_feature_collections(
+        # allow_last_good=False: a routing origin must come from a live
+        # official fetch, never a possibly-dated last-known-good snapshot -
+        # see _fetch_pfz_feature_collections's docstring.
+        feed = await _fetch_pfz_feature_collections(
             area.state_name if area else None,
             bucket=bucket, settings=settings, cache=cache, client=client,
+            allow_last_good=False,
         )
     except incois_pfz.IncoisPfzError:
         logger.warning(
@@ -480,6 +608,7 @@ async def resolve_maritime_origin(
         logger.warning("maritime origin resolution unexpected error: %s", type(exc).__name__)
         return MaritimeOriginResolution(coordinate=coordinate, unavailable=True)
 
+    landing_fc, source_url = feed.landing_fc, feed.source_url
     if source_url == _TEXTDATA_SOURCE_URL:
         # Text Data's "landing centre" rows carry a PFZ zone's own coordinate,
         # not a real port location (see the docstring above) - never usable
@@ -570,9 +699,13 @@ async def resolve_pfz_route_destination(
     area = lookup_marine_area(coordinate)
     try:
         bucket = time_bucket(_utcnow(), "day")
-        lines_fc, _landing_fc, source_url = await _fetch_pfz_feature_collections(
+        # allow_last_good=False: an actual routing destination must come from
+        # a live official fetch, never a possibly-dated last-known-good
+        # snapshot - see _fetch_pfz_feature_collections's docstring.
+        feed = await _fetch_pfz_feature_collections(
             area.state_name if area else None,
             bucket=bucket, settings=settings, cache=cache, client=client,
+            allow_last_good=False,
         )
     except incois_pfz.IncoisPfzError:
         logger.warning(
@@ -584,6 +717,7 @@ async def resolve_pfz_route_destination(
         logger.warning("PFZ route destination resolution unexpected error: %s", type(exc).__name__)
         return PfzRouteDestination(area_matched=area.state_name if area else None)
 
+    lines_fc, source_url = feed.lines_fc, feed.source_url
     match = incois_pfz.nearest_pfz_zone_point(
         lines_fc, coordinate,
         state_name=area.state_name if area else None,

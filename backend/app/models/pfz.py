@@ -85,6 +85,12 @@ class PfzZoneRankingResult(BaseModel):
     zones: tuple[PfzZoneRef, ...] = ()
     retrieved_at: datetime | None = None
     source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    # True only when both live official channels (WFS + Text Data) failed and
+    # this is the last successfully-fetched sector snapshot instead -
+    # data_retrieved_at is then when THAT snapshot was actually fetched, not
+    # when this query ran (see app.gis.pfz_reference._fetch_pfz_feature_collections).
+    is_stale: bool = False
+    data_retrieved_at: datetime | None = None
     disclaimer: str = (
         "Official INCOIS Potential Fishing Zone reference geometry, ranked by "
         "distance from the query location. Not a safety zone, not an ORCA "
@@ -111,6 +117,12 @@ class PfzReferenceResult(BaseModel):
     issued_at: str | None = None                # Julian day / year the lines carry
     retrieved_at: datetime | None = None
     source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    # True only when both live official channels (WFS + Text Data) failed and
+    # this is the last successfully-fetched sector snapshot instead -
+    # data_retrieved_at is then when THAT snapshot was actually fetched, not
+    # when this query ran (see app.gis.pfz_reference._fetch_pfz_feature_collections).
+    is_stale: bool = False
+    data_retrieved_at: datetime | None = None
     disclaimer: str = (
         "Official INCOIS Potential Fishing Zone reference. This is a "
         "fishing-potential reference only - not a safety zone, not an ORCA "

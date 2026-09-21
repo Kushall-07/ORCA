@@ -391,8 +391,8 @@ export default function WorkspacePage() {
   };
 
   const toggles = useMemo(
-    () => buildLayerToggles(latest, gis.manifest),
-    [latest, gis.manifest],
+    () => buildLayerToggles(latest, gis.manifest, { pfzLoading: loading }),
+    [latest, gis.manifest, loading],
   );
 
   // Milestone 5 - "Open Today View" / "Plan Trip" / "View System" / "View
@@ -488,12 +488,14 @@ export default function WorkspacePage() {
                 {suitabilityInsufficient && (
                   <p className="layer-toggle__note">{t("env.suitability.insufficientData")}</p>
                 )}
-                {pfzZones.length > 0 && (
+                {(pfzZones.length > 0 || (latest && isPfzIntentResponse(latest))) && (
                   <PfzRankedPanel
                     zones={pfzZones}
                     selectedZoneId={selectedPfzZoneId}
                     onSelectZone={setSelectedPfzZoneId}
                     layerVisible={activeLayers.has("pfz")}
+                    loading={loading}
+                    availability={latest?.pfz_zones?.availability}
                   />
                 )}
                 {selectedPfzs.length > 0 && (

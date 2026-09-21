@@ -565,6 +565,8 @@ class PfzReferenceInfo(BaseModel):
     issued_at: str | None = None
     retrieved_at: str | None = None
     source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    is_stale: bool = False
+    data_retrieved_at: str | None = None
     disclaimer: str = ""
 
 
@@ -598,6 +600,8 @@ class PfzZoneRankingInfo(BaseModel):
     zones: list[PfzZoneInfo] = Field(default_factory=list)
     retrieved_at: str | None = None
     source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"
+    is_stale: bool = False
+    data_retrieved_at: str | None = None
     disclaimer: str = ""
 
 

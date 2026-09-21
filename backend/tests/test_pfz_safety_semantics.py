@@ -135,7 +135,10 @@ async def test_plain_pfz_reference_keeps_existing_yes_framing() -> None:
     )
     e = await _explain(understanding=u)
     low = e.text.lower()
-    assert low.startswith("yes. an official incois")
+    # Never conflated with the safety/catch corrections above, which always
+    # open with "no" - a plain reference answer must not.
+    assert not low.startswith("no")
+    assert low.startswith("here are the nearest official incois")
     assert "not a safety recommendation" in low
 
 

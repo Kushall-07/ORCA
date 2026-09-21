@@ -10,9 +10,12 @@ the ordinary (unmoved) safety-query coordinate.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from app.core.config import Settings
+from app.gis import pfz_reference
 from app.gis.pfz_reference import resolve_maritime_origin
 from app.models.common import Coordinate
 from app.services import incois_pfz
@@ -204,6 +207,41 @@ async def test_incois_outage_resolves_to_unavailable_not_an_exception(monkeypatc
         MANGALORE_CITY, settings=Settings(), cache=_cache(), land_backend=_LAND_BOX,
     )
     assert result.unavailable is True
+    assert result.coordinate == MANGALORE_CITY
+
+
+# ---- 6c. a last-known-good snapshot (see test_incois_pfz.py) must NEVER be
+# used to resolve a routing origin, even though it's real official data -
+# only build_pfz_reference / build_pfz_zone_ranking / the map layer (pure
+# reference/display) may serve it. A routing origin substitution must come
+# from a live fetch or be honestly unavailable.
+async def test_maritime_origin_never_uses_last_known_good_snapshot(monkeypatch) -> None:
+    landing_fc = {
+        "type": "FeatureCollection",
+        "features": [_landing("KARNATAKA", 12.85, 74.60, "Mangalore Fishing Harbour")],
+    }
+    cache = _cache()
+    # Prime the last-known-good snapshot directly (bypassing the ordinary
+    # day-bucketed hot cache, which would otherwise mask "both channels down"
+    # on a same-day retry with its own already-cached success).
+    await pfz_reference._save_last_good(
+        cache, "KARNATAKA", {"type": "FeatureCollection", "features": []}, landing_fc,
+        pfz_reference._WFS_SOURCE_URL,
+        settings=Settings(), fetched_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    async def _boom(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("simulated outage")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _boom)
+
+    result = await resolve_maritime_origin(
+        MANGALORE_CITY, settings=Settings(), cache=cache, land_backend=_LAND_BOX,
+    )
+    assert result.unavailable is True
+    assert result.substituted is False
     assert result.coordinate == MANGALORE_CITY
 
 

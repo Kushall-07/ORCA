@@ -4,13 +4,14 @@ see test_pfz_safety_isolation.py for the mandatory isolation checks."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
 
 from app.agents.marine_area import lookup as lookup_area
 from app.core.config import Settings
+from app.gis import pfz_reference
 from app.gis.pfz_reference import build_pfz_reference, build_pfz_zone_ranking, fetch_matched_lines
 from app.models.common import Coordinate
 from app.models.geo import Geofence, GeofenceSeverity, GeofenceType
@@ -391,6 +392,87 @@ async def test_build_pfz_reference_unavailable_when_both_channels_fail(monkeypat
     )
     assert result.availability is PfzAvailability.UNAVAILABLE
     assert result.zone_count == 0
+
+
+# ---- 14b. last-known-good: a stale but real snapshot when BOTH channels ---
+# fail on a LATER query, after an EARLIER query already succeeded for the
+# same sector (see app.gis.pfz_reference._fetch_pfz_feature_collections).
+# Never a third source, never fabricated - the exact same WFS/Text Data
+# payload that was already served live once, just replayed with its real
+# original fetch time and labelled stale.
+async def test_build_pfz_reference_uses_last_known_good_when_both_channels_fail(
+    monkeypatch,
+) -> None:
+    # Prime the last-known-good snapshot directly (bypassing the ordinary
+    # day-bucketed hot cache, which would otherwise mask "both channels down"
+    # on a same-day retry with its own already-cached success).
+    cache = JsonCache(InMemoryCache())
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    await pfz_reference._save_last_good(
+        cache, "KARNATAKA", _LINES_FC, _LANDING_FC, pfz_reference._WFS_SOURCE_URL,
+        settings=Settings(), fetched_at=yesterday,
+    )
+
+    async def _wfs_403(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("INCOIS PFZ WFS HTTP 403")
+
+    async def _textdata_fails(*, state_name, settings, client=None):
+        raise incois_pfz.PfzTextDataUnavailable("Text Data also unreachable")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _wfs_403)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _wfs_403)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _textdata_fails)
+
+    result = await build_pfz_reference(MANGALORE, settings=Settings(), cache=cache)
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert result.zone_count == 2
+    assert result.area_matched == "KARNATAKA"
+    assert result.is_stale is True
+    assert result.data_retrieved_at == yesterday
+    assert result.data_retrieved_at < result.retrieved_at
+
+
+async def test_build_pfz_zone_ranking_uses_last_known_good_when_both_channels_fail(
+    monkeypatch,
+) -> None:
+    cache = JsonCache(InMemoryCache())
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    await pfz_reference._save_last_good(
+        cache, "KARNATAKA", _LINES_FC, _LANDING_FC, pfz_reference._WFS_SOURCE_URL,
+        settings=Settings(), fetched_at=yesterday,
+    )
+
+    async def _boom(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("simulated outage")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _boom)
+
+    result = await build_pfz_zone_ranking(MANGALORE, settings=Settings(), cache=cache)
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert len(result.zones) == 2
+    assert result.is_stale is True
+    assert result.data_retrieved_at == yesterday
+
+
+async def test_build_pfz_reference_no_last_known_good_stays_honestly_unavailable(
+    monkeypatch,
+) -> None:
+    """No sector has ever succeeded before (fresh cache) - both live channels
+    failing must stay a true UNAVAILABLE, never silently invent a snapshot."""
+    async def _boom(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("simulated outage")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _boom)
+
+    result = await build_pfz_reference(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.availability is PfzAvailability.UNAVAILABLE
+    assert result.is_stale is False
 
 
 async def test_build_pfz_reference_unavailable_when_wfs_fails_outside_known_sector(

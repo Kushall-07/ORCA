@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useI18n } from "../../i18n";
-import type { PfzZoneInfo } from "../../types/api";
+import type { PfzAvailability, PfzZoneInfo } from "../../types/api";
 
 /**
  * Ranked official INCOIS PFZ zones (additive companion to PfzSelectionCard,
@@ -16,6 +16,8 @@ export function PfzRankedPanel({
   selectedZoneId,
   onSelectZone,
   layerVisible = true,
+  loading = false,
+  availability,
 }: {
   zones: PfzZoneInfo[];
   selectedZoneId: string | null;
@@ -27,6 +29,15 @@ export function PfzRankedPanel({
    * list collapses to a plain "PFZ layer is hidden" notice instead of
    * offering clickable cards for markers the user cannot see. */
   layerVisible?: boolean;
+  /** True while a new query is in flight (see WorkspacePage's `loading`) -
+   * shown as an honest "checking" state rather than leaving a stale
+   * unavailable/empty message on screen from the PREVIOUS query. */
+  loading?: boolean;
+  /** `latest.pfz_zones.availability` - distinguishes "the official INCOIS
+   * source itself is unreachable" from "no advisory matches this exact
+   * location" so an empty list never reads as one generic, unexplained
+   * failure (see PfzAvailability on the backend). */
+  availability?: PfzAvailability | string;
 }) {
   const { t } = useI18n();
   // Collapsing/expanding this section is purely a local display concern - it
@@ -37,9 +48,17 @@ export function PfzRankedPanel({
   const [expanded, setExpanded] = useState(zones.length > 0);
 
   if (zones.length === 0) {
+    const emptyKey = loading
+      ? "pfz.ranked.checking"
+      : availability === "no_location_match"
+        ? "pfz.ranked.noLocationMatch"
+        : availability === "unavailable"
+          ? "pfz.ranked.unavailable"
+          : "pfz.ranked.empty";
     return (
       <div className="pfz-ranked-panel">
-        <p className="pfz-ranked-panel__empty">{t("pfz.ranked.empty")}</p>
+        <strong className="pfz-ranked-panel__title">{t("pfz.ranked.title")}</strong>
+        <p className="pfz-ranked-panel__empty">{t(emptyKey)}</p>
       </div>
     );
   }

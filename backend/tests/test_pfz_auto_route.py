@@ -17,8 +17,11 @@ Two independent concerns are covered:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.core.config import Settings
+from app.gis import pfz_reference
 from app.gis.pfz_reference import resolve_pfz_route_destination
 from app.models.common import Coordinate
 from app.services import incois_pfz
@@ -103,6 +106,41 @@ async def test_resolve_pfz_route_destination_returns_nearest_zone_point(monkeypa
     assert result.coordinate == WATER_DESTINATION
     assert result.distance_km is not None
     assert result.area_matched == "KARNATAKA"
+
+
+# A routing destination must never come from a possibly-dated last-known-good
+# snapshot (see app.gis.pfz_reference._fetch_pfz_feature_collections /
+# test_incois_pfz.test_build_pfz_reference_uses_last_known_good_when_both_channels_fail,
+# which covers the reference-only functions that MAY use it) - only the pure
+# reference/display path may serve a stale zone; an actual route destination
+# must come from a live fetch or be honestly unavailable.
+async def test_resolve_pfz_route_destination_never_uses_last_known_good_snapshot(
+    monkeypatch,
+) -> None:
+    lines_fc = {
+        "type": "FeatureCollection",
+        "features": [_zone_point_feature(12.85, 74.70)],
+    }
+    cache = _cache()
+    # Prime the last-known-good snapshot directly (bypassing the ordinary
+    # day-bucketed hot cache, which would otherwise mask "both channels down"
+    # on a same-day retry with its own already-cached success).
+    await pfz_reference._save_last_good(
+        cache, "KARNATAKA", lines_fc, {"type": "FeatureCollection", "features": []},
+        pfz_reference._WFS_SOURCE_URL,
+        settings=Settings(), fetched_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    async def _boom(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("simulated outage")
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _boom)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _boom)
+
+    result = await resolve_pfz_route_destination(WATER_ORIGIN, settings=Settings(), cache=cache)
+    assert result.available is False
+    assert result.coordinate is None
 
 
 async def test_resolve_pfz_route_destination_unavailable_when_no_zone_matches(monkeypatch) -> None:

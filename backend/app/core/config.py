@@ -216,7 +216,13 @@ class Settings(BaseSettings):
     incois_pfz_textdata_base_url: str = Field(default="https://incois.gov.in/MarineFisheries")
     incois_pfz_timeout_seconds: float = Field(default=15.0, gt=0)
     incois_pfz_cache_ttl_seconds: int = Field(default=21600, gt=0)      # 6 h
-    incois_pfz_cache_max_age_seconds: int = Field(default=86400, gt=0)  # 24 h
+    # How long a per-sector "last known good" official PFZ dataset (the most
+    # recent successful WFS or Text Data fetch) may still be served, labelled
+    # stale, when BOTH live official channels fail on a later query - never a
+    # third source, never fabricated geometry, just an older real snapshot of
+    # the same two official channels above. See
+    # app.gis.pfz_reference._fetch_pfz_feature_collections.
+    incois_pfz_cache_max_age_seconds: int = Field(default=604800, gt=0)  # 7 d
     incois_pfz_match_radius_km: float = Field(default=250.0, gt=0)
     incois_pfz_max_features: int = Field(default=40, ge=1, le=500)
 
