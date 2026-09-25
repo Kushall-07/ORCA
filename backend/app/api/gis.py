@@ -17,20 +17,27 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.redis import get_redis
 from app.gis.validation import CoordinateError, validate_latitude, validate_longitude
 from app.models.common import Coordinate
 from app.models.environmental import EnvironmentalSuitabilityGridResult
-from app.services.cache import InMemoryCache, JsonCache, suitability_grid_cache_key
+from app.services.cache import InMemoryCache, JsonCache, RedisCache, suitability_grid_cache_key
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["gis"])
 
-# Process-wide cache for the PFZ WFS fetch, shared across requests so toggling
-# the map layer repeatedly does not re-hit INCOIS on every call (task D).
-# An in-process TTL cache (no Redis dependency) is enough here: the dataset is
-# day-bucketed and a few hundred KB. Swap for a Redis-backed JsonCache the same
-# way the rest of the data agents would be wired for multi-process deployment.
-_pfz_cache = JsonCache(InMemoryCache())
+# Redis-backed - the SAME cache app.orchestration.deps.build_default_deps wires
+# up as OrcaDeps.pfz_cache for the chat pipeline's pfz_node, so a live INCOIS
+# PFZ fetch (or the last-known-good snapshot; see
+# app.gis.pfz_reference._save_last_good) made by one path is immediately
+# visible to the other, exactly as app.gis.pfz_reference's module docstring
+# describes ("Both share the same cached full datasets"). A plain
+# process-local InMemoryCache used to be used here instead, which silently
+# defeated that sharing (two independent caches) and could not survive a
+# restart or a multi-worker deployment - RedisCache degrades to a cache miss
+# on any Redis failure, never raises, so this is a strict improvement with no
+# new failure mode.
+_pfz_cache = JsonCache(RedisCache(get_redis()))
 
 # Same rationale as `_pfz_cache`: one bounded ERDDAP box fetch per (location,
 # day), shared across requests, so toggling the "ORCA Environmental

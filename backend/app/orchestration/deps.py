@@ -147,5 +147,15 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
         anomaly_engine=EnvironmentalAnomalyEngine(),
         advisory_agent=MarineAdvisoryAgent(settings=settings, cache=live_cache),
-        pfz_cache=JsonCache(InMemoryCache()),
+        # Same Redis-backed live_cache as the other live data agents above -
+        # NOT a fresh InMemoryCache. The last-known-good PFZ snapshot (see
+        # app.gis.pfz_reference._save_last_good) is meant to survive up to
+        # incois_pfz_cache_max_age_seconds (7 days), which an in-process dict
+        # cannot do across a restart or a multi-worker deployment; Redis also
+        # makes this the SAME cache GET /gis/layers/pfz uses (app.api.gis),
+        # matching pfz_reference.py's module docstring ("Both share the same
+        # cached full datasets"). RedisCache degrades to a cache miss on any
+        # Redis failure, never raises, so this is a strict improvement with
+        # no new failure mode.
+        pfz_cache=live_cache,
     )
