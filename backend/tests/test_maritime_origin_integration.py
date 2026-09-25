@@ -93,8 +93,16 @@ async def test_land_origin_routes_via_substituted_maritime_origin(monkeypatch) -
     assert r.route.marine_cost_enabled is True
 
 
-# ---- 6. no verified maritime origin -> honest ORIGIN_BLOCKED, no fabrication
-async def test_no_verified_landing_centre_stays_origin_blocked_with_a_clear_reason(monkeypatch) -> None:
+# ---- 6. no verified maritime origin -> routing-origin normalization still
+#          rescues the raw city coordinate to nearby navigable water --------
+async def test_no_verified_landing_centre_still_routes_via_origin_normalization(monkeypatch) -> None:
+    """No INCOIS-verified landing-centre substitution is available here (see
+    `maritime_origin_verified is False` below), but `plan_route`'s general
+    routing-origin normalization (app.routing.planner.plan_route step 4)
+    applies regardless of that: it rescues the raw MANGALORE_CITY coordinate
+    itself to the nearest navigable water cell. This is what makes the fix
+    general (works for ANY coastal origin) rather than dependent on a
+    verified/assumed maritime-origin substitution having already happened."""
     _patch_landing_centres(monkeypatch, {"type": "FeatureCollection", "features": []})
     pipe = make_pipeline()
     r = await pipe.run(
@@ -105,11 +113,14 @@ async def test_no_verified_landing_centre_stays_origin_blocked_with_a_clear_reas
         now=NOW,
     )
     assert r.route is not None
-    assert r.route.status == "ORIGIN_BLOCKED"
+    assert r.route.status == "ROUTE_FOUND"
     assert r.route.maritime_origin_verified is False
-    assert any("verified maritime departure point" in reason for reason in r.route.reasons)
-    # Still the original (land) coordinate - never an invented offshore point.
+    assert r.route.origin_adjusted is True
+    assert r.route.routing_origin is not None
+    # `origin` (the reference/display coordinate) is still the original city
+    # point - never moved by the fix, never an invented offshore point.
     assert r.route.origin == [MANGALORE_CITY.latitude, MANGALORE_CITY.longitude]
+    assert r.route.routing_origin != r.route.origin
 
 
 # ---- 3. a substituted maritime origin still passes the planner's own

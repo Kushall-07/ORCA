@@ -174,12 +174,16 @@ def test_hard_geofence_remains_a_hard_block_with_marine_cost_enabled() -> None:
 def test_land_remains_a_hard_block_with_marine_cost_enabled() -> None:
     class AllLand:
         def depth_m(self, coordinate: Coordinate) -> float:
-            return 10.0  # always "land"
+            return 10.0  # always "land" - EVERY cell, so no rescue is possible
 
     request = RouteRequest(origin=coord(12.83, 74.45), destination=coord(13.15, 74.95), grid=GRID)
     risk = RiskEngine().evaluate(RiskEngineInput(wave_height_m=0.2, wind_speed_ms=1.0))
     result = plan_route(request, [], AllLand(), risk=risk)
-    assert result.status is RouteStatus.ORIGIN_BLOCKED
+    # The bounded routing-origin normalization search finds nothing navigable
+    # anywhere (every cell is land) - a distinct, still-honest status from an
+    # ordinary hard-geofence ORIGIN_BLOCKED (see app.models.routing.RouteStatus
+    # .ORIGIN_NO_NAVIGABLE_CELL), but land still hard-blocks the route either way.
+    assert result.status is RouteStatus.ORIGIN_NO_NAVIGABLE_CELL
 
 
 def test_marine_cost_cannot_bypass_the_hard_geofence_even_with_zero_hazard_weight() -> None:

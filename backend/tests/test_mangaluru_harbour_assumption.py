@@ -121,15 +121,19 @@ async def test_hard_geofence_still_blocks_the_assumed_harbour_origin(monkeypatch
     assert any("hard geofence" in reason.lower() for reason in r.route.reasons)
 
 
-# ---- E: existing normal non-harbour land origins still ORIGIN_BLOCKED ------
-async def test_land_origin_without_mangaluru_recognition_stays_origin_blocked(
+# ---- E: a non-harbour land origin, without the Mangaluru demo assumption,
+#          is now rescued by the GENERAL routing-origin normalization -------
+async def test_land_origin_without_mangaluru_recognition_still_routes(
     monkeypatch,
 ) -> None:
     _patch_incois_unavailable_landing_but_pfz_zone_available(monkeypatch)
     pipe = make_pipeline()
     # Same on-land coordinate, but nothing in the query names Mangaluru/
-    # Mangalore - Query Understanding never recognizes it, so the demo
-    # assumption must NOT apply.
+    # Mangalore - Query Understanding never recognizes it, so the narrowly-
+    # scoped demo assumption must NOT apply. `plan_route`'s general
+    # routing-origin normalization (app.routing.planner.plan_route step 4)
+    # is unconditional, though, and rescues it anyway - proving the fix does
+    # NOT depend on the Mangaluru-specific recognition machinery.
     r = await pipe.run(
         message="conditions here",
         session_id="s-mangaluru-3",
@@ -138,9 +142,12 @@ async def test_land_origin_without_mangaluru_recognition_stays_origin_blocked(
         now=NOW,
     )
     assert r.route is not None
-    assert r.route.status == "ORIGIN_BLOCKED"
+    assert r.route.status == "ROUTE_FOUND"
     assert r.route.maritime_origin_assumed is False
     assert r.route.maritime_origin_verified is False
+    assert r.route.origin_adjusted is True
+    assert r.route.routing_origin is not None
+    assert r.route.origin == [MANGALORE_CITY.latitude, MANGALORE_CITY.longitude]
     assert r.route.origin == [MANGALORE_CITY.latitude, MANGALORE_CITY.longitude]
 
 

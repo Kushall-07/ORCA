@@ -168,6 +168,20 @@ class RouteInfo(BaseModel):
     # substitution. `origin_note` carries the required user-facing disclosure
     # ("Assumption: the boat starts here...") whenever this is true.
     maritime_origin_assumed: bool = False
+    # True when the ROUTING origin (the actual A* start point) differs from
+    # `origin` above because `origin`'s own grid cell fell on land - see
+    # app.routing.planner.plan_route's routing-origin normalization step
+    # (app.routing.grid.find_nearest_navigable_cell). `origin` itself is
+    # NEVER moved (it stays the human/reference coordinate for the map
+    # marker); `routing_origin` is the nearest navigable sea cell A* actually
+    # started from, and `routing_origin_note` is a short, ready-to-display
+    # explanation for Route Controls. Distinct from `maritime_origin_verified`/
+    # `maritime_origin_assumed` above, which substitute a DIFFERENT named
+    # landing centre for the query location - this instead nudges whatever
+    # origin was already selected onto a navigable grid cell.
+    origin_adjusted: bool = False
+    routing_origin: list[float] | None = None
+    routing_origin_note: str | None = None
     # True when `destination` was automatically derived from the nearest
     # official INCOIS PFZ zone for an explicit "PFZ + route" compound
     # natural-language request (see app.orchestration.nodes.normalize /

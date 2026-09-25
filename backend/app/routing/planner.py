@@ -5,14 +5,22 @@ Fixed pipeline (each step can only *narrow* the outcome):
   1. validate origin coordinates
   2. validate destination coordinates
   3. build + validate the grid (hard geofences AND land/water rasterised together)
-  4. origin on land (exact point)          -> ORIGIN_BLOCKED
-  5. destination on land (exact point)     -> DESTINATION_BLOCKED
-  6. origin against hard geofences         -> ORIGIN_BLOCKED
+  4. routing-origin normalization: if the origin's OWN cell is land-raster
+     blocked (and not hard-geofence blocked), translate it to the nearest
+     navigable water cell via a bounded, deterministic search - see
+     ``app.routing.grid.find_nearest_navigable_cell``. `request.origin`
+     itself is NEVER modified (it stays the caller's reference coordinate for
+     display/provenance); only the internal `routing_origin` used from here
+     on may differ.                          -> ORIGIN_NO_NAVIGABLE_CELL if
+                                                  no water cell exists nearby
+  5. destination on land (exact point)     -> DESTINATION_BLOCKED (unchanged;
+                                                 the destination is NEVER normalized)
+  6. routing origin against hard geofences -> ORIGIN_BLOCKED
   7. destination against hard geofences    -> DESTINATION_BLOCKED
-  8. origin / destination grid cells       -> ORIGIN_BLOCKED / DESTINATION_BLOCKED
-  9. origin == destination cell            -> trivial ROUTE_FOUND (validated)
- 10. A*                                    -> NO_ROUTE if unreachable / budget
- 11. reconstruct path + costs
+  8. routing origin / destination grid cells -> ORIGIN_BLOCKED / DESTINATION_BLOCKED
+  9. routing origin == destination cell    -> trivial ROUTE_FOUND (validated)
+ 10. A* (starts from the routing origin)   -> NO_ROUTE if unreachable / budget
+ 11. reconstruct path + costs (path starts at the routing origin)
  12. independent route validation          -> ROUTE_VALIDATION_FAILED on any breach
 
 ``land_backend`` (optional) supplies the land/water constraint via
@@ -29,22 +37,21 @@ never touches the blocked mask built above and never changes whether a route
 is found, blocked, or valid - omitting it (the default) reproduces the exact
 prior distance-only behaviour.
 
-``allow_blocked_origin_cell`` (Phase 9.x, default ``False``) lets the ONE
-narrowly-scoped Mangaluru Fishing Harbour demo planning assumption (see
-``app.orchestration.nodes._mangaluru_demo_assumption`` /
-``app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR``) start a route from its
-verified harbour coordinate even when the coarse 0.05 deg land/water raster
-snaps that coordinate's OWN grid cell to "land" (the harbour's exact point
-already passed the independent, non-rasterised land check at step 4 above).
-It excuses ONLY step 8's land-raster verdict on the origin cell, and ONLY
-when that cell is not ALSO hard-geofence-blocked - hard-geofence blocking of
-the origin (exact-point at step 6, raster at step 8) is completely
-unaffected. It never touches the destination cell, the blocked mask itself,
-or any other cell A* visits: every cell the search actually moves into,
-starting with the very first step out of the origin, is still checked
-against the unmodified land/water + hard-geofence raster exactly as before
-(see ``app.routing.astar.a_star``'s ``allow_blocked_start``). The default
-``False`` reproduces the exact prior behaviour for every other caller.
+``allow_blocked_origin_cell`` (Phase 9.x, default ``False``) is kept for
+backward compatibility with the ONE narrowly-scoped Mangaluru Fishing Harbour
+demo planning assumption (see ``app.orchestration.nodes._mangaluru_demo_assumption``
+/ ``app.gis.pfz_reference.MANGALURU_FISHING_HARBOUR``), which used to excuse
+step 8's land-raster verdict on the origin cell directly. Step 4's general
+routing-origin normalization above now handles that same class of failure
+(a coastal reference point whose own raster cell reads "land") for ANY
+origin, not just the recognized Mangaluru case, so this flag is a no-op in
+practice for the land-raster case - it remains reachable only for whatever
+edge case might still slip past step 4 (e.g. a hard-geofence-clear cell that
+step 4 already normalized away). It never touches the destination cell, the
+blocked mask itself, or any other cell A* visits: every cell the search
+actually moves into, starting with the very first step out of the origin, is
+still checked against the unmodified land/water + hard-geofence raster
+exactly as before (see ``app.routing.astar.a_star``'s ``allow_blocked_start``).
 
 Everything is deterministic and offline. No LLM, no network beyond whatever
 ``land_backend`` itself already does. Marine cost issues zero additional
@@ -58,6 +65,7 @@ from collections.abc import Sequence
 from app.gis.geofencing import check_geofences
 from app.gis.operations import geodesic_distance_m
 from app.gis.validation import CoordinateError, validate_coordinate
+from app.models.common import Coordinate
 from app.models.geo import Geofence
 from app.models.risk import RiskResult
 from app.models.routing import (
@@ -69,12 +77,19 @@ from app.models.routing import (
     RouteStatus,
 )
 from app.routing.astar import a_star, path_cost, weighted_path_cost
-from app.routing.grid import Cell, Grid, GridError, rasterize_geofences
+from app.routing.grid import Cell, Grid, GridError, find_nearest_navigable_cell, rasterize_geofences
 from app.routing.land_mask import LandBackend, rasterize_land
 from app.routing.marine_cost import MarineCostWeights, build_marine_cost
 from app.routing.validation import validate_route
 
 _NEIGHBOUR_DELTAS = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1))
+
+# Bounded search radius (in grid cells) for the routing-origin normalization
+# step below - deliberately generous for a coastal reference point (~40 cells
+# at the default 0.05 deg cell size is ~2 deg, ~220 km) while still being a
+# hard, deterministic bound: a genuinely inland origin correctly reports
+# ORIGIN_NO_NAVIGABLE_CELL rather than searching forever.
+_ORIGIN_RESCUE_MAX_RADIUS_CELLS = 40
 
 
 def _hard_hit_ids(geofence_result) -> list[str]:
@@ -154,21 +169,44 @@ def plan_route(
             blocked_cell_count=grid.blocked_count,
         )
 
-    # ---- 4: origin on land (exact point, independent of raster/cell snapping) ----
-    if land_backend is not None:
-        origin_depth = land_backend.depth_m(request.origin)
-        if origin_depth is not None and origin_depth > 0.0:
+    # ---- 4: routing-origin normalization (coastal reference -> navigable cell) --
+    # Translates a human coastal reference point (e.g. a landing-centre
+    # coordinate) into a valid A* start cell using the SAME land/water +
+    # hard-geofence raster built above - never a second land/water system,
+    # never an arbitrary lat/lon offset. Only ever fires when the origin's
+    # OWN cell is blocked by the land raster and NOT also by a hard geofence:
+    # hard-geofence blocking of the origin is completely unaffected (still
+    # rejected below, exactly as before). `request.origin` itself is NEVER
+    # modified - it stays the caller's reference coordinate for display/
+    # provenance; only `routing_origin` (the actual A* start) may differ.
+    routing_origin = request.origin
+    routing_origin_cell = origin_cell
+    origin_adjusted = False
+    origin_cell_land_blocked = bool(land_blocked[origin_cell])
+    origin_cell_geofence_blocked = bool(geofence_blocked[origin_cell])
+    if origin_cell_land_blocked and not origin_cell_geofence_blocked:
+        rescued_cell = find_nearest_navigable_cell(
+            grid, origin_cell, _ORIGIN_RESCUE_MAX_RADIUS_CELLS
+        )
+        if rescued_cell is None:
             return _result(
                 request,
-                RouteStatus.ORIGIN_BLOCKED,
+                RouteStatus.ORIGIN_NO_NAVIGABLE_CELL,
                 reasons=(
-                    "origin lies on land (bathymetric depth indicates land, "
-                    "not navigable water)",
+                    "origin cell is blocked by the land/water raster (on land) and "
+                    f"no navigable water cell was found within "
+                    f"{_ORIGIN_RESCUE_MAX_RADIUS_CELLS} grid cells "
+                    f"({_ORIGIN_RESCUE_MAX_RADIUS_CELLS * request.grid.cell_size_deg:.2f} "
+                    "deg) of the origin",
                 ),
                 blocked_cell_count=grid.blocked_count,
             )
+        routing_origin_cell = rescued_cell
+        origin_adjusted = rescued_cell != origin_cell
+        if origin_adjusted:
+            routing_origin = grid.cell_center(rescued_cell)
 
-    # ---- 5: destination on land (exact point) ----
+    # ---- 5: destination on land (exact point) - UNCHANGED, never normalized --
     if land_backend is not None:
         dest_depth = land_backend.depth_m(request.destination)
         if dest_depth is not None and dest_depth > 0.0:
@@ -180,10 +218,13 @@ def plan_route(
                     "not navigable water)",
                 ),
                 blocked_cell_count=grid.blocked_count,
+                routing_origin=routing_origin,
+                origin_adjusted=origin_adjusted,
             )
 
-    # ---- 6: origin against hard geofences ----
-    origin_geofence = check_geofences(request.origin, hard_geofences)
+    # ---- 6: origin against hard geofences (uses the normalized routing origin -
+    #          identical to `request.origin` unless step 4 adjusted it) --------
+    origin_geofence = check_geofences(routing_origin, hard_geofences)
     if origin_geofence.inside_hard:
         return _result(
             request,
@@ -193,9 +234,11 @@ def plan_route(
                 + ", ".join(_hard_hit_ids(origin_geofence)),
             ),
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
-    # ---- 7: destination against hard geofences ----
+    # ---- 7: destination against hard geofences - UNCHANGED ----
     dest_geofence = check_geofences(request.destination, hard_geofences)
     if dest_geofence.inside_hard:
         return _result(
@@ -206,28 +249,38 @@ def plan_route(
                 + ", ".join(_hard_hit_ids(dest_geofence)),
             ),
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
     # ---- 8: origin / destination grid cells (raster: land OR hard geofence) ----
-    origin_cell_land_blocked = bool(land_blocked[origin_cell])
-    origin_cell_geofence_blocked = bool(geofence_blocked[origin_cell])
-    # The Mangaluru demo assumption's start-node exception (see this
-    # function's docstring): only excuses a LAND-raster verdict, and only
-    # when the same cell is not also hard-geofence-blocked.
+    # `routing_origin_cell` is the (possibly step-4-normalized) start cell; by
+    # construction it is never land-raster-blocked once normalized, so this
+    # check is defense-in-depth for the origin side (it still matters for a
+    # non-normalized, hard-geofence-blocked origin cell, which step 4 never
+    # touches). `allow_blocked_origin_cell` (Phase 9.x) is preserved for
+    # backward compatibility but is now a no-op for the land-raster case that
+    # step 4 already generalizes - see plan_route's docstring.
+    origin_cell_land_blocked_final = bool(land_blocked[routing_origin_cell])
+    origin_cell_geofence_blocked_final = bool(geofence_blocked[routing_origin_cell])
     origin_start_exception = (
-        allow_blocked_origin_cell and origin_cell_land_blocked and not origin_cell_geofence_blocked
+        allow_blocked_origin_cell
+        and origin_cell_land_blocked_final
+        and not origin_cell_geofence_blocked_final
     )
-    if grid.is_blocked(origin_cell) and not origin_start_exception:
+    if grid.is_blocked(routing_origin_cell) and not origin_start_exception:
         reasons = []
-        if origin_cell_land_blocked:
+        if origin_cell_land_blocked_final:
             reasons.append("origin cell is blocked by the land/water raster (on land)")
-        if origin_cell_geofence_blocked:
+        if origin_cell_geofence_blocked_final:
             reasons.append("origin cell is blocked by a hard-geofence raster")
         return _result(
             request,
             RouteStatus.ORIGIN_BLOCKED,
             reasons=tuple(reasons) or ("origin cell is blocked",),
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
     if grid.is_blocked(dest_cell):
         reasons = []
@@ -240,11 +293,15 @@ def plan_route(
             RouteStatus.DESTINATION_BLOCKED,
             reasons=tuple(reasons) or ("destination cell is blocked",),
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
     # ---- 9: origin == destination cell -> trivial route ----
-    if origin_cell == dest_cell:
-        return _trivial_route(request, grid, hard_geofences, origin_cell)
+    if routing_origin_cell == dest_cell:
+        return _trivial_route(
+            request, grid, hard_geofences, routing_origin_cell, routing_origin, origin_adjusted
+        )
 
     # ---- 10: A* (marine cost is a SOFT cost only; it never affects the
     #            blocked mask built above and is computed once, offline) ----
@@ -258,7 +315,7 @@ def plan_route(
         astar_kwargs["allow_blocked_start"] = True
     cells, expanded = a_star(
         grid,
-        origin_cell,
+        routing_origin_cell,
         dest_cell,
         allow_diagonal=request.allow_diagonal,
         max_expanded=budget,
@@ -273,7 +330,7 @@ def plan_route(
             )
         elif not _has_free_neighbour(grid, dest_cell):
             reason = "destination cell is fully enclosed by blocked cells or the grid edge"
-        elif not _has_free_neighbour(grid, origin_cell):
+        elif not _has_free_neighbour(grid, routing_origin_cell):
             reason = "origin cell is fully enclosed by blocked cells or the grid edge"
         else:
             reason = (
@@ -286,11 +343,13 @@ def plan_route(
             reasons=(reason,),
             expanded_nodes=expanded,
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
     # ---- 11: reconstruct path + costs ----
     coordinates = [grid.cell_center(cell) for cell in cells]
-    coordinates[0] = request.origin
+    coordinates[0] = routing_origin
     coordinates[-1] = request.destination
     total_distance = sum(
         geodesic_distance_m(a.latitude, a.longitude, b.latitude, b.longitude)
@@ -303,7 +362,7 @@ def plan_route(
         hard_geofences,
         grid=grid,
         cells=cells,
-        origin=request.origin,
+        origin=routing_origin,
         destination=request.destination,
         allow_diagonal=request.allow_diagonal,
         allow_blocked_start_cell=origin_start_exception,
@@ -319,6 +378,8 @@ def plan_route(
             validation=route_validation,
             expanded_nodes=expanded,
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
     path = tuple(
@@ -348,6 +409,8 @@ def plan_route(
         marine_cost_enabled=marine_result.enabled,
         omitted_cost_factors=marine_result.omitted_factors,
         warnings=marine_result.warnings,
+        routing_origin=routing_origin,
+        origin_adjusted=origin_adjusted,
     )
 
 
@@ -356,14 +419,19 @@ def _trivial_route(
     grid: Grid,
     hard_geofences: Sequence[Geofence],
     cell: Cell,
+    routing_origin: Coordinate,
+    origin_adjusted: bool,
 ) -> RouteResult:
-    """origin and destination fall in the same free, non-geofenced cell."""
-    same_point = request.origin == request.destination
+    """origin and destination fall in the same free, non-geofenced cell.
+
+    ``routing_origin`` is the (possibly step-4-normalized) A* start point -
+    identical to ``request.origin`` unless ``origin_adjusted`` is true."""
+    same_point = routing_origin == request.destination
     if same_point:
-        coordinates = [request.origin]
+        coordinates = [routing_origin]
         cells: list[Cell] = [cell]
     else:
-        coordinates = [request.origin, request.destination]
+        coordinates = [routing_origin, request.destination]
         cells = [cell, cell]
 
     validation = validate_route(
@@ -371,7 +439,7 @@ def _trivial_route(
         hard_geofences,
         grid=grid,
         cells=cells,
-        origin=request.origin,
+        origin=routing_origin,
         destination=request.destination,
         allow_diagonal=request.allow_diagonal,
     )
@@ -385,13 +453,15 @@ def _trivial_route(
             validation=validation,
             expanded_nodes=0,
             blocked_cell_count=grid.blocked_count,
+            routing_origin=routing_origin,
+            origin_adjusted=origin_adjusted,
         )
 
     distance = 0.0
     if not same_point:
         distance = geodesic_distance_m(
-            request.origin.latitude,
-            request.origin.longitude,
+            routing_origin.latitude,
+            routing_origin.longitude,
             request.destination.latitude,
             request.destination.longitude,
         )
@@ -415,4 +485,6 @@ def _trivial_route(
         expanded_nodes=0,
         blocked_cell_count=grid.blocked_count,
         validation=validation,
+        routing_origin=routing_origin,
+        origin_adjusted=origin_adjusted,
     )

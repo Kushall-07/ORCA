@@ -37,6 +37,10 @@ export type RouteStatus =
   | "NO_ROUTE"
   | "DESTINATION_BLOCKED"
   | "ORIGIN_BLOCKED"
+  // The origin sits on land and no navigable water cell was found within the
+  // bounded routing-origin normalization search radius - distinct from
+  // ORIGIN_BLOCKED (a hard-geofence rejection). See RouteInfo.origin_adjusted.
+  | "ORIGIN_NO_NAVIGABLE_CELL"
   | "INVALID_REQUEST"
   | "ROUTE_VALIDATION_FAILED";
 
@@ -353,6 +357,14 @@ export interface RouteInfo {
   // point because no authoritative harbour-mouth coordinate is available).
   // `origin_note` always carries the required disclosure text when this is true.
   maritime_origin_assumed?: boolean;
+  // True when the ROUTING origin (the actual A* start point) differs from
+  // `origin` above because `origin`'s own grid cell fell on land - `origin`
+  // itself is never moved (it stays the reference/map-marker coordinate);
+  // `routing_origin` is the nearest navigable sea cell A* actually started
+  // from, and `routing_origin_note` is a ready-to-display explanation.
+  origin_adjusted?: boolean;
+  routing_origin?: [number, number] | null;
+  routing_origin_note?: string | null;
   // True when `destination` was automatically derived from the nearest
   // official INCOIS PFZ zone for an explicit "PFZ + route" compound
   // natural-language request (e.g. "Show me the nearest PFZ at Mangalore and

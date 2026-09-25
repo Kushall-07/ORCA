@@ -103,6 +103,39 @@ class Grid:
         )
 
 
+def find_nearest_navigable_cell(grid: Grid, origin: Cell, max_radius: int) -> Cell | None:
+    """Bounded, deterministic search for the nearest navigable cell to
+    ``origin`` (used to translate a coastal reference point that falls on a
+    blocked/land cell into a valid A* start cell - see
+    ``app.routing.planner.plan_route``'s origin normalization step).
+
+    Expands ring by ring (Chebyshev distance 1, 2, 3, ... up to
+    ``max_radius``) around ``origin`` and stops at the first ring containing
+    at least one navigable cell. Among candidates in that ring, picks the one
+    with the smallest actual (row, col) squared distance, tie-broken by
+    ``(dr, dc)`` then the candidate cell itself - a total order, so the
+    result is bit-for-bit reproducible across runs. Returns ``origin``
+    unchanged if it is already navigable, or ``None`` if no navigable cell
+    exists within ``max_radius`` rings (bounded - never scans the whole
+    grid)."""
+    if grid.is_navigable(origin):
+        return origin
+    row0, col0 = origin
+    for radius in range(1, max_radius + 1):
+        candidates: list[tuple[int, int, int, Cell]] = []
+        for dr in range(-radius, radius + 1):
+            for dc in range(-radius, radius + 1):
+                if max(abs(dr), abs(dc)) != radius:
+                    continue  # only this ring's cells - inner rings already checked
+                cell = (row0 + dr, col0 + dc)
+                if grid.is_navigable(cell):
+                    candidates.append((dr * dr + dc * dc, dr, dc, cell))
+        if candidates:
+            candidates.sort()
+            return candidates[0][3]
+    return None
+
+
 def rasterize_geofences(
     spec: GridSpec,
     geofences: Iterable[Geofence],

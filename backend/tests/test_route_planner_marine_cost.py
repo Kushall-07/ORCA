@@ -86,11 +86,18 @@ def test_hard_geofence_still_blocks_origin_with_risk_present() -> None:
 
 
 def test_land_still_blocks_origin_with_risk_present() -> None:
+    # This origin's own grid cell (sampled at its centre) is not land-blocked
+    # (see test_route_planner.py's test_land_origin_is_rejected for the same
+    # fixture geometry and the exact raster arithmetic), so routing-origin
+    # normalization never moves it - but the full-height land strip still
+    # separates it from CLEAR_DEST, so no route exists either way. Land still
+    # blocks the route (NO_ROUTE).
     land = FakeLandBackend(74.68, 74.73)
     result = plan_route(
         _request(origin=coord(12.83, 74.70)), [], land, risk=_risk()
     )
-    assert result.status is RouteStatus.ORIGIN_BLOCKED
+    assert result.status is RouteStatus.NO_ROUTE
+    assert result.origin_adjusted is False
 
 
 def test_route_validation_still_runs_and_passes_with_marine_cost_enabled() -> None:

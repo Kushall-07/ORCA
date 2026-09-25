@@ -32,6 +32,12 @@ class RouteStatus(str, Enum):
     NO_ROUTE = "NO_ROUTE"
     DESTINATION_BLOCKED = "DESTINATION_BLOCKED"
     ORIGIN_BLOCKED = "ORIGIN_BLOCKED"
+    # The requested origin sits on land and no navigable water cell exists
+    # within the bounded origin-normalization search radius (see
+    # app.routing.planner.plan_route / app.routing.grid.find_nearest_navigable_cell).
+    # Distinct from ORIGIN_BLOCKED (a hard-geofence rejection) so callers can
+    # tell "genuinely no nearby sea" apart from "blocked by a safety zone".
+    ORIGIN_NO_NAVIGABLE_CELL = "ORIGIN_NO_NAVIGABLE_CELL"
     INVALID_REQUEST = "INVALID_REQUEST"
     # A* produced a path but the independent Layer-3 validator rejected it.
     # This is a defence-in-depth failure signal, distinct from "no path exists".
@@ -136,6 +142,18 @@ class RouteResult(BaseModel):
     algorithm: str = ROUTING_ALGORITHM
     algorithm_version: str = ROUTING_VERSION
     reasons: tuple[str, ...] = ()
+
+    # ---- routing-origin normalization (coastal reference -> navigable cell) --
+    # ``origin`` above is always the caller's ORIGINAL requested coordinate
+    # (e.g. a landing-centre reference) - it is NEVER moved, so map markers /
+    # provenance keep showing it unchanged. ``routing_origin`` is the actual
+    # coordinate A* started from: identical to ``origin`` unless
+    # ``origin_adjusted`` is true, in which case it is the nearest navigable
+    # water cell found by app.routing.grid.find_nearest_navigable_cell. This
+    # NEVER affects risk/safety/decision - it only prepares a valid A* start
+    # point from a coastal human reference location.
+    routing_origin: Coordinate | None = None
+    origin_adjusted: bool = False
 
     # ---- Phase 10D: marine-aware route cost (soft cost only) --------------
     # These NEVER affect ``status`` or whether a route was found - they are

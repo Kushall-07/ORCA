@@ -3,7 +3,11 @@ import { useI18n } from "../../i18n";
 import type { PfzZoneInfo, QueryResponse } from "../../types/api";
 
 const ROUTE_OK = new Set(["ROUTE_FOUND"]);
-const ROUTE_BLOCKED = new Set(["DESTINATION_BLOCKED", "ORIGIN_BLOCKED"]);
+const ROUTE_BLOCKED = new Set([
+  "DESTINATION_BLOCKED",
+  "ORIGIN_BLOCKED",
+  "ORIGIN_NO_NAVIGABLE_CELL",
+]);
 
 // Small tolerance for matching a route's echoed destination back to the zone
 // that was requested (float round-trip through the API), not a distance
@@ -109,6 +113,9 @@ export function RouteControls({
               <p className="route-controls__stat">
                 {t("routeControls.waypoints")}: {route!.waypoint_count}
               </p>
+            )}
+            {route!.origin_adjusted && (
+              <p className="route-controls__note">{t("routeControls.originAdjusted")}</p>
             )}
           </div>
         ) : (

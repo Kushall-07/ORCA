@@ -297,6 +297,7 @@ def combine_multi_route_legs(legs: Sequence[MultiRouteLeg]) -> RouteResult | Non
         )
         warnings.extend(route.warnings)
 
+    first_route = first.result.route
     return RouteResult(
         status=status,
         origin=first.origin,
@@ -306,6 +307,11 @@ def combine_multi_route_legs(legs: Sequence[MultiRouteLeg]) -> RouteResult | Non
         total_distance_m=total_distance_m if have_distance else None,
         reasons=tuple(reasons),
         warnings=tuple(warnings),
+        # Only the FIRST leg's origin can ever be normalized (every later leg
+        # starts from the previous leg's own destination, already navigable) -
+        # see app.routing.planner.plan_route's routing-origin normalization.
+        routing_origin=first_route.routing_origin if first_route else None,
+        origin_adjusted=bool(first_route and first_route.origin_adjusted),
     )
 
 

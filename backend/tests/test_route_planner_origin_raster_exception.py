@@ -1,18 +1,27 @@
-"""Phase 9.x: `plan_route`'s `allow_blocked_origin_cell` start-node exception.
+"""Routing-origin normalization (general fix) + the legacy Phase 9.x
+`allow_blocked_origin_cell` start-node exception it now supersedes.
 
 Reproduces, with a fully deterministic synthetic land backend, the exact
 class of failure the live Mangaluru Fishing Harbour demo hit: the harbour's
-own EXACT coordinate is verified navigable water (passes `plan_route`'s
-step-4 exact-point check), but the coarse 0.05 deg land/water raster samples
-only each grid cell's CENTRE (see `app.routing.land_mask.rasterize_land`),
-and that cell centre can fall on land even though the harbour point itself
-does not - blocking the origin at step 8 with "origin cell is blocked by the
-land/water raster (on land)".
+own EXACT coordinate is verified navigable water, but the coarse 0.05 deg
+land/water raster samples only each grid cell's CENTRE (see
+`app.routing.land_mask.rasterize_land`), and that cell centre can fall on
+land even though the harbour point itself does not - blocking the origin
+with "origin cell is blocked by the land/water raster (on land)".
+
+`plan_route` now fixes this generally (see its step-4 routing-origin
+normalization / `app.routing.grid.find_nearest_navigable_cell`): ANY origin
+whose own cell is land-raster-blocked (and not hard-geofence-blocked) is
+translated to the nearest navigable water cell before A* runs - not just the
+one narrowly-scoped, name-recognized Mangaluru case. `allow_blocked_origin_cell`
+is therefore a no-op for this class of failure now (tests A/B/"default false"
+below prove the fix applies unconditionally); it is kept only for backward
+API compatibility - see `plan_route`'s docstring.
 
 These tests exercise `plan_route` directly (not the full pipeline / the
 Mangaluru name-recognition machinery - see `test_mangaluru_harbour_assumption
-.py` for that) so the start-node exception itself is proven in isolation,
-independent of query understanding, INCOIS fetches, or real bathymetry data.
+.py` for that) so the normalization is proven in isolation, independent of
+query understanding, INCOIS fetches, or real bathymetry data.
 
 The origin cell / cell-centre / cell-bounds used below are all DERIVED from a
 real `Grid` built off `GRID`, rather than hand-computed, so they are
@@ -99,34 +108,44 @@ def _cell_half_geofence() -> Geofence:
     )
 
 
-# ---- A: the exception accepts a start node whose raster cell is "land" -----
-def test_a_blocked_origin_cell_is_accepted_as_start_when_exception_is_set() -> None:
+# ---- A: the general routing-origin normalization rescues a start node whose
+#          raster cell is "land" - UNCONDITIONALLY, no flag required --------
+def test_a_blocked_origin_cell_is_rescued_to_the_nearest_navigable_cell() -> None:
     backend = CellCentreLandBackend(ORIGIN_CELL_CENTRE)
     # Sanity: this backend genuinely blocks the origin cell in the raster.
     assert backend.depth_m(ORIGIN_CELL_CENTRE) > 0.0
     assert backend.depth_m(ORIGIN) <= 0.0
     result = plan_route(_request(), [], backend, allow_blocked_origin_cell=True)
     assert result.status is RouteStatus.ROUTE_FOUND
-    assert result.path[0].coordinate == ORIGIN
-    assert result.path[0].row == ORIGIN_CELL[0]
-    assert result.path[0].col == ORIGIN_CELL[1]
+    assert result.origin_adjusted is True
+    # `origin` (the reference coordinate) is never moved; only the internal
+    # routing origin (and so the route line's own start point) differs.
+    assert result.origin == ORIGIN
+    assert result.routing_origin is not None and result.routing_origin != ORIGIN
+    assert result.path[0].coordinate == result.routing_origin
 
 
-def test_default_false_preserves_prior_origin_blocked_behaviour() -> None:
+def test_default_false_now_rescues_the_origin_without_needing_the_exception_flag() -> None:
+    # The general fix applies REGARDLESS of `allow_blocked_origin_cell` - this
+    # proves the flag is no longer required for this class of failure (it is
+    # kept only for backward API compatibility - see plan_route's docstring).
     backend = CellCentreLandBackend(ORIGIN_CELL_CENTRE)
     result = plan_route(_request(), [], backend)  # allow_blocked_origin_cell defaults False
-    assert result.status is RouteStatus.ORIGIN_BLOCKED
-    assert "land/water raster" in " ".join(result.reasons)
+    assert result.status is RouteStatus.ROUTE_FOUND
+    assert result.origin_adjusted is True
+    assert result.routing_origin is not None and result.routing_origin != ORIGIN
 
 
-# ---- B: a genuinely on-land origin (exact point, not just its raster cell)
-#         stays blocked even with the exception flag set ------------------
-def test_b_genuine_on_land_origin_still_blocked_even_with_exception_set() -> None:
+# ---- B: an origin genuinely on land (exact point AND its raster cell, with
+#         navigable water nearby) is ALSO rescued now - the fix works from
+#         the raster alone, it never needed the old exact-point distinction --
+def test_b_genuine_on_land_origin_with_nearby_water_is_also_rescued() -> None:
     backend = FakeLandBackend(74.40, 74.50)  # covers ORIGIN's own exact point
     assert backend.depth_m(ORIGIN) > 0.0
     result = plan_route(_request(), [], backend, allow_blocked_origin_cell=True)
-    assert result.status is RouteStatus.ORIGIN_BLOCKED
-    assert "land" in " ".join(result.reasons).lower()
+    assert result.status is RouteStatus.ROUTE_FOUND
+    assert result.origin_adjusted is True
+    assert result.routing_origin is not None and result.routing_origin != ORIGIN
 
 
 # ---- C & D: every cell after the start is still held to the normal rules --

@@ -124,12 +124,23 @@ def test_mangalore_land_crossing_pair_does_not_return_a_route() -> None:
     assert res.route.validation is None or res.route.validation.valid is not True
 
 
-def test_land_origin_is_blocked_through_the_route_agent() -> None:
+def test_land_origin_is_rescued_through_the_route_agent() -> None:
+    """This is the exact live-reported bug: MANGALORE_LAND (12.87, 74.84) is
+    a real coastal reference point whose own raster cell is on land.
+    `plan_route`'s routing-origin normalization (see its step-4 docstring)
+    now rescues it to the nearest navigable cell instead of failing outright
+    - the route is no longer ORIGIN_BLOCKED. (For this particular real-
+    bathymetry origin/KOCHI destination pair the destination's own grid cell
+    for THIS grid alignment happens to raster-block, so the overall route
+    still doesn't complete - see DESTINATION_BLOCKED below - but the origin
+    side of the historical bug is fixed either way.)"""
     d, r = _ok_decision()
     res = RouteAgent().plan(understanding=_route_understanding(), decision=d,
                             origin=MANGALORE_LAND, destination=KOCHI, risk=r)
-    assert res.route.status is RouteStatus.ORIGIN_BLOCKED
-    assert "land" in " ".join(res.route.reasons).lower()
+    assert res.route.status is not RouteStatus.ORIGIN_BLOCKED
+    assert res.route.status is not RouteStatus.ORIGIN_NO_NAVIGABLE_CELL
+    assert res.route.origin_adjusted is True
+    assert res.route.routing_origin is not None and res.route.routing_origin != MANGALORE_LAND
 
 
 def test_land_destination_is_blocked_through_the_route_agent() -> None:
@@ -153,14 +164,19 @@ def test_water_route_between_real_ports_is_still_found() -> None:
 
 def test_injected_land_backend_is_used_instead_of_the_real_one() -> None:
     # A fake land backend can be injected (e.g. for a deterministic unit test)
-    # and takes priority over the real bathymetry-backed default.
+    # and takes priority over the real bathymetry-backed default. This band
+    # (74.0..78.0, unbounded latitude) fully covers the entire routing grid
+    # built around MANGALORE/KOCHI (see app.agents.route._grid_for's padding),
+    # so the bounded routing-origin normalization search finds no navigable
+    # cell anywhere in it either - a distinct, still-honest status (see
+    # RouteStatus.ORIGIN_NO_NAVIGABLE_CELL) from an ordinary ORIGIN_BLOCKED.
     land = FakeLandBackend(74.0, 78.0)  # blocks the whole MANGALORE..KOCHI corridor
     d, r = _ok_decision()
     res = RouteAgent(land_backend=land).plan(
         understanding=_route_understanding(), decision=d,
         origin=MANGALORE, destination=KOCHI, risk=r,
     )
-    assert res.route.status is RouteStatus.ORIGIN_BLOCKED
+    assert res.route.status is RouteStatus.ORIGIN_NO_NAVIGABLE_CELL
 
 
 # ---- Phase 10D: marine-aware route cost (reuses the already-computed `risk`) --

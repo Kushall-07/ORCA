@@ -114,7 +114,11 @@ LAND_ON_DEST = coord(13.15, 74.70)         # inside the full-height land strip b
 def _full_height_land_strip() -> FakeLandBackend:
     # A land band spanning the whole grid latitude range at lon 74.68..74.73 -
     # mirrors `_full_wall()`'s geometry so "no route" behaves identically for
-    # land as it already does for a hard geofence.
+    # land as it already does for a hard geofence. Only 1 cell wide, so the
+    # routing-origin normalization step (app.routing.planner.plan_route)
+    # rescues an origin sitting inside it to an adjacent (water) cell before
+    # A* ever runs - but since the strip still spans the full grid height, no
+    # route across it exists either way (see test_land_origin_is_rejected).
     return FakeLandBackend(74.68, 74.73)
 
 
@@ -130,12 +134,19 @@ def _far_away_land_patch() -> FakeLandBackend:
 
 
 def test_land_origin_is_rejected() -> None:
+    # LAND_ON_ORIGIN's own grid CELL (sampled at its centre, like every other
+    # raster cell) is not land-blocked here, so routing-origin normalization
+    # never needs to move it - but the full-height wall still separates it
+    # from CLEAR_DEST, so no route exists either way. Land still blocks the
+    # ROUTE (NO_ROUTE), just no longer mis-reported as an origin-side land
+    # rejection based on the point falling in the strip's exact lon range.
     result = plan_route(
         _request(origin=LAND_ON_ORIGIN), [], _full_height_land_strip()
     )
-    assert result.status is RouteStatus.ORIGIN_BLOCKED
+    assert result.status is RouteStatus.NO_ROUTE
     assert result.path == ()
-    assert "land" in " ".join(result.reasons).lower()
+    assert result.origin_adjusted is False
+    assert result.routing_origin == LAND_ON_ORIGIN
 
 
 def test_land_destination_is_rejected() -> None:

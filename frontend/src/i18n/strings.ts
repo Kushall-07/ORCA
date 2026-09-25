@@ -552,6 +552,7 @@ export type StringKey =
   | "routeControls.viewRoute"
   | "routeControls.expand"
   | "routeControls.collapse"
+  | "routeControls.originAdjusted"
   | "env.interp"
   | "env.interp.limited"
   | "env.interp.limitedNote"
@@ -1299,6 +1300,7 @@ const en: Table = {
   "routeControls.viewRoute": "View Route",
   "routeControls.expand": "Show route controls",
   "routeControls.collapse": "Hide route controls",
+  "routeControls.originAdjusted": "Routing origin: nearest navigable sea cell (reference origin is on land)",
   "env.interp": "Productivity interpretation",
   "env.interp.limited": "LIMITED",
   "env.interp.limitedNote":
@@ -2067,6 +2069,7 @@ const hi: Table = {
   "routeControls.viewRoute": "मार्ग देखें",
   "routeControls.expand": "मार्ग नियंत्रण दिखाएं",
   "routeControls.collapse": "मार्ग नियंत्रण छिपाएं",
+  "routeControls.originAdjusted": "मार्ग उद्गम: निकटतम नौवहन योग्य समुद्री सेल (संदर्भ उद्गम भूमि पर है)",
   "env.interp": "उत्पादकता व्याख्या",
   "env.interp.limited": "सीमित",
   "env.interp.limitedNote":
@@ -2835,6 +2838,7 @@ const kn: Table = {
   "routeControls.viewRoute": "ಮಾರ್ಗ ವೀಕ್ಷಿಸಿ",
   "routeControls.expand": "ಮಾರ್ಗ ನಿಯಂತ್ರಣಗಳನ್ನು ತೋರಿಸಿ",
   "routeControls.collapse": "ಮಾರ್ಗ ನಿಯಂತ್ರಣಗಳನ್ನು ಮರೆಮಾಡಿ",
+  "routeControls.originAdjusted": "ಮಾರ್ಗ ಮೂಲ: ಹತ್ತಿರದ ನೌಕಾಯಾನ ಯೋಗ್ಯ ಸಮುದ್ರ ಕೋಶ (ಉಲ್ಲೇಖ ಮೂಲವು ಭೂಮಿಯಲ್ಲಿದೆ)",
   "env.interp": "ಉತ್ಪಾದಕತೆ ವ್ಯಾಖ್ಯಾನ",
   "env.interp.limited": "ಸೀಮಿತ",
   "env.interp.limitedNote":

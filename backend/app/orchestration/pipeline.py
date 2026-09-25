@@ -605,6 +605,18 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
             maritime_origin_verified=bool(maritime_origin and maritime_origin.substituted),
             maritime_origin_assumed=bool(maritime_origin and maritime_origin.assumed),
             origin_note=origin_note,
+            origin_adjusted=route.origin_adjusted,
+            routing_origin=(
+                [route.routing_origin.latitude, route.routing_origin.longitude]
+                if route.routing_origin is not None
+                else None
+            ),
+            routing_origin_note=(
+                "Origin adjusted to the nearest navigable sea cell "
+                "(the reference location itself is on land)."
+                if route.origin_adjusted
+                else None
+            ),
             pfz_auto_destination=pfz_auto_destination,
             pfz_zone_distance_km=(
                 pfz_route_destination.distance_km if pfz_auto_destination else None
