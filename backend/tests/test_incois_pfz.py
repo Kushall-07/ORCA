@@ -158,6 +158,75 @@ async def test_build_pfz_reference_available_with_matched_geometry(monkeypatch) 
     assert result.nearest_landing_centre.depth_from_m == 18.0
 
 
+# ---- 11b. WFS landing-centre static dates must never read as a live forecast -
+# The official WFS landing-centres layer (~1223 nodes) bakes the SAME single
+# FORECAST_D/VALIDITY_D timestamp into every node from whenever that layer was
+# last rebuilt (verified live: identical across the whole dataset) - showing
+# it as "valid until <that date>" to a query made long after would misleadingly
+# read as a current forecast. Only the Text Data channel re-scrapes these two
+# fields fresh every day, so they must only be surfaced when THAT is the
+# source. The stable geographic profile (distance/direction/bearing/depth) is
+# never time-sensitive and must still come through either way.
+async def test_build_pfz_reference_wfs_landing_centre_static_dates_not_surfaced(
+    monkeypatch,
+) -> None:
+    async def _lines(*a, **k):
+        return _LINES_FC
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_reference(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    lc = result.nearest_landing_centre
+    assert lc is not None
+    # The raw fixture DOES carry FORECAST_D/VALIDITY_D (see _landing above) -
+    # they must still be dropped because this result came from the WFS.
+    assert lc.forecast_date is None
+    assert lc.valid_until is None
+    # Genuinely stable geographic fields are unaffected.
+    assert lc.direction == "NW"
+    assert lc.depth_from_m == 18.0
+    assert lc.updated_at == "2026-09-11T06:00:00Z"
+
+
+async def test_build_pfz_reference_textdata_landing_centre_dates_are_surfaced(
+    monkeypatch,
+) -> None:
+    async def _wfs_403(*a, **k):
+        raise incois_pfz.IncoisPfzUnavailable("INCOIS PFZ WFS HTTP 403")
+
+    async def _textdata(*, state_name, settings, client=None):
+        return {
+            "points": [
+                {
+                    "from_coast": "Mangalore LC", "direction": "SW", "bearing_deg": 256.0,
+                    "distance_from_nm": 17.82, "distance_to_nm": 20.52,
+                    "depth_from_m": 56.0, "depth_to_m": 61.0,
+                    "latitude": 12.88, "longitude": 74.85,
+                }
+            ],
+            "forecast_date": "12 SEP 2026",
+            "valid_until": "13 SEP 2026",
+        }
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _wfs_403)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _wfs_403)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_textdata", _textdata)
+
+    result = await build_pfz_reference(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    lc = result.nearest_landing_centre
+    assert lc is not None
+    # Text Data is re-scraped fresh every query, so these ARE trustworthy here.
+    assert lc.forecast_date == "12 SEP 2026"
+    assert lc.valid_until == "13 SEP 2026"
+
+
 # ---- 12. PFZ rendering data contract -----------------------------------------
 async def test_fetch_matched_lines_returns_feature_collection_with_provenance(monkeypatch) -> None:
     async def _lines(*a, **k):
@@ -177,6 +246,98 @@ async def test_fetch_matched_lines_returns_feature_collection_with_provenance(mo
     assert fc["orca_meta"]["authority"] == "INCOIS"
     assert "not a safety zone" in fc["orca_meta"]["disclaimer"]
     assert all(f["properties"]["State_Name"] == "KARNATAKA" for f in fc["features"])
+
+
+# ---- 12b. map layer falls back to the landing centre when no line matched --
+# A day with no PFZ LINE advisory for the query's sector (e.g. today's
+# satellite pass skipped it - the real Karnataka/Mangalore case that exposed
+# this) must not make GET /gis/layers/pfz render nothing while the chat
+# answer (build_pfz_reference) reports a landing centre reference as
+# available - see fetch_matched_lines's own comment. Two real official Point
+# features, both clearly tagged, never a fabricated line/polygon: the landing
+# centre itself, and (since the fixture's BEARING/DISTANCE_F/DISTANCE_T are
+# usable) the point that landing centre's own published distance/bearing
+# describes.
+async def test_fetch_matched_lines_falls_back_to_landing_centre_when_no_lines_matched(
+    monkeypatch,
+) -> None:
+    no_karnataka_lines_fc = {
+        "type": "FeatureCollection",
+        "features": [_line("KERALA", 76.20, 9.90), _line("GOA", 73.80, 15.30)],
+    }
+
+    async def _lines(*a, **k):
+        return no_karnataka_lines_fc
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    fc = await fetch_matched_lines(MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache()))
+    assert len(fc["features"]) == 2
+    landing_feature, projected_feature = fc["features"]
+    assert landing_feature["properties"]["orca_feature_kind"] == "LANDING_CENTRE"
+    assert landing_feature["properties"]["LC_NAME"] == "Mangalore LC"
+    assert landing_feature["geometry"]["type"] == "Point"
+    assert landing_feature["properties"]["orca_distance_km"] is not None
+    assert projected_feature["properties"]["orca_feature_kind"] == "PROJECTED_ADVISORY_POINT"
+    assert projected_feature["geometry"]["type"] == "Point"
+    assert "Mangalore LC" in projected_feature["properties"]["derived_from"]
+    # The projected point must not be the same coordinate as the landing
+    # centre - it moved along the published bearing/distance.
+    assert projected_feature["geometry"]["coordinates"] != landing_feature["geometry"]["coordinates"]
+
+
+async def test_fetch_matched_lines_no_lines_and_no_landing_centre_is_empty(
+    monkeypatch,
+) -> None:
+    async def _lines(*a, **k):
+        return {"type": "FeatureCollection", "features": [_line("KERALA", 76.20, 9.90)]}
+
+    async def _landing_fc(*a, **k):
+        return {"type": "FeatureCollection", "features": [_landing("KERALA", 9.97, 76.24, "Kochi LC")]}
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    fc = await fetch_matched_lines(
+        Coordinate(latitude=13.0, longitude=72.0),  # open sea, far from Kerala
+        settings=Settings(), cache=JsonCache(InMemoryCache()),
+    )
+    assert fc["features"] == []
+
+
+# ---- WFS endpoint URL (root-cause regression) --------------------------------
+# The live INCOIS WebGIS's own js/featureinfo.js never calls the GLOBAL
+# /geoserver/ows endpoint (verified live: it returns HTTP 403 independent of
+# ORCA) - it calls the PER-WORKSPACE path (e.g. /geoserver/PFZ_Automation/ows),
+# which is public and returns real data. An earlier version of this module
+# built the global URL instead, so every WFS fetch failed and fell through to
+# the Text Data fallback even though the WFS was actually reachable.
+async def test_fetch_wfs_geojson_uses_per_workspace_ows_path_not_global() -> None:
+    captured_urls: list[str] = []
+
+    class _FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"type": "FeatureCollection", "features": []}
+
+    class _FakeClient:
+        async def get(self, url, timeout):
+            captured_urls.append(url)
+            return _FakeResponse()
+
+    await incois_pfz._fetch_wfs_geojson(
+        base_url="https://www.incois.gov.in/geoserver",
+        type_name="PFZ_Automation:pfzlines", timeout_s=5.0, client=_FakeClient(),
+    )
+    assert captured_urls == [
+        "https://www.incois.gov.in/geoserver/PFZ_Automation/ows"
+        "?service=WFS&version=1.1.0&request=GetFeature"
+        "&typeName=PFZ_Automation:pfzlines&outputFormat=application/json"
+    ]
+    assert "/geoserver/ows?" not in captured_urls[0]
 
 
 # ---- schema validation for the WFS client -----------------------------------
@@ -604,3 +765,161 @@ async def test_build_pfz_zone_ranking_unavailable_on_transport_error(monkeypatch
     )
     assert result.availability is PfzAvailability.UNAVAILABLE
     assert result.zones == ()
+
+
+# ---- projected advisory point (no line advisory, but a WFS landing centre's
+# own published distance/bearing describes a real advised point) -----------
+# The WFS landing-centres layer's LATITUDE/LONGITUDE is the coastal landing
+# centre itself, not the advised fishing area - DISTANCE_F/DISTANCE_T (nm)
+# and BEARING separately describe how far/which way the actual advisory zone
+# is from there. When no PFZ line advisory matched at all, ORCA computes that
+# described point with plain WGS84 geodesic trigonometry on those official
+# published numbers - never an estimate, never derived from SST/CHL, and
+# clearly labelled everywhere as computed (geometry_source /
+# PROJECTED_ADVISORY_POINT), never conflated with a real matched line.
+async def test_destination_point_geodesic_matches_known_offset() -> None:
+    from app.gis.operations import destination_point_geodesic, geodesic_distance_m
+
+    lat, lon = 12.85, 74.84
+    proj_lat, proj_lon = destination_point_geodesic(lat, lon, bearing_deg=0.0, distance_m=1852.0)
+    # Due north by exactly 1 nm: latitude increases, longitude essentially
+    # unchanged, and the round-trip distance matches what was requested.
+    assert proj_lat > lat
+    assert abs(proj_lon - lon) < 1e-6
+    assert geodesic_distance_m(lat, lon, proj_lat, proj_lon) == pytest.approx(1852.0, rel=1e-3)
+
+
+async def test_build_pfz_reference_sets_projected_zone_when_no_lines_matched(monkeypatch) -> None:
+    no_karnataka_lines_fc = {
+        "type": "FeatureCollection",
+        "features": [_line("KERALA", 76.20, 9.90)],
+    }
+
+    async def _lines(*a, **k):
+        return no_karnataka_lines_fc
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_reference(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.zone_count == 0  # never inflated by the projected point
+    assert result.projected_zone is not None
+    assert result.projected_zone.geometry_source == "PROJECTED_FROM_LANDING_CENTRE"
+    assert "Mangalore LC" in result.projected_zone.derived_from
+    assert result.projected_zone.latitude != result.nearest_landing_centre.latitude
+
+
+async def test_build_pfz_reference_no_projected_zone_when_lines_matched(monkeypatch) -> None:
+    async def _lines(*a, **k):
+        return _LINES_FC
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_reference(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.zone_count > 0
+    assert result.projected_zone is None
+
+
+async def test_build_pfz_zone_ranking_falls_back_to_projected_point(monkeypatch) -> None:
+    # _LANDING_FC has TWO KARNATAKA-sector landing centres ("Mangalore LC",
+    # "Far LC") within the default 250km match radius, plus one KERALA-sector
+    # one ("Kochi LC") excluded by the same-sector-first rule. The fallback
+    # must surface BOTH real KARNATAKA references, not collapse to only the
+    # single nearest one (the exact regression this test used to encode -
+    # see rank_landing_centres and build_pfz_zone_ranking's fallback).
+    no_karnataka_lines_fc = {
+        "type": "FeatureCollection",
+        "features": [_line("KERALA", 76.20, 9.90)],
+    }
+
+    async def _lines(*a, **k):
+        return no_karnataka_lines_fc
+
+    async def _landing_fc(*a, **k):
+        return _LANDING_FC
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_zone_ranking(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert len(result.zones) == 2
+    names = {z.derived_from for z in result.zones}
+    assert any("Mangalore LC" in n for n in names)
+    assert any("Far LC" in n for n in names)
+    assert all(z.geometry_source == "PROJECTED_FROM_LANDING_CENTRE" for z in result.zones)
+    # Ranked 1..N, nearest-first, by the PROJECTED point's own distance.
+    assert [z.rank for z in result.zones] == [1, 2]
+    assert result.zones[0].distance_km <= result.zones[1].distance_km
+    ids = [z.id for z in result.zones]
+    assert len(ids) == len(set(ids))  # stable, unique per-zone identity
+
+
+async def test_build_pfz_zone_ranking_projected_fallback_single_reference(monkeypatch) -> None:
+    """Exactly one landing centre in range must still work (not just >=2)."""
+    kochi_only_fc = {
+        "type": "FeatureCollection",
+        "features": [_landing("KERALA", 9.97, 76.24, "Kochi LC")],
+    }
+    no_lines_fc = {"type": "FeatureCollection", "features": []}
+
+    async def _lines(*a, **k):
+        return no_lines_fc
+
+    async def _landing_fc(*a, **k):
+        return kochi_only_fc
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_zone_ranking(
+        Coordinate(latitude=9.93, longitude=76.26),
+        settings=Settings(), cache=JsonCache(InMemoryCache()),
+    )
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert len(result.zones) == 1
+    assert result.zones[0].rank == 1
+    assert "Kochi LC" in result.zones[0].derived_from
+
+
+async def test_build_pfz_zone_ranking_projected_fallback_caps_at_max_ranked_zones(
+    monkeypatch,
+) -> None:
+    """15 real landing centres in range must cap at 10 (_MAX_RANKED_ZONES),
+    never fabricate more and never silently drop to fewer than the cap."""
+    many_landing_fc = {
+        "type": "FeatureCollection",
+        "features": [
+            _landing("KARNATAKA", 12.80 + i * 0.02, 74.80 + i * 0.02, f"LC {i}")
+            for i in range(15)
+        ],
+    }
+    no_lines_fc = {"type": "FeatureCollection", "features": []}
+
+    async def _lines(*a, **k):
+        return no_lines_fc
+
+    async def _landing_fc(*a, **k):
+        return many_landing_fc
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _lines)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _landing_fc)
+    result = await build_pfz_zone_ranking(
+        MANGALORE, settings=Settings(), cache=JsonCache(InMemoryCache())
+    )
+    assert result.availability is PfzAvailability.AVAILABLE
+    assert len(result.zones) == 10
+    assert [z.rank for z in result.zones] == list(range(1, 11))
+    distances = [z.distance_km for z in result.zones]
+    assert distances == sorted(distances)
+    ids = [z.id for z in result.zones]
+    assert len(ids) == len(set(ids))

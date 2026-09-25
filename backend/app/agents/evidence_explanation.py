@@ -756,6 +756,10 @@ def _render_pfz_intent(language, understanding, pfz, decision, route, pfz_route_
             if lc.valid_until:
                 bits.append(f"valid until {lc.valid_until}")
             parts.append(frag(language, "pfz_reference_landing_centre", detail=", ".join(bits)))
+        if pfz.projected_zone is not None and pfz.projected_zone.derived_from:
+            parts.append(frag(
+                language, "pfz_reference_projected_zone", detail=pfz.projected_zone.derived_from,
+            ))
     else:
         if origin_name:
             parts.append(frag(language, "pfz_reference_unavailable_near", place=origin_name))

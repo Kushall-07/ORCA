@@ -469,6 +469,7 @@ export type StringKey =
   | "layer.pfz.noLocationMatch"
   | "layer.pfz.checking"
   | "layer.pfz.zoneCount"
+  | "layer.pfz.landingCentreOnly"
   | "layer.sst"
   | "layer.chlorophyll"
   | "layer.sst.available"
@@ -522,11 +523,13 @@ export type StringKey =
   | "pfz.ranked.subtitle"
   | "pfz.ranked.distanceKm"
   | "pfz.ranked.restricted"
+  | "pfz.ranked.projected"
   | "pfz.ranked.selectHint"
   | "pfz.ranked.markerTooltip"
   | "pfz.ranked.empty"
   | "pfz.ranked.unavailable"
   | "pfz.ranked.noLocationMatch"
+  | "pfz.ranked.landingCentreOnly"
   | "pfz.ranked.checking"
   | "pfz.ranked.available"
   | "pfz.ranked.layerHidden"
@@ -1213,6 +1216,8 @@ const en: Table = {
   "layer.pfz.noGeometry":
     "Official INCOIS reference unavailable for map rendering at this location.",
   "layer.pfz.zoneCount": "Official INCOIS reference — {count} zone(s)",
+  "layer.pfz.landingCentreOnly":
+    "No PFZ zone advisory for today — showing the nearest official INCOIS reference landing centre.",
   "layer.sst": "Sea surface temperature",
   "layer.chlorophyll": "Chlorophyll-a",
   "layer.sst.available":
@@ -1270,11 +1275,13 @@ const en: Table = {
   "pfz.ranked.subtitle": "Nearest official INCOIS zones, ranked by distance",
   "pfz.ranked.distanceKm": "{km} km away",
   "pfz.ranked.restricted": "Restricted",
+  "pfz.ranked.projected": "Computed reference",
   "pfz.ranked.selectHint": "Select a zone to highlight it on the map",
   "pfz.ranked.markerTooltip": "PFZ zone {n} — {km} km",
   "pfz.ranked.empty": "No matched PFZ zones near this location",
   "pfz.ranked.unavailable": "No official INCOIS PFZ reference is currently available for this location or date. ORCA does not generate or estimate PFZ locations. You can still assess sea-going safety and environmental conditions separately.",
   "pfz.ranked.noLocationMatch": "No official INCOIS PFZ advisory matches this exact location today. You can still assess sea-going safety and environmental conditions separately.",
+  "pfz.ranked.landingCentreOnly": "No ranked PFZ zone lines match this location today. A nearest official INCOIS reference landing centre is shown on the map and in the chat answer instead.",
   "pfz.ranked.checking": "Checking for official INCOIS PFZ zones…",
   "pfz.ranked.available": "{count} available",
   "pfz.ranked.layerHidden": "PFZ layer is hidden — turn on INCOIS PFZ Reference in Map Layers to see and select these zones.",
@@ -1982,6 +1989,8 @@ const hi: Table = {
   "layer.pfz.checking": "आधिकारिक INCOIS PFZ उपलब्धता जांची जा रही है…",
   "layer.pfz.noGeometry": "इस स्थान के लिए आधिकारिक INCOIS संदर्भ मानचित्र पर उपलब्ध नहीं है।",
   "layer.pfz.zoneCount": "आधिकारिक INCOIS संदर्भ — {count} क्षेत्र",
+  "layer.pfz.landingCentreOnly":
+    "आज के लिए कोई PFZ क्षेत्र सलाह नहीं है — निकटतम आधिकारिक INCOIS संदर्भ लैंडिंग केंद्र दिखाया जा रहा है।",
   "layer.sst": "समुद्र सतह तापमान",
   "layer.chlorophyll": "क्लोरोफिल-a",
   "layer.sst.available":
@@ -2039,11 +2048,13 @@ const hi: Table = {
   "pfz.ranked.subtitle": "निकटतम आधिकारिक INCOIS क्षेत्र, दूरी के अनुसार क्रमबद्ध",
   "pfz.ranked.distanceKm": "{km} किमी दूर",
   "pfz.ranked.restricted": "प्रतिबंधित",
+  "pfz.ranked.projected": "परिकलित संदर्भ",
   "pfz.ranked.selectHint": "मानचित्र पर हाइलाइट करने के लिए एक क्षेत्र चुनें",
   "pfz.ranked.markerTooltip": "PFZ क्षेत्र {n} — {km} किमी",
   "pfz.ranked.empty": "इस स्थान के निकट कोई मिलान PFZ क्षेत्र नहीं",
   "pfz.ranked.unavailable": "इस स्थान या तिथि के लिए फिलहाल कोई आधिकारिक INCOIS PFZ संदर्भ उपलब्ध नहीं है। ORCA कोई PFZ स्थान नहीं बनाता या अनुमान नहीं लगाता। आप फिर भी समुद्र में जाने की सुरक्षा और पर्यावरणीय स्थितियों का आकलन अलग से कर सकते हैं।",
   "pfz.ranked.noLocationMatch": "आज इस सटीक स्थान के लिए कोई आधिकारिक INCOIS PFZ सलाह उपलब्ध नहीं है। आप फिर भी समुद्र में जाने की सुरक्षा और पर्यावरणीय स्थितियों का आकलन अलग से कर सकते हैं।",
+  "pfz.ranked.landingCentreOnly": "आज इस स्थान के लिए कोई क्रमबद्ध PFZ क्षेत्र रेखा मेल नहीं खाती। इसके बजाय मानचित्र और चैट उत्तर में निकटतम आधिकारिक INCOIS संदर्भ लैंडिंग केंद्र दिखाया गया है।",
   "pfz.ranked.checking": "आधिकारिक INCOIS PFZ क्षेत्रों की जांच की जा रही है…",
   "pfz.ranked.available": "{count} उपलब्ध",
   "pfz.ranked.layerHidden": "PFZ परत छिपी है — इन क्षेत्रों को देखने और चुनने के लिए मानचित्र परतों में INCOIS PFZ संदर्भ चालू करें।",
@@ -2751,6 +2762,8 @@ const kn: Table = {
   "layer.pfz.checking": "ಅಧಿಕೃತ INCOIS PFZ ಲಭ್ಯತೆಯನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
   "layer.pfz.noGeometry": "ಈ ಸ್ಥಳಕ್ಕೆ ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ ನಕ್ಷೆಯಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ.",
   "layer.pfz.zoneCount": "ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ — {count} ವಲಯ(ಗಳು)",
+  "layer.pfz.landingCentreOnly":
+    "ಇಂದಿಗೆ ಯಾವುದೇ PFZ ವಲಯ ಸಲಹೆ ಇಲ್ಲ — ಹತ್ತಿರದ ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ ಲ್ಯಾಂಡಿಂಗ್ ಕೇಂದ್ರವನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
   "layer.sst": "ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ",
   "layer.chlorophyll": "ಕ್ಲೋರೊಫಿಲ್-a",
   "layer.sst.available":
@@ -2808,11 +2821,13 @@ const kn: Table = {
   "pfz.ranked.subtitle": "ಹತ್ತಿರದ ಅಧಿಕೃತ INCOIS ವಲಯಗಳು, ದೂರದ ಆಧಾರದ ಮೇಲೆ ಶ್ರೇಣೀಕರಿಸಲಾಗಿದೆ",
   "pfz.ranked.distanceKm": "{km} ಕಿ.ಮೀ ದೂರದಲ್ಲಿ",
   "pfz.ranked.restricted": "ನಿರ್ಬಂಧಿತ",
+  "pfz.ranked.projected": "ಲೆಕ್ಕಹಾಕಿದ ಉಲ್ಲೇಖ",
   "pfz.ranked.selectHint": "ನಕ್ಷೆಯಲ್ಲಿ ಹೈಲೈಟ್ ಮಾಡಲು ಒಂದು ವಲಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
   "pfz.ranked.markerTooltip": "PFZ ವಲಯ {n} — {km} ಕಿ.ಮೀ",
   "pfz.ranked.empty": "ಈ ಸ್ಥಳದ ಬಳಿ ಯಾವುದೇ ಹೊಂದಾಣಿಕೆಯಾದ PFZ ವಲಯಗಳಿಲ್ಲ",
   "pfz.ranked.unavailable": "ಈ ಸ್ಥಳ ಅಥವಾ ದಿನಾಂಕಕ್ಕೆ ಪ್ರಸ್ತುತ ಯಾವುದೇ ಅಧಿಕೃತ INCOIS PFZ ಉಲ್ಲೇಖ ಲಭ್ಯವಿಲ್ಲ. ORCA ಯಾವುದೇ PFZ ಸ್ಥಳವನ್ನು ರಚಿಸುವುದಿಲ್ಲ ಅಥವಾ ಅಂದಾಜಿಸುವುದಿಲ್ಲ. ನೀವು ಇನ್ನೂ ಸಮುದ್ರಕ್ಕೆ ಹೋಗುವ ಸುರಕ್ಷತೆ ಮತ್ತು ಪರಿಸರ ಪರಿಸ್ಥಿತಿಗಳನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಮೌಲ್ಯಮಾಪನ ಮಾಡಬಹುದು.",
   "pfz.ranked.noLocationMatch": "ಇಂದು ಈ ನಿಖರ ಸ್ಥಳಕ್ಕೆ ಯಾವುದೇ ಅಧಿಕೃತ INCOIS PFZ ಸಲಹೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ. ನೀವು ಇನ್ನೂ ಸಮುದ್ರಕ್ಕೆ ಹೋಗುವ ಸುರಕ್ಷತೆ ಮತ್ತು ಪರಿಸರ ಪರಿಸ್ಥಿತಿಗಳನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಮೌಲ್ಯಮಾಪನ ಮಾಡಬಹುದು.",
+  "pfz.ranked.landingCentreOnly": "ಇಂದು ಈ ಸ್ಥಳಕ್ಕೆ ಯಾವುದೇ ಕ್ರಮಾಂಕಿತ PFZ ವಲಯ ರೇಖೆ ಹೊಂದಾಣಿಕೆಯಾಗುವುದಿಲ್ಲ. ಬದಲಿಗೆ ನಕ್ಷೆ ಮತ್ತು ಚಾಟ್ ಉತ್ತರದಲ್ಲಿ ಹತ್ತಿರದ ಅಧಿಕೃತ INCOIS ಉಲ್ಲೇಖ ಲ್ಯಾಂಡಿಂಗ್ ಕೇಂದ್ರವನ್ನು ತೋರಿಸಲಾಗಿದೆ.",
   "pfz.ranked.checking": "ಅಧಿಕೃತ INCOIS PFZ ವಲಯಗಳನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
   "pfz.ranked.available": "{count} ಲಭ್ಯವಿದೆ",
   "pfz.ranked.layerHidden": "PFZ ಪದರ ಮರೆಯಾಗಿದೆ — ಈ ವಲಯಗಳನ್ನು ನೋಡಲು ಮತ್ತು ಆಯ್ಕೆಮಾಡಲು ನಕ್ಷೆ ಪದರಗಳಲ್ಲಿ INCOIS PFZ ಉಲ್ಲೇಖವನ್ನು ಆನ್ ಮಾಡಿ.",

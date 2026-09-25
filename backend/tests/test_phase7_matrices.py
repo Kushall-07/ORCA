@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.fabric import DataTier
+from app.services import incois_pfz
 from tests.orchestration_fakes import (
     NOW,
     FakeOceanAgent,
@@ -128,7 +129,24 @@ async def test_pfz_vs_derived_suitability_conflict_preserved() -> None:
 # --------------------------------------------------------------------------
 # Determinism
 # --------------------------------------------------------------------------
-async def test_deterministic_chain_is_reproducible() -> None:
+async def test_deterministic_chain_is_reproducible(monkeypatch) -> None:
+    # "route from Mangalore to Kochi" resolves its maritime origin through
+    # app.gis.pfz_reference.resolve_maritime_origin, which - like the real
+    # PFZ node - reaches the live INCOIS WFS on a cache miss (make_pipeline's
+    # default pfz_cache is a fresh, empty per-call cache; see its docstring's
+    # "no network" contract, which this one path was missing). The live WFS
+    # is genuinely flaky request-to-request (verified: the same endpoint
+    # returns 200 then 503 seconds apart), so without pinning it here, this
+    # test's own 8-iteration reproducibility check was itself non-
+    # deterministic. Pinned to "nothing matched" (the same pattern
+    # tests/test_pfz_auto_route.py uses) so every iteration takes the same
+    # deterministic fallback path, regardless of INCOIS's live availability.
+    async def _empty(*a, **k):
+        return {"type": "FeatureCollection", "features": []}
+
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_lines", _empty)
+    monkeypatch.setattr(incois_pfz, "fetch_pfz_landing_centres", _empty)
+
     rough = FakeOceanAgent(observations=(obs("wave_height", 4.2, "m", "open-meteo-marine"),))
     windy = FakeWeatherAgent(observations=(
         obs("wind_speed", 19.0, "m/s", "open-meteo-forecast"),

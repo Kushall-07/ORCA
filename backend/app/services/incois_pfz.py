@@ -16,15 +16,25 @@ Both are public, unauthenticated GeoJSON (``outputFormat=application/json``).
 This is the same official machine-readable source the WebGIS itself uses -
 never a scraped third-party copy, never a fabricated polygon.
 
-As of 2026-09-12 the GeoServer (``/geoserver/ows``, both ``GetCapabilities``
-and ``GetFeature``) returns HTTP 403 for every request, independent of ORCA
-(reproduced from a plain ``curl`` on the Windows host and from inside Docker,
-with no INCOIS-specific auth ever configured). INCOIS's other official PFZ
-channel - the Text Data service linked from the same PFZ landing page
-(https://incois.gov.in/MarineFisheries/TextDataHome) - is unaffected and is
-used as a same-authority fallback: see :func:`fetch_pfz_textdata` and its
-docstring. It is a different dissemination mechanism for the same official
-INCOIS PFZ product, not a different authority.
+The GeoServer's GLOBAL ``/geoserver/ows`` endpoint returns HTTP 403 for every
+request (reproduced from a plain ``curl``, independent of ORCA, with no
+INCOIS-specific auth ever configured) - an earlier version of this module
+treated that as "the GeoServer denies access" and fell back to Text Data for
+every query. That was itself a bug: ``js/featureinfo.js`` on the live WebGIS
+never calls the global endpoint - it calls the PER-WORKSPACE OWS endpoint
+(``/geoserver/<workspace>/ows``, e.g. ``/geoserver/PFZ_Automation/ows``),
+which is NOT blocked and returns real ``200`` GeoJSON (verified live
+2026-09-24: both layers return full FeatureCollections, e.g. real MultiLineString
+PFZ lines for whichever states have a line advisory that day, and ~1223 real
+landing-centre points including "Mangalore" at (12.85, 74.84), nationwide,
+every day, regardless of that day's line advisory). :func:`_fetch_wfs_geojson`
+derives the workspace from ``type_name`` (the part before the ``:``) and
+always calls the per-workspace path - never the blocked global one. The Text
+Data service linked from the same PFZ landing page
+(https://incois.gov.in/MarineFisheries/TextDataHome) is kept as a fallback
+for the rarer case where the per-workspace WFS itself is genuinely down: see
+:func:`fetch_pfz_textdata` and its docstring. It is a different dissemination
+mechanism for the same official INCOIS PFZ product, not a different authority.
 
 PFZ != safety zone, PFZ != ORCA risk. This module returns geometry / reference
 data only; nothing here is ever passed to the Risk Engine or the Policy &
@@ -111,8 +121,13 @@ async def _fetch_wfs_geojson(
     timeout_s: float,
     client: httpx.AsyncClient,
 ) -> dict[str, Any]:
+    # The workspace-qualified per-layer path (e.g. "/PFZ_Automation/ows"), NOT
+    # the global "/ows" - see the module docstring: the global OWS endpoint is
+    # blocked (403) independent of ORCA, but the WebGIS's own js/featureinfo.js
+    # always calls the per-workspace one, which is public and live.
+    workspace = type_name.split(":", 1)[0]
     url = (
-        f"{base_url.rstrip('/')}/ows"
+        f"{base_url.rstrip('/')}/{workspace}/ows"
         f"?service=WFS&version=1.1.0&request=GetFeature"
         f"&typeName={type_name}&outputFormat=application/json"
     )
@@ -583,6 +598,57 @@ def nearest_landing_centre(
     return feature, round(dist_m / 1000.0, 2)
 
 
+def rank_landing_centres(
+    landing_fc: dict[str, Any],
+    coordinate: Coordinate,
+    *,
+    state_name: str | None,
+    max_distance_km: float | None = None,
+    max_features: int | None = None,
+) -> list[tuple[dict[str, Any], float]]:
+    """ALL landing-centre features within ``max_distance_km`` (same
+    matched-sector-first preference as :func:`nearest_landing_centre`),
+    nearest-first, each paired with its geodesic distance in km.
+
+    :func:`nearest_landing_centre` only ever returns the single closest
+    match, which is correct for routing/summary use but wrong for the ranked
+    PFZ panel/map markers' no-line-advisory fallback: the official landing-
+    centre dataset routinely has several real, distinct nodes within a
+    typical match radius (e.g. ~1223 nodes nationwide), and collapsing that
+    fallback to only the nearest one regresses the ranked panel/map to a
+    single marker even though multiple genuine reference points exist (see
+    ``app.gis.pfz_reference.build_pfz_zone_ranking``). Ties are broken by
+    each candidate's stable ``LC_NAME`` so repeated calls for the same inputs
+    return the same order, matching :func:`rank_matched_lines`'s determinism
+    contract."""
+    features = landing_fc.get("features", [])
+    if state_name:
+        candidates = [
+            f for f in features
+            if str(f.get("properties", {}).get("SECTOR_NAM", "")).strip().upper() == state_name
+        ] or features
+    else:
+        candidates = features
+
+    scored: list[tuple[float, str, dict[str, Any]]] = []
+    for f in candidates:
+        props = f.get("properties", {})
+        lat, lon = props.get("LATITUDE"), props.get("LONGITUDE")
+        if lat is None or lon is None:
+            continue
+        try:
+            dist_m = geodesic_distance_m(coordinate.latitude, coordinate.longitude, float(lat), float(lon))
+        except (TypeError, ValueError):
+            continue
+        if max_distance_km is not None and dist_m / 1000.0 > max_distance_km:
+            continue
+        scored.append((dist_m, str(props.get("LC_NAME", "")), f))
+    scored.sort(key=lambda t: (t[0], t[1]))
+    if max_features is not None:
+        scored = scored[:max_features]
+    return [(f, round(dist_m / 1000.0, 2)) for dist_m, _name, f in scored]
+
+
 def nearest_verified_landing_centre(
     landing_fc: dict[str, Any],
     coordinate: Coordinate,
@@ -649,9 +715,10 @@ def incois_pfz_status(settings: Settings) -> dict[str, Any]:
         "configured": True,
         "integrated": True,
         "note": (
-            "As of 2026-09-12 the GeoServer WFS returns HTTP 403 for every "
-            "request (including plain GetCapabilities), reproduced outside "
-            "Docker; the Text Data fallback is used instead for matched "
-            "sectors. Never feeds RiskEngine or the Policy & Safety Guard."
+            "GeoServer WFS is fetched from the per-workspace OWS path "
+            "(e.g. /geoserver/PFZ_Automation/ows), not the global "
+            "/geoserver/ows (blocked, HTTP 403, independent of ORCA); the "
+            "Text Data fallback is used only if the per-workspace WFS itself "
+            "fails. Never feeds RiskEngine or the Policy & Safety Guard."
         ),
     }

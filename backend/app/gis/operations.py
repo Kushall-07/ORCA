@@ -48,6 +48,21 @@ def geodesic_distance_m(
     return abs(float(distance))
 
 
+def destination_point_geodesic(
+    lat: float, lon: float, bearing_deg: float, distance_m: float
+) -> tuple[float, float]:
+    """The (lat, lon) reached by travelling ``distance_m`` metres from
+    (lat, lon) along ``bearing_deg`` (compass degrees, 0 = north), on the
+    WGS84 ellipsoid. The standard geodesic "forward" problem - pure
+    trigonometry, never an estimate or a fabricated position. Used to turn an
+    officially published distance+bearing-from-a-known-point advisory (e.g.
+    an INCOIS PFZ landing-centre record's own DISTANCE/BEARING fields) into
+    the actual coordinate that advisory describes.
+    """
+    lon2, lat2, _ = _GEOD.fwd(lon, lat, bearing_deg, distance_m)
+    return float(lat2), float(lon2)
+
+
 def distance_point_to_geometry_m(
     latitude: float, longitude: float, geometry: BaseGeometry
 ) -> float:

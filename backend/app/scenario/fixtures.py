@@ -9,6 +9,7 @@ is tagged ``DEMO`` intent via its scenario id and the source string
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from app.agents.base import AgentResult
@@ -34,12 +35,47 @@ from app.orchestration.deps import OrcaDeps
 from app.orchestration.pipeline import OrcaPipeline
 from app.reasoning.arbitration import HierarchyArbitrator
 from app.risk.engine import RiskEngine
+from app.services.cache import JsonCache
 from app.session.store import InMemorySessionStore
 from app.suitability.engine import SuitabilityEngine
 
 # A fixed clock so scenario runs are reproducible.
 SCENARIO_NOW = datetime(2026, 9, 7, 7, 0, tzinfo=timezone.utc)
 MANGALORE = Coordinate(latitude=12.87, longitude=74.84)
+
+
+class _OfflinePfzCache:
+    """Deterministic 'no official INCOIS PFZ data matched' cache backend for
+    scenario pipelines - never reaches the live INCOIS network.
+
+    Every ``incois-pfz*`` cache lookup (see app.gis.pfz_reference's
+    ``_LINES_CACHE_KEY`` / ``_LANDING_CACHE_KEY``) is answered as an immediate
+    HIT with an empty FeatureCollection, so app.gis.pfz_reference.build_pfz_
+    reference / resolve_maritime_origin never call the real
+    app.services.incois_pfz fetch functions at all (a cache hit skips the
+    fetch entirely - see app.gis.pfz_reference._cached_fetch). This keeps
+    every PFZ-touching scenario (in particular 06_route_around_geofence's
+    Mangaluru Fishing Harbour demo planning assumption in
+    resolve_maritime_origin, which is deliberately exercised only when NO
+    verified live INCOIS landing centre is found) deterministic regardless of
+    INCOIS's real day-to-day data availability. The static PFZ *reference
+    card* scenarios (09/10, via the unrelated ``references=`` fixture config
+    below) are untouched by this - it only affects the live INCOIS WFS/Text
+    Data fetch path.
+    """
+
+    _EMPTY_FC = json.dumps({"fc": {"type": "FeatureCollection", "features": []}})
+
+    async def get(self, key: str) -> str | None:
+        if key.startswith("incois-pfz:"):
+            return self._EMPTY_FC
+        return None
+
+    async def set(self, key: str, value: str, ttl_s: int) -> None:
+        return None
+
+    async def ping(self) -> bool:
+        return True
 
 _PFZ_REFERENCE = ReferenceArtifact(
     reference_id="pfz-scenario",
@@ -595,6 +631,7 @@ def make_scenario_pipeline(
         stability_engine=EnvironmentalStabilityEngine(),
         neighbourhood_engine=EnvironmentalNeighbourhoodEngine(),
         neighbourhood_probe=neighbourhood_probe,
+        pfz_cache=JsonCache(_OfflinePfzCache()),
     )
     return OrcaPipeline(deps)
 

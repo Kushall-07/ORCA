@@ -561,6 +561,19 @@ button { font-family: inherit; }
   background: var(--orca-burgundy);
   color: #ffffff;
 }
+/* Distinguishes a computed advisory point (no INCOIS line advisory matched -
+   see PfzZoneInfo.geometry_source) from a real matched zone line, which
+   otherwise looks identical in this list - neutral/outlined, never the same
+   solid fill as the "restricted" badge above, so the two are never confused. */
+.pfz-ranked-card__projected {
+  align-self: flex-start;
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--sb-border);
+  color: var(--sb-text-muted);
+}
 
 /* ---------- numbered PFZ zone map markers ---------- */
 .orca-pfz-zone-marker-wrap { background: transparent; border: none; }

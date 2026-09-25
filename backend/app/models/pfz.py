@@ -46,13 +46,25 @@ class PfzLandingCentreRef(BaseModel):
 
 
 class PfzZoneRef(BaseModel):
-    """One ranked official INCOIS PFZ zone (matched line geometry), for the
-    ranked PFZ panel/map markers. ``rank`` is 1-based, nearest-first, by real
-    geodesic distance from the query coordinate - never a fabricated
-    suitability/catch score (PFZ carries no such score; see module docstring).
-    ``restricted`` / ``nearest_hard_geofence_m`` come from the same
+    """One ranked official INCOIS PFZ zone, for the ranked PFZ panel/map
+    markers. ``rank`` is 1-based, nearest-first, by real geodesic distance
+    from the query coordinate - never a fabricated suitability/catch score
+    (PFZ carries no such score; see module docstring). ``restricted`` /
+    ``nearest_hard_geofence_m`` come from the same
     :func:`app.gis.geofencing.check_geofences` the route planner and Safety
-    Guard use - reused for display only, never fed back into either."""
+    Guard use - reused for display only, never fed back into either.
+
+    ``geometry_source`` distinguishes the two ways this coordinate can arise:
+    ``"MATCHED_LINE"`` (the default) is a point taken directly from an
+    official INCOIS PFZ line advisory's own geometry. ``"PROJECTED_FROM_
+    LANDING_CENTRE"`` is used only when no line advisory matched at all: the
+    coordinate is then computed from a landing centre's own officially
+    published DISTANCE/BEARING fields (see
+    :func:`app.gis.operations.destination_point_geodesic`) - pure geodesic
+    trigonometry on official numbers, never an estimate. ``derived_from``
+    carries a human-readable description of that computation (landing centre
+    name, distance range, bearing) for full transparency; it is ``None`` for
+    a ``MATCHED_LINE`` zone."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -65,6 +77,8 @@ class PfzZoneRef(BaseModel):
     forecast_day: str | None = None
     restricted: bool = False
     nearest_hard_geofence_m: float | None = None
+    geometry_source: str = "MATCHED_LINE"
+    derived_from: str | None = None
 
 
 class PfzZoneRankingResult(BaseModel):
@@ -114,6 +128,12 @@ class PfzReferenceResult(BaseModel):
     area_matched: str | None = None            # marine sector name (e.g. "KARNATAKA")
     zone_count: int = 0                         # matched pfzlines feature count
     nearest_landing_centre: PfzLandingCentreRef | None = None
+    # Only set when zone_count is 0 (no official line advisory matched) and
+    # the nearest landing centre's own published DISTANCE/BEARING fields
+    # allow computing the point that landing centre's advisory actually
+    # describes (see PfzZoneRef.geometry_source) - never counted in
+    # zone_count, which stays strictly "official matched line advisories".
+    projected_zone: PfzZoneRef | None = None
     issued_at: str | None = None                # Julian day / year the lines carry
     retrieved_at: datetime | None = None
     source_url: str = "https://www.incois.gov.in/MarineFisheries/PfzWebGis"

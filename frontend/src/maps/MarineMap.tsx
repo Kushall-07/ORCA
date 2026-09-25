@@ -58,6 +58,15 @@ const LAYER_STYLE: Record<string, PathOptions> = {
   // Risk (red-orange), Route (accent) and Protected Areas (orange/red), so a
   // user never mistakes a fishing-potential reference for a safety layer.
   pfz: { color: "#0ca678", weight: 2, dashArray: "3 3", fillOpacity: 0 },
+  // The single landing-centre reference point fetch_matched_lines falls back
+  // to when no PFZ line advisory matched today (see pfzPointLayer below) -
+  // deliberately NOT the same dashed/hollow `pfz` style above. A landing
+  // centre is by definition the coastal point closest to the query location,
+  // so it typically sits only 1-3 km from the map's own "Origin" marker; a
+  // thin 2px dashed, unfilled ring at that distance is easy to lose next to
+  // that marker and the basemap's own similarly-teal coastline/EEZ lines. A
+  // thicker solid ring with a faint fill stays legible either way.
+  pfzLandingCentre: { color: "#0ca678", weight: 3, fillColor: "#0ca678", fillOpacity: 0.15 },
 };
 
 // "ORCA Environmental Suitability" grid cells - a restrained, neutral-blue
@@ -106,12 +115,41 @@ function pfzZoneIcon(rank: number, restricted: boolean, selected: boolean) {
 // coordinates the ranked/numbered PFZ zone markers already render below, so
 // left alone this doubles up as a blue pin sitting on/next to every numbered
 // circle. There must be only ONE visible marker per PFZ zone (the numbered
-// circle), so raw "pfz" Point features render as a fully invisible
+// circle), so those raw "pfz" Point features render as a fully invisible
 // (zero-opacity) circle marker instead - keeping their click-to-select and
 // tooltip behaviour (bound in onEachFeature below) without ever painting a
-// second marker. LineString/Polygon "pfz" features are unaffected: Leaflet
-// only calls pointToLayer for Point/MultiPoint geometry.
-function invisiblePfzPointLayer(_feature: Feature<Geometry, Record<string, unknown>>, latlng: LatLng) {
+// second marker.
+//
+// One Point feature is DIFFERENT and must stay visible: the nearest official
+// INCOIS landing-centre reference GET /gis/layers/pfz falls back to (tagged
+// `orca_feature_kind: "LANDING_CENTRE"`, see app.gis.pfz_reference.fetch_
+// matched_lines) when no PFZ line advisory matched this location/date at
+// all. It has no corresponding numbered zone marker anywhere else on the
+// map, so hiding it would make the layer say "available" (see
+// isPfzLayerAvailable in MapControls.tsx, which already treats a landing
+// centre match as availability) while rendering nothing - the exact
+// contradiction this exists to avoid. LineString/Polygon "pfz" features are
+// unaffected either way: Leaflet only calls pointToLayer for Point/
+// MultiPoint geometry.
+function pfzPointLayer(feature: Feature<Geometry, Record<string, unknown>>, latlng: LatLng) {
+  if (feature.properties?.orca_feature_kind === "LANDING_CENTRE") {
+    // A landing centre is, by definition, the coastal town/harbour closest
+    // to the query location - so this point and the query's own "Origin"
+    // marker (rendered later, in the default overlayPane, on top of this
+    // GeoJSON layer - see the StaticLayer/origin marker order below) are
+    // routinely only 1-3 km apart. At typical zoom levels that is a handful
+    // of screen pixels, so a same-size solid dot here was fully hidden under
+    // the origin marker's larger, permanently-labelled dot - the map looked
+    // empty even though this feature was rendering correctly. `radius: 13`
+    // (vs. the origin/destination markers' radius 7) stays visible as a ring
+    // around/behind those markers regardless of paint order, without moving
+    // this feature's real coordinate by even a pixel. Its color/weight/fill
+    // come from LAYER_STYLE.pfzLandingCentre via styleFn below, not from
+    // options set here - <GeoJSON style={styleFn}> calls setStyle() on every
+    // layer pointToLayer returns, which would silently override any of
+    // those options given here instead.
+    return circleMarker(latlng, { radius: 13 });
+  }
   return circleMarker(latlng, { radius: 6, opacity: 0, fillOpacity: 0 });
 }
 
@@ -147,7 +185,18 @@ function StaticLayer({
   const styleFn = (feature?: Feature<Geometry, Record<string, unknown>>): PathOptions => {
     if (id === "coastline") return LAYER_STYLE.coastline;
     if (id === "eez") return LAYER_STYLE.eez;
-    if (id === "pfz") return LAYER_STYLE.pfz;
+    if (id === "pfz") {
+      // <GeoJSON style={styleFn} pointToLayer={pfzPointLayer} .../> - Leaflet
+      // calls setStyle(styleFn(feature)) on EVERY resulting layer, including
+      // ones pointToLayer already built, so returning the generic `pfz`
+      // style here for a LANDING_CENTRE point would silently overwrite the
+      // distinct solid-ring style pfzPointLayer just gave it (this is
+      // exactly what happened before this fix - the ring rendered, but as a
+      // thin dashed/hollow line, not the intended solid one).
+      return feature?.properties?.orca_feature_kind === "LANDING_CENTRE"
+        ? LAYER_STYLE.pfzLandingCentre
+        : LAYER_STYLE.pfz;
+    }
     if (id === "environmental_suitability") {
       const index = Number(feature?.properties?.suitability_index ?? 0);
       return { ...SUITABILITY_CELL_STYLE, fillColor: suitabilityFillColor(index) };
@@ -158,6 +207,18 @@ function StaticLayer({
   const onEach = (feature: Feature<Geometry, Record<string, unknown>>, layer: Layer) => {
     const p = feature.properties ?? {};
     if (id === "pfz") {
+      if (p.orca_feature_kind === "LANDING_CENTRE") {
+        const name = String(p.LC_NAME ?? "");
+        const sector = String(p.SECTOR_NAM ?? "");
+        const direction = String(p.DIRECTION ?? "");
+        const distance = p.orca_distance_km != null ? `${Number(p.orca_distance_km).toFixed(1)} km` : "";
+        const bits = [name, sector, distance, direction].filter(Boolean).join(", ");
+        layer.bindTooltip(
+          `INCOIS PFZ Reference — nearest landing centre${bits ? ` (${bits})` : ""}`,
+          { sticky: true },
+        );
+        return;
+      }
       const state = String(p.State_Name ?? "");
       const day = String(p.Julian_day ?? "");
       layer.bindTooltip(
@@ -195,7 +256,7 @@ function StaticLayer({
       data={fc as never}
       style={styleFn}
       onEachFeature={onEach}
-      pointToLayer={id === "pfz" ? invisiblePfzPointLayer : undefined}
+      pointToLayer={id === "pfz" ? pfzPointLayer : undefined}
     />
   );
 }
@@ -419,6 +480,9 @@ export default function MarineMap({
           <Tooltip>
             {t("pfz.ranked.markerTooltip", { n: zone.rank, km: zone.distance_km.toFixed(1) })}
             {zone.restricted ? ` — ${t("pfz.ranked.restricted")}` : ""}
+            {zone.geometry_source === "PROJECTED_FROM_LANDING_CENTRE"
+              ? ` — ${t("pfz.ranked.projected")}${zone.derived_from ? ` (${zone.derived_from})` : ""}`
+              : ""}
           </Tooltip>
         </Marker>
       ))}

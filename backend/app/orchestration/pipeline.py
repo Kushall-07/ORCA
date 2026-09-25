@@ -231,12 +231,23 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                 depth_from_m=lc.depth_from_m, depth_to_m=lc.depth_to_m,
                 forecast_date=lc.forecast_date, valid_until=lc.valid_until,
             )
+        projected = None
+        if pfz.projected_zone is not None:
+            pz = pfz.projected_zone
+            projected = PfzZoneInfo(
+                id=pz.id, rank=pz.rank, latitude=pz.latitude, longitude=pz.longitude,
+                distance_km=pz.distance_km, state_matched=pz.state_matched,
+                forecast_day=pz.forecast_day, restricted=pz.restricted,
+                nearest_hard_geofence_m=pz.nearest_hard_geofence_m,
+                geometry_source=pz.geometry_source, derived_from=pz.derived_from,
+            )
         pfz_info = PfzReferenceInfo(
             source=pfz.source,
             availability=pfz.availability.value,
             area_matched=pfz.area_matched,
             zone_count=pfz.zone_count,
             nearest_landing_centre=nearest,
+            projected_zone=projected,
             issued_at=pfz.issued_at,
             retrieved_at=pfz.retrieved_at.isoformat() if pfz.retrieved_at else None,
             source_url=pfz.source_url,
@@ -258,6 +269,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                     distance_km=z.distance_km, state_matched=z.state_matched,
                     forecast_day=z.forecast_day, restricted=z.restricted,
                     nearest_hard_geofence_m=z.nearest_hard_geofence_m,
+                    geometry_source=z.geometry_source, derived_from=z.derived_from,
                 )
                 for z in pfz_zones.zones
             ],

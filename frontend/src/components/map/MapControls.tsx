@@ -191,13 +191,21 @@ export function buildLayerToggles(
       badgeKey: "layer.badge.incois",
       descKey: "layer.desc.pfz",
       sourceTitleKey: "layer.source.incois",
+      // A landing-centre-only match (no PFZ line advisory for today - see
+      // fetch_matched_lines on the backend) is still `available` (a real
+      // official reference point is on the map), but showing "0 zone(s)"
+      // alongside "available" reads as a contradiction. Say what IS there
+      // instead of a zone count of zero.
       noteKey: pfzGeometryAvailable
-        ? undefined
+        ? (pfzRef?.zone_count ?? 0) === 0
+          ? "layer.pfz.landingCentreOnly"
+          : undefined
         : opts?.pfzLoading
           ? "layer.pfz.checking"
           : pfzRef?.availability === "no_location_match"
             ? "layer.pfz.noLocationMatch"
             : "layer.pfz.noGeometry",
+      alwaysShowNote: pfzGeometryAvailable && (pfzRef?.zone_count ?? 0) === 0,
       zoneCount: pfzRef?.zone_count,
     },
     {
@@ -442,7 +450,7 @@ function LayerRow({
       {tg.available && tg.alwaysShowNote && tg.noteKey && (
         <p className="layer-toggle__note layer-toggle__note--info">{t(tg.noteKey)}</p>
       )}
-      {tg.available && tg.zoneCount != null && (
+      {tg.available && tg.zoneCount != null && tg.zoneCount > 0 && (
         <p className="layer-toggle__note layer-toggle__note--info">
           {t("layer.pfz.zoneCount", { count: tg.zoneCount })}
         </p>

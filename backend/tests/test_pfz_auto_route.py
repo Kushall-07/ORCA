@@ -152,6 +152,27 @@ async def test_resolve_pfz_route_destination_unavailable_when_no_zone_matches(mo
     assert result.coordinate is None
 
 
+# No line advisory matched, but the nearest landing centre's own published
+# distance/bearing describes a real point - routing must fall back to that
+# computed point rather than reporting no destination (see
+# app.gis.pfz_reference._project_landing_centre_advisory_point).
+async def test_resolve_pfz_route_destination_falls_back_to_projected_point(monkeypatch) -> None:
+    _patch_pfz_fetches(
+        monkeypatch,
+        lines_fc={"type": "FeatureCollection", "features": []},
+        landing_fc={
+            "type": "FeatureCollection",
+            "features": [_landing_centre_feature(12.85, 74.84, "Mangalore LC")],
+        },
+    )
+    result = await resolve_pfz_route_destination(
+        WATER_ORIGIN, settings=Settings(), cache=_cache(),
+    )
+    assert result.available is True
+    assert result.coordinate is not None
+    assert (result.coordinate.latitude, result.coordinate.longitude) != (12.85, 74.84)
+
+
 # ---- 2/3/4. PFZ auto-selected and wired into route_node's destination -----
 async def test_pfz_auto_selected_and_wired_into_route_destination(monkeypatch) -> None:
     _patch_pfz_fetches(monkeypatch, lines_fc={

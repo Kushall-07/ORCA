@@ -496,6 +496,7 @@ export default function WorkspacePage() {
                     layerVisible={activeLayers.has("pfz")}
                     loading={loading}
                     availability={latest?.pfz_zones?.availability}
+                    hasLandingCentreReference={!!latest?.pfz_reference?.nearest_landing_centre}
                   />
                 )}
                 {selectedPfzs.length > 0 && (

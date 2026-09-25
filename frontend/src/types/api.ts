@@ -502,6 +502,12 @@ export interface PfzReferenceInfo {
   area_matched: string | null;
   zone_count: number;
   nearest_landing_centre: PfzLandingCentreInfo | null;
+  // Only set when zone_count is 0 and the nearest landing centre's own
+  // published distance/bearing allows computing the point that landing
+  // centre's advisory actually describes - see PfzZoneInfo.geometry_source.
+  // Optional (defaults to absent/null) so existing fixtures/tests built
+  // before this field existed keep compiling.
+  projected_zone?: PfzZoneInfo | null;
   issued_at: string | null;
   retrieved_at: string | null;
   source_url: string;
@@ -521,6 +527,17 @@ export interface PfzZoneInfo {
   forecast_day: string | null;
   restricted: boolean;
   nearest_hard_geofence_m: number | null;
+  // "MATCHED_LINE" (default): taken directly from an official INCOIS PFZ
+  // line advisory. "PROJECTED_FROM_LANDING_CENTRE": no line advisory
+  // matched at all, so ORCA computed this point from a landing centre's own
+  // officially published distance+bearing fields (plain geodesic
+  // trigonometry, never an estimate) - see `derived_from` for the source
+  // description, and always show that provenance next to this zone so it is
+  // never mistaken for an INCOIS-published zone line. Both fields are
+  // optional (absent means "MATCHED_LINE"/no provenance) so fixtures/tests
+  // built before this distinction existed keep compiling.
+  geometry_source?: "MATCHED_LINE" | "PROJECTED_FROM_LANDING_CENTRE" | string;
+  derived_from?: string | null;
 }
 
 export interface PfzZoneRankingInfo {

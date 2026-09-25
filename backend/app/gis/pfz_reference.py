@@ -26,6 +26,7 @@ from app.agents.marine_area import lookup as lookup_marine_area
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.gis.geofencing import check_geofences
+from app.gis.operations import destination_point_geodesic, geodesic_distance_m
 from app.models.geo import Geofence
 from app.models.common import Coordinate
 from app.models.pfz import (
@@ -225,6 +226,71 @@ async def _fetch_pfz_feature_collections(
             raise
 
 
+class _ProjectedPoint(NamedTuple):
+    latitude: float
+    longitude: float
+    landing_centre_name: str
+    direction: str
+    bearing_deg: float
+    distance_from_nm: float
+    distance_to_nm: float
+
+
+def _project_landing_centre_advisory_point(
+    feature: dict[str, Any], *, source_url: str
+) -> _ProjectedPoint | None:
+    """When ``feature`` is a WFS-sourced landing-centre record, compute the
+    point its own officially published DISTANCE_F/DISTANCE_T/BEARING fields
+    actually describe.
+
+    The WFS landing-centres layer's own LATITUDE/LONGITUDE is the coastal
+    landing centre itself, not the advised fishing area - DISTANCE_F/
+    DISTANCE_T (nautical miles) and BEARING (degrees) separately describe how
+    far and in what direction from that landing centre the advisory's zone
+    actually is (the standard INCOIS "X-Y nm, bearing Z, from <landing
+    centre>" format). This projects the midpoint of that published distance
+    range along the published bearing using WGS84 geodesic forward
+    trigonometry (:func:`app.gis.operations.destination_point_geodesic`) -
+    pure math on official numbers, never an estimate or invented location.
+
+    Returns ``None`` when the source is the Text Data channel instead (whose
+    own point IS already the advised zone's coordinate, not the landing
+    centre's - see :func:`resolve_maritime_origin`'s docstring, so projecting
+    again would double-apply the offset), or when the record lacks a usable
+    bearing/distance to project from.
+    """
+    if source_url != _WFS_SOURCE_URL:
+        return None
+    p = feature.get("properties", {})
+    bearing = _to_float(p.get("BEARING"))
+    distance_from = _to_float(p.get("DISTANCE_F"))
+    distance_to = _to_float(p.get("DISTANCE_T"))
+    lat = _to_float(p.get("LATITUDE"))
+    lon = _to_float(p.get("LONGITUDE"))
+    if None in (bearing, distance_from, distance_to, lat, lon):
+        return None
+    distance_nm = (distance_from + distance_to) / 2.0
+    proj_lat, proj_lon = destination_point_geodesic(lat, lon, bearing, distance_nm * 1852.0)
+    return _ProjectedPoint(
+        latitude=proj_lat,
+        longitude=proj_lon,
+        landing_centre_name=str(p.get("LC_NAME", "")),
+        direction=str(p.get("DIRECTION", "")),
+        bearing_deg=bearing,
+        distance_from_nm=distance_from,
+        distance_to_nm=distance_to,
+    )
+
+
+def _projected_point_description(proj: _ProjectedPoint) -> str:
+    return (
+        f"{proj.landing_centre_name} landing centre, "
+        f"{proj.distance_from_nm:.0f}-{proj.distance_to_nm:.0f} nm"
+        f"{f' {proj.direction}' if proj.direction else ''} "
+        f"(bearing {proj.bearing_deg:.0f}°)"
+    )
+
+
 async def fetch_matched_lines(
     coordinate: Coordinate,
     *,
@@ -247,6 +313,45 @@ async def fetch_matched_lines(
         max_distance_km=settings.incois_pfz_match_radius_km,
         max_features=settings.incois_pfz_max_features,
     )
+    # No PFZ LINE advisory matched (e.g. today's satellite pass skipped this
+    # sector) does not mean nothing official exists here: the same nearest
+    # landing-centre reference build_pfz_reference already surfaces in the
+    # chat/API summary is real official geometry too (a Point, from the same
+    # WFS/Text Data dataset) - without this, the map layer would say
+    # "available" (see app.api.gis.isPfzLayerAvailable on the frontend, which
+    # already treats a landing-centre match as availability) yet render
+    # nothing, contradicting the chat's own "PFZ reference available" answer.
+    # Never a fabricated line/polygon - one real official point, clearly
+    # tagged so the frontend never confuses it with a duplicate zone marker.
+    landing_feature: dict[str, Any] | None = None
+    # The advised point the landing centre's own published distance/bearing
+    # describes (see _project_landing_centre_advisory_point) - shown ALONGSIDE
+    # the landing centre itself, not instead of it, so the map keeps both the
+    # real reference facility and the actual advised fishing area visible.
+    projected_feature: dict[str, Any] | None = None
+    if not matched:
+        landing_match = incois_pfz.nearest_landing_centre(
+            feed.landing_fc, coordinate,
+            state_name=area.state_name if area else None,
+            max_distance_km=settings.incois_pfz_match_radius_km,
+        )
+        if landing_match is not None:
+            feature, distance_km = landing_match
+            landing_feature = {
+                **feature,
+                "properties": {**feature.get("properties", {}), "orca_feature_kind": "LANDING_CENTRE", "orca_distance_km": distance_km},
+            }
+            proj = _project_landing_centre_advisory_point(feature, source_url=feed.source_url)
+            if proj is not None:
+                projected_feature = {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [proj.longitude, proj.latitude]},
+                    "properties": {
+                        "orca_feature_kind": "PROJECTED_ADVISORY_POINT",
+                        "derived_from": _projected_point_description(proj),
+                        "State_Name": area.state_name if area else None,
+                    },
+                }
     source = (
         "INCOIS PFZ WebGIS (official GeoServer WFS)"
         if feed.source_url == _WFS_SOURCE_URL
@@ -271,7 +376,11 @@ async def fetch_matched_lines(
                 feed.data_retrieved_at.isoformat() if feed.data_retrieved_at else None
             ),
         },
-        "features": matched,
+        "features": (
+            matched
+            if matched
+            else [f for f in (landing_feature, projected_feature) if f is not None]
+        ),
     }
 
 
@@ -339,6 +448,20 @@ async def build_pfz_reference(
     if landing_match is not None:
         feature, distance_km = landing_match
         p = feature.get("properties", {})
+        # The official WFS landing-centres layer (~1223 nodes) is a static
+        # reference profile, not a daily feed: EVERY node's own FORECAST_D /
+        # VALIDITY_D carries the same single frozen timestamp from whenever
+        # that layer was last rebuilt (e.g. "2024-04-27T18:30:00Z" for
+        # LandingCenters_29Apr2024 - verified across the whole dataset), which
+        # would misleadingly read as "today's forecast, valid until <a date
+        # long past>" if shown as-is. Only the Text Data channel actually
+        # re-scrapes these two fields fresh every day (see
+        # textdata_to_feature_collections), so they are trustworthy as a
+        # live forecast validity window ONLY when that is the source; from
+        # the WFS they are left unset here. distance/direction/bearing/depth
+        # are the landing centre's own stable geographic profile either way -
+        # never time-sensitive, always shown.
+        from_live_textdata = source_url == _TEXTDATA_SOURCE_URL
         nearest_ref = PfzLandingCentreRef(
             name=str(p.get("LC_NAME", "")),
             district=str(p.get("DIST_NAME", "")),
@@ -352,10 +475,28 @@ async def build_pfz_reference(
             distance_to_nm=_to_float(p.get("DISTANCE_T")),
             depth_from_m=_to_float(p.get("DEPTH_FROM")),
             depth_to_m=_to_float(p.get("DEPTH_TO")),
-            forecast_date=_to_str(p.get("FORECAST_D")),
-            valid_until=_to_str(p.get("VALIDITY_D")),
+            forecast_date=_to_str(p.get("FORECAST_D")) if from_live_textdata else None,
+            valid_until=_to_str(p.get("VALIDITY_D")) if from_live_textdata else None,
             updated_at=_to_str(p.get("UPDATED_DA")),
         )
+
+    projected_zone_ref = None
+    if not matched and landing_match is not None:
+        proj = _project_landing_centre_advisory_point(landing_match[0], source_url=source_url)
+        if proj is not None:
+            proj_distance_km = geodesic_distance_m(
+                coordinate.latitude, coordinate.longitude, proj.latitude, proj.longitude
+            ) / 1000.0
+            projected_zone_ref = PfzZoneRef(
+                id=f"pfz-projected-{proj.landing_centre_name}",
+                rank=1,
+                latitude=proj.latitude,
+                longitude=proj.longitude,
+                distance_km=proj_distance_km,
+                state_matched=area.state_name if area else None,
+                geometry_source="PROJECTED_FROM_LANDING_CENTRE",
+                derived_from=_projected_point_description(proj),
+            )
 
     issued_at = None
     if matched:
@@ -381,6 +522,7 @@ async def build_pfz_reference(
         area_matched=area.state_name if area else None,
         zone_count=len(matched),
         nearest_landing_centre=nearest_ref,
+        projected_zone=projected_zone_ref,
         issued_at=issued_at,
         retrieved_at=retrieved_at,
         source_url=source_url,
@@ -472,6 +614,62 @@ async def build_pfz_zone_ranking(
             )
         )
 
+    # No official line advisory matched at all - fall back to the points the
+    # nearby landing centres' own published distance/bearing describe (see
+    # _project_landing_centre_advisory_point / PfzZoneRef.geometry_source),
+    # so the ranked panel and numbered map markers still show something real
+    # instead of an empty list, the same fallback build_pfz_reference already
+    # surfaces (singular, for the chat summary) via
+    # PfzReferenceResult.projected_zone. Unlike that single summary point,
+    # the ranked panel must reflect EVERY genuine landing-centre reference
+    # within range (there are routinely several within a typical match
+    # radius, e.g. ~1223 nodes nationwide) - using only the nearest one here
+    # would collapse a real multi-reference dataset down to one marker.
+    if not zones:
+        landing_matches = incois_pfz.rank_landing_centres(
+            feed.landing_fc, coordinate,
+            state_name=area.state_name if area else None,
+            max_distance_km=settings.incois_pfz_match_radius_km,
+            max_features=_MAX_RANKED_ZONES,
+        )
+        projected: list[tuple[float, str, _ProjectedPoint]] = []
+        for feature, _landing_distance_km in landing_matches:
+            proj = _project_landing_centre_advisory_point(feature, source_url=feed.source_url)
+            if proj is None:
+                continue
+            proj_distance_km = geodesic_distance_m(
+                coordinate.latitude, coordinate.longitude, proj.latitude, proj.longitude
+            ) / 1000.0
+            projected.append((proj_distance_km, proj.landing_centre_name, proj))
+        # Re-sorted by the PROJECTED point's own distance (what the ranked
+        # panel/markers actually show), not the landing centre's distance -
+        # the two can differ slightly once the published bearing/distance
+        # offset is applied. Ties broken by name for determinism.
+        projected.sort(key=lambda t: (t[0], t[1]))
+        for rank, (proj_distance_km, _name, proj) in enumerate(projected, start=1):
+            restricted = False
+            nearest_hard_m = None
+            if hard:
+                gf_result = check_geofences(
+                    Coordinate(latitude=proj.latitude, longitude=proj.longitude), hard
+                )
+                restricted = gf_result.inside_hard
+                nearest_hard_m = gf_result.nearest_hard_distance_m
+            zones.append(
+                PfzZoneRef(
+                    id=f"pfz-projected-{proj.landing_centre_name}-{rank}",
+                    rank=rank,
+                    latitude=proj.latitude,
+                    longitude=proj.longitude,
+                    distance_km=proj_distance_km,
+                    state_matched=area.state_name if area else None,
+                    restricted=restricted,
+                    nearest_hard_geofence_m=nearest_hard_m,
+                    geometry_source="PROJECTED_FROM_LANDING_CENTRE",
+                    derived_from=_projected_point_description(proj),
+                )
+            )
+
     availability = (
         PfzAvailability.AVAILABLE
         if zones
@@ -514,14 +712,15 @@ class MaritimeOriginResolution(BaseModel):
 
 
 # ---- Phase 9.x demo planning assumption: Mangaluru Fishing Harbour --------
-# The verified Mangaluru Fishing Harbour reference coordinate. INCOIS's
-# Landing Centre WFS currently returns HTTP 403 and its Text Data channel
-# never carries a real port coordinate (see resolve_maritime_origin's
-# docstring), so no authoritative harbour-mouth coordinate can be fetched
-# live for this specific, named demo location. This constant is NOT a
-# general-purpose harbour gazetteer entry and must never be used as a
-# stand-in for any other on-land origin - see is_recognized_mangaluru_query
-# and its narrowly-scoped call site in app.orchestration.nodes.route_node.
+# The verified Mangaluru Fishing Harbour reference coordinate, kept as a
+# fallback for the rare case where the WFS is reachable but genuinely has no
+# landing centre literally named "... Fishing Harbour" for the matched
+# sector, or its Text Data channel is in use instead (Text Data never carries
+# a real port coordinate - see resolve_maritime_origin's docstring). This
+# constant is NOT a general-purpose harbour gazetteer entry and must never be
+# used as a stand-in for any other on-land origin - see
+# is_recognized_mangaluru_query and its narrowly-scoped call site in
+# app.orchestration.nodes.route_node.
 MANGALURU_FISHING_HARBOUR = Coordinate(latitude=12.84833, longitude=74.83639)
 MANGALURU_ORIGIN_NOTE = (
     "Assumption: the boat starts here. This is an advisory planning route, "
@@ -717,7 +916,7 @@ async def resolve_pfz_route_destination(
         logger.warning("PFZ route destination resolution unexpected error: %s", type(exc).__name__)
         return PfzRouteDestination(area_matched=area.state_name if area else None)
 
-    lines_fc, source_url = feed.lines_fc, feed.source_url
+    lines_fc, landing_fc, source_url = feed.lines_fc, feed.landing_fc, feed.source_url
     match = incois_pfz.nearest_pfz_zone_point(
         lines_fc, coordinate,
         state_name=area.state_name if area else None,
@@ -725,6 +924,30 @@ async def resolve_pfz_route_destination(
         max_features=settings.incois_pfz_max_features,
     )
     if match is None:
+        # No official line advisory matched at all - fall back to the point
+        # the nearest landing centre's own published distance/bearing
+        # describes (see _project_landing_centre_advisory_point), the same
+        # fallback build_pfz_reference/build_pfz_zone_ranking already use for
+        # display, so a compound "show and route me to the PFZ" request can
+        # still compute a real route instead of reporting no destination.
+        landing_match = incois_pfz.nearest_landing_centre(
+            landing_fc, coordinate,
+            state_name=area.state_name if area else None,
+            max_distance_km=settings.incois_pfz_match_radius_km,
+        )
+        if landing_match is not None:
+            proj = _project_landing_centre_advisory_point(landing_match[0], source_url=source_url)
+            if proj is not None:
+                proj_distance_km = geodesic_distance_m(
+                    coordinate.latitude, coordinate.longitude, proj.latitude, proj.longitude
+                ) / 1000.0
+                return PfzRouteDestination(
+                    coordinate=Coordinate(latitude=proj.latitude, longitude=proj.longitude),
+                    available=True,
+                    distance_km=proj_distance_km,
+                    area_matched=area.state_name if area else None,
+                    source_url=source_url,
+                )
         return PfzRouteDestination(
             area_matched=area.state_name if area else None, source_url=source_url
         )
