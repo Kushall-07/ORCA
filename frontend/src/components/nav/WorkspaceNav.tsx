@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, type AssessmentSection } from "./navItems";
+import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, SOS_ITEM, type AssessmentSection } from "./navItems";
 
 /**
  * Horizontal top navigation, shared by Workspace mode and Authority mode
@@ -62,6 +62,17 @@ export function WorkspaceNav({
             onClick={() => onNavigate(ENGINE_ROOM_ITEM.id)}
           >
             {t(ENGINE_ROOM_ITEM.key)}
+          </button>
+        </li>
+        <li>
+          {/* Always enabled - a fisherman needs Emergency Distress reachable
+              with no query in flight and no live pipeline data at all. */}
+          <button
+            type="button"
+            className="top-nav__item top-nav__item--sos"
+            onClick={() => onNavigate(SOS_ITEM.id)}
+          >
+            {t(SOS_ITEM.key)}
           </button>
         </li>
         {ASSESSMENT_NAV_ITEMS.map((item) => (

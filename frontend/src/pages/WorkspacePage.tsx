@@ -7,6 +7,7 @@ import { useOrcaQuery } from "../hooks/useOrcaQuery";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useTour } from "../hooks/useTour";
 import { getStakeholder, type StakeholderId } from "../stakeholders";
+import type { BoatClassId } from "../boatClasses";
 import type { BaselineRouteResult, GeoJsonFeatureCollection, QueryResponse } from "../types/api";
 import {
   ApiError,
@@ -38,6 +39,7 @@ import {
 import { AlertsPanel, ExplanationPanel } from "../components/intel/IntelPanels";
 import { AgentActivity } from "../components/intel/AgentTrace";
 import { EngineRoomView } from "../components/system/EngineRoom";
+import { SosView } from "../components/sos/SosView";
 import { EnvironmentalPanel } from "../components/environmental/EnvironmentalPanel";
 import { AdvisoryPanel } from "../components/advisory/AdvisoryPanel";
 import { GeofencePanel } from "../components/advisory/GeofencePanel";
@@ -68,6 +70,7 @@ export default function WorkspacePage() {
   const gis = useGisLayers();
 
   const [stakeholder, setStakeholder] = useState<StakeholderId>("fisherman");
+  const [boatClass, setBoatClass] = useState<BoatClassId | null>(null);
   const [page, setPage] = useState<AssessmentSection>("decision");
   const [activeLayers, setActiveLayers] = useState<Set<LayerId>>(
     () => new Set(getStakeholder("fisherman").defaultLayers as LayerId[]),
@@ -83,6 +86,7 @@ export default function WorkspacePage() {
   const { messages, latest, loading, send, retry, clear, openExternal } = useOrcaQuery({
     stakeholder,
     language: lang,
+    boatClass,
   });
   const gps = useGeolocation();
   const tour = useTour({ latest, setMode, setPage });
@@ -424,6 +428,8 @@ export default function WorkspacePage() {
       <OrcaHeader
         stakeholder={stakeholder}
         onStakeholder={setStakeholder}
+        boatClass={boatClass}
+        onBoatClass={setBoatClass}
         health={health}
         latest={latest}
         onStartTour={tour.start}
@@ -554,6 +560,8 @@ export default function WorkspacePage() {
             <div className="rail__content">
               {page === "system" ? (
                 <EngineRoomView resp={latest} />
+              ) : page === "sos" ? (
+                <SosView boatClass={boatClass} />
               ) : !latest ? null : page === "decision" ? (
                 // PRIMARY — the operational answer, one scannable block, plus
                 // Decision Replay directly beneath it (not buried in Details)

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 
+from app.agents import gazetteer
 from app.core.logging import get_logger
 from app.i18n.messages import (
     comparison_direction_label,
@@ -284,7 +285,15 @@ class ExplanationAgent:
             ) and _contains_biological_claim(
                 text, check_neighbourhood=neighbourhood is not None or anomaly is not None
             )
-            if report.grounded and not contradiction and not biological:
+            lang_mismatch = _language_mismatch(text, language)
+            unresolved_place = _contains_unresolved_place(text, understanding)
+            if (
+                report.grounded
+                and not contradiction
+                and not biological
+                and not lang_mismatch
+                and not unresolved_place
+            ):
                 return Explanation(
                     text=text.strip(),
                     language=language,
@@ -305,6 +314,10 @@ class ExplanationAgent:
                 else "it made a biological / catch claim - chlorophyll-a is only a "
                 "productivity proxy, never say fish are present or predict catch"
                 if biological
+                else f"it was not written in the requested language ({language.value})"
+                if lang_mismatch
+                else "it named a place that was never part of this query's context"
+                if unresolved_place
                 else "it contained unsupported number(s): " + ", ".join(report.unsupported)
             )
             system = _SYSTEM + f"\nYour previous reply was rejected because {reason}. Fix it."
@@ -1309,6 +1322,60 @@ def _contradicts_decision(text: str, decision: DecisionResult | None) -> bool:
         return False
     low = text.lower()
     return any(phrase in low for phrase in _UNSAFE_ASSERTIONS)
+
+
+# Devanagari (hi) / Kannada (kn) Unicode blocks - same ranges Query
+# Understanding's own language-detection regex uses (see
+# app.agents.query_understanding._DEVANAGARI / _KANNADA).
+_DEVANAGARI_RE = re.compile("[ऀ-ॿ]")
+_KANNADA_RE = re.compile("[ಀ-೿]")
+
+
+def _language_mismatch(text: str, language: Language) -> bool:
+    """Deterministic guard: a Hindi/Kannada request must come back in a
+    script the user can actually read. English is not script-checkable this
+    way (correct English is legitimately all-Latin), so only hi/kn are
+    enforced - this catches Groq silently ignoring the system prompt's
+    "Respond in the requested language only" rule, the same "prompt is not
+    enforcement" posture as every other guard in this module."""
+    if language is Language.HI:
+        return not _DEVANAGARI_RE.search(text)
+    if language is Language.KN:
+        return not _KANNADA_RE.search(text)
+    return False
+
+
+# Broad water-body names are legitimate regional context regardless of which
+# specific harbour/city this turn resolved (e.g. correctly saying "conditions
+# in the Arabian Sea" for a Mangalore query) - only checking specific
+# place/harbour names below keeps this a hallucination check, not a
+# geography-vocabulary ban.
+_PLACE_CHECK_EXCLUDE = {"arabian sea", "bay of bengal", "gulf of mannar"}
+
+
+def _contains_unresolved_place(text: str, understanding: QueryUnderstanding | None) -> bool:
+    """Deterministic guard: the explanation must not name a place ORCA never
+    resolved for this query. Checks every known gazetteer harbour/city name
+    (app.agents.gazetteer) that appears in the text as a whole word against
+    the ONLY places this turn's context actually supplied - the origin and
+    destination Query Understanding itself resolved. A gazetteer name never
+    associated with this query appearing in the LLM's text is a hallucinated
+    location, not a restated one (see gazetteer.canonical_name)."""
+    if understanding is None:
+        return False
+    allowed: set[str] = set()
+    for ref in (understanding.origin, understanding.destination):
+        if ref is not None and ref.name:
+            canon = gazetteer.canonical_name(ref.name)
+            if canon:
+                allowed.add(canon)
+    low = text.lower()
+    for name in gazetteer.known_names():
+        if name in allowed or name in _PLACE_CHECK_EXCLUDE:
+            continue
+        if re.search(rf"\b{re.escape(name)}\b", low):
+            return True
+    return False
 
 
 def _contains_biological_claim(text: str, *, check_neighbourhood: bool = False) -> bool:

@@ -51,7 +51,15 @@ export type StringKey =
   | "landing.footer.problem"
   | "landing.footer.sponsor"
   | "header.stakeholder"
+  | "header.boatClass"
+  | "header.boatClassNotSet"
   | "header.language"
+  | "boatClass.traditionalNonmotorized"
+  | "boatClass.smallMotorized"
+  | "boatClass.mediumMechanized"
+  | "boatClass.largeMechanized"
+  | "pfz.withinRange"
+  | "pfz.outOfRange"
   | "header.connection"
   | "header.dataStatus"
   | "conn.online"
@@ -92,7 +100,49 @@ export type StringKey =
   | "nav.sections"
   | "nav.returnToWorkspace"
   | "nav.engineRoom"
+  | "nav.sos"
   | "panel.engineRoom"
+  | "sos.title"
+  | "sos.lead"
+  | "sos.disclaimer"
+  | "sos.step1.title"
+  | "sos.category.flooding"
+  | "sos.category.fire"
+  | "sos.category.collision"
+  | "sos.category.manOverboard"
+  | "sos.category.disabled"
+  | "sos.category.medical"
+  | "sos.category.severeWeather"
+  | "sos.category.security"
+  | "sos.step2.title"
+  | "sos.vesselName"
+  | "sos.vesselNamePlaceholder"
+  | "sos.personsAboard"
+  | "sos.boatClassHint"
+  | "sos.gps.get"
+  | "sos.gps.requesting"
+  | "sos.gps.denied"
+  | "sos.gps.unavailable"
+  | "sos.gps.notYet"
+  | "sos.step3.title"
+  | "sos.step3.selectFirst"
+  | "sos.action.speak"
+  | "sos.action.copy"
+  | "sos.action.copied"
+  | "sos.action.copyUnsupported"
+  | "sos.action.call"
+  | "sos.action.sms"
+  | "sos.action.whatsapp"
+  | "sos.checklist.title"
+  | "sos.checklist.lead"
+  | "sos.checklist.epirb"
+  | "sos.checklist.sart"
+  | "sos.checklist.liferaft"
+  | "sos.checklist.pfd"
+  | "sos.checklist.grabbag"
+  | "sos.checklist.fireExtinguisher"
+  | "sos.checklist.firstAid"
+  | "sos.checklist.radioCharged"
   | "phase.understanding"
   | "phase.collection"
   | "phase.core"
@@ -104,6 +154,7 @@ export type StringKey =
   | "kind.data"
   | "stage.understand"
   | "stage.normalize"
+  | "stage.plan"
   | "stage.weather"
   | "stage.ocean"
   | "stage.gis"
@@ -776,7 +827,15 @@ const en: Table = {
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "Context",
+  "header.boatClass": "Boat class",
+  "header.boatClassNotSet": "Not set",
   "header.language": "Language",
+  "boatClass.traditionalNonmotorized": "Traditional / non-motorised craft",
+  "boatClass.smallMotorized": "Small motorised boat (under 10 m)",
+  "boatClass.mediumMechanized": "Medium mechanised boat (10-15 m)",
+  "boatClass.largeMechanized": "Large mechanised vessel (over 15 m)",
+  "pfz.withinRange": "Within your boat's range",
+  "pfz.outOfRange": "Beyond your boat's declared range",
   "header.connection": "Backend",
   "header.dataStatus": "Data",
   "conn.online": "Online",
@@ -818,6 +877,48 @@ const en: Table = {
   "nav.sections": "Sections",
   "nav.returnToWorkspace": "Return to Workspace",
   "nav.engineRoom": "Engine Room",
+  "nav.sos": "Emergency (SOS)",
+  "sos.title": "Emergency Distress",
+  "sos.lead": "Build a standard Mayday radio script and reach the Indian Coast Guard - works even with a weak signal, and needs no ORCA query first.",
+  "sos.disclaimer": "This page composes a distress message for you to send yourself (by voice call, radio, SMS or WhatsApp). It does not contact anyone automatically and does not replace VHF Channel 16 or a real Coast Guard call in a genuine emergency.",
+  "sos.step1.title": "1. What is the emergency?",
+  "sos.category.flooding": "Taking on water",
+  "sos.category.fire": "Fire on board",
+  "sos.category.collision": "Collision",
+  "sos.category.manOverboard": "Man overboard",
+  "sos.category.disabled": "Disabled / adrift",
+  "sos.category.medical": "Medical emergency",
+  "sos.category.severeWeather": "Severe weather",
+  "sos.category.security": "Piracy / security threat",
+  "sos.step2.title": "2. Your details",
+  "sos.vesselName": "Vessel name",
+  "sos.vesselNamePlaceholder": "e.g. Matsya Rani",
+  "sos.personsAboard": "Persons on board",
+  "sos.boatClassHint": "Boat class on file: {cls}",
+  "sos.gps.get": "Get my position",
+  "sos.gps.requesting": "Getting position...",
+  "sos.gps.denied": "Location permission denied - enter your position by radio from memory if you can.",
+  "sos.gps.unavailable": "Location is not available on this device.",
+  "sos.gps.notYet": "Position not yet acquired.",
+  "sos.step3.title": "3. Send for help",
+  "sos.step3.selectFirst": "Select an emergency type above to generate your distress message.",
+  "sos.action.speak": "Read aloud",
+  "sos.action.copy": "Copy text",
+  "sos.action.copied": "Copied",
+  "sos.action.copyUnsupported": "Copy isn't available on this device - please read or photograph the message above.",
+  "sos.action.call": "Call Coast Guard ({number})",
+  "sos.action.sms": "Share by SMS",
+  "sos.action.whatsapp": "Share by WhatsApp",
+  "sos.checklist.title": "Pre-departure safety checklist",
+  "sos.checklist.lead": "Saved on this device only. Check before every trip.",
+  "sos.checklist.epirb": "EPIRB (emergency beacon) on board and tested",
+  "sos.checklist.sart": "SART / radar transponder on board",
+  "sos.checklist.liferaft": "Life raft on board and in date",
+  "sos.checklist.pfd": "Life jackets (PFDs) for every person on board",
+  "sos.checklist.grabbag": "Grab-bag packed (torch, whistle, flares, water)",
+  "sos.checklist.fireExtinguisher": "Fire extinguisher on board and checked",
+  "sos.checklist.firstAid": "First-aid kit on board",
+  "sos.checklist.radioCharged": "VHF radio / phone fully charged",
   "panel.engineRoom": "ORCA Engine Room",
   "phase.understanding": "Understanding",
   "phase.collection": "Parallel Data Collection",
@@ -830,6 +931,7 @@ const en: Table = {
   "kind.data": "Data intelligence",
   "stage.understand": "Query Understanding",
   "stage.normalize": "Normalize / resolve location",
+  "stage.plan": "Execution Planning",
   "stage.weather": "Weather Intelligence",
   "stage.ocean": "Oceanographic Intelligence",
   "stage.gis": "GIS & Geofencing",
@@ -1551,7 +1653,15 @@ const hi: Table = {
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "संदर्भ",
+  "header.boatClass": "नाव वर्ग",
+  "header.boatClassNotSet": "निर्धारित नहीं",
   "header.language": "भाषा",
+  "boatClass.traditionalNonmotorized": "पारंपरिक / बिना इंजन वाली नाव",
+  "boatClass.smallMotorized": "छोटी मोटर नाव (10 मीटर से कम)",
+  "boatClass.mediumMechanized": "मध्यम यांत्रिक नाव (10-15 मीटर)",
+  "boatClass.largeMechanized": "बड़ा यांत्रिक जहाज़ (15 मीटर से अधिक)",
+  "pfz.withinRange": "आपकी नाव की सीमा के भीतर",
+  "pfz.outOfRange": "आपकी नाव की घोषित सीमा से परे",
   "header.connection": "बैकएंड",
   "header.dataStatus": "डेटा",
   "conn.online": "ऑनलाइन",
@@ -1593,6 +1703,48 @@ const hi: Table = {
   "nav.sections": "अनुभाग",
   "nav.returnToWorkspace": "वर्कस्पेस पर लौटें",
   "nav.engineRoom": "इंजन रूम",
+  "nav.sos": "आपातकाल (SOS)",
+  "sos.title": "आपातकालीन संकट संदेश",
+  "sos.lead": "एक मानक मेडे रेडियो संदेश तैयार करें और भारतीय तटरक्षक बल से संपर्क करें - कमज़ोर सिग्नल में भी काम करता है, और पहले किसी ORCA प्रश्न की ज़रूरत नहीं।",
+  "sos.disclaimer": "यह पृष्ठ आपके लिए एक संकट संदेश तैयार करता है जिसे आप स्वयं भेजते हैं (कॉल, रेडियो, SMS या WhatsApp द्वारा)। यह अपने आप किसी से संपर्क नहीं करता और वास्तविक आपातकाल में VHF चैनल 16 या तटरक्षक बल को सीधे कॉल करने का विकल्प नहीं है।",
+  "sos.step1.title": "1. आपातकाल क्या है?",
+  "sos.category.flooding": "नाव में पानी भर रहा है",
+  "sos.category.fire": "नाव में आग लगी है",
+  "sos.category.collision": "टक्कर",
+  "sos.category.manOverboard": "व्यक्ति समुद्र में गिरा",
+  "sos.category.disabled": "नाव खराब / बहाव में",
+  "sos.category.medical": "चिकित्सा आपातकाल",
+  "sos.category.severeWeather": "गंभीर मौसम",
+  "sos.category.security": "समुद्री डकैती / सुरक्षा खतरा",
+  "sos.step2.title": "2. आपकी जानकारी",
+  "sos.vesselName": "नाव का नाम",
+  "sos.vesselNamePlaceholder": "उदा. मत्स्य रानी",
+  "sos.personsAboard": "नाव पर लोगों की संख्या",
+  "sos.boatClassHint": "दर्ज नाव वर्ग: {cls}",
+  "sos.gps.get": "मेरी स्थिति प्राप्त करें",
+  "sos.gps.requesting": "स्थिति प्राप्त हो रही है...",
+  "sos.gps.denied": "स्थान अनुमति अस्वीकृत - यदि संभव हो तो अपनी स्थिति याद से रेडियो पर बताएँ।",
+  "sos.gps.unavailable": "इस डिवाइस पर स्थान उपलब्ध नहीं है।",
+  "sos.gps.notYet": "स्थिति अभी प्राप्त नहीं हुई।",
+  "sos.step3.title": "3. मदद के लिए भेजें",
+  "sos.step3.selectFirst": "अपना संकट संदेश बनाने के लिए ऊपर आपातकाल का प्रकार चुनें।",
+  "sos.action.speak": "ज़ोर से पढ़ें",
+  "sos.action.copy": "टेक्स्ट कॉपी करें",
+  "sos.action.copied": "कॉपी हो गया",
+  "sos.action.copyUnsupported": "इस डिवाइस पर कॉपी उपलब्ध नहीं है - कृपया ऊपर दिया संदेश पढ़ें या उसकी फ़ोटो लें।",
+  "sos.action.call": "तटरक्षक बल को कॉल करें ({number})",
+  "sos.action.sms": "SMS से साझा करें",
+  "sos.action.whatsapp": "WhatsApp से साझा करें",
+  "sos.checklist.title": "यात्रा-पूर्व सुरक्षा जांच-सूची",
+  "sos.checklist.lead": "केवल इस डिवाइस पर सहेजी गई। हर यात्रा से पहले जांचें।",
+  "sos.checklist.epirb": "EPIRB (आपातकालीन बीकन) नाव पर है और जांचा गया है",
+  "sos.checklist.sart": "SART / रडार ट्रांसपोंडर नाव पर है",
+  "sos.checklist.liferaft": "लाइफ राफ्ट नाव पर है और वैध है",
+  "sos.checklist.pfd": "हर व्यक्ति के लिए लाइफ जैकेट (PFD) मौजूद है",
+  "sos.checklist.grabbag": "ग्रैब-बैग तैयार है (टॉर्च, सीटी, फ्लेयर, पानी)",
+  "sos.checklist.fireExtinguisher": "अग्निशामक यंत्र नाव पर है और जांचा गया है",
+  "sos.checklist.firstAid": "प्राथमिक चिकित्सा किट नाव पर है",
+  "sos.checklist.radioCharged": "VHF रेडियो / फ़ोन पूरी तरह चार्ज है",
   "panel.engineRoom": "ORCA इंजन रूम",
   "phase.understanding": "समझ",
   "phase.collection": "समानांतर डेटा संग्रहण",
@@ -1605,6 +1757,7 @@ const hi: Table = {
   "kind.data": "डेटा बुद्धिमत्ता",
   "stage.understand": "प्रश्न समझ एजेंट",
   "stage.normalize": "स्थान सामान्यीकरण/समाधान",
+  "stage.plan": "निष्पादन योजना एजेंट",
   "stage.weather": "मौसम बुद्धिमत्ता",
   "stage.ocean": "समुद्र विज्ञान बुद्धिमत्ता",
   "stage.gis": "GIS एवं जियोफेंसिंग",
@@ -2324,7 +2477,15 @@ const kn: Table = {
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
   "header.stakeholder": "ಸಂದರ್ಭ",
+  "header.boatClass": "ದೋಣಿ ವರ್ಗ",
+  "header.boatClassNotSet": "ಹೊಂದಿಸಿಲ್ಲ",
   "header.language": "ಭಾಷೆ",
+  "boatClass.traditionalNonmotorized": "ಸಾಂಪ್ರದಾಯಿಕ / ಎಂಜಿನ್ ಇಲ್ಲದ ದೋಣಿ",
+  "boatClass.smallMotorized": "ಸಣ್ಣ ಮೋಟಾರು ದೋಣಿ (10 ಮೀ ಗಿಂತ ಕಡಿಮೆ)",
+  "boatClass.mediumMechanized": "ಮಧ್ಯಮ ಯಾಂತ್ರಿಕ ದೋಣಿ (10-15 ಮೀ)",
+  "boatClass.largeMechanized": "ದೊಡ್ಡ ಯಾಂತ್ರಿಕ ಹಡಗು (15 ಮೀ ಗಿಂತ ಹೆಚ್ಚು)",
+  "pfz.withinRange": "ನಿಮ್ಮ ದೋಣಿಯ ವ್ಯಾಪ್ತಿಯೊಳಗೆ",
+  "pfz.outOfRange": "ನಿಮ್ಮ ದೋಣಿಯ ಘೋಷಿತ ವ್ಯಾಪ್ತಿಯ ಆಚೆ",
   "header.connection": "ಬ್ಯಾಕೆಂಡ್",
   "header.dataStatus": "ದತ್ತಾಂಶ",
   "conn.online": "ಆನ್‌ಲೈನ್",
@@ -2366,6 +2527,48 @@ const kn: Table = {
   "nav.sections": "ವಿಭಾಗಗಳು",
   "nav.returnToWorkspace": "ಕಾರ್ಯಕ್ಷೇತ್ರಕ್ಕೆ ಹಿಂತಿರುಗಿ",
   "nav.engineRoom": "ಎಂಜಿನ್ ಕೊಠಡಿ",
+  "nav.sos": "ತುರ್ತು (SOS)",
+  "sos.title": "ತುರ್ತು ಸಂಕಷ್ಟ ಸಂದೇಶ",
+  "sos.lead": "ಪ್ರಮಾಣಿತ ಮೇಡೇ ರೇಡಿಯೊ ಸಂದೇಶವನ್ನು ಸಿದ್ಧಪಡಿಸಿ ಮತ್ತು ಭಾರತೀಯ ಕರಾವಳಿ ರಕ್ಷಣಾ ಪಡೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ - ದುರ್ಬಲ ಸಿಗ್ನಲ್‌ನಲ್ಲೂ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ, ಮೊದಲು ORCA ಪ್ರಶ್ನೆಯ ಅಗತ್ಯವಿಲ್ಲ.",
+  "sos.disclaimer": "ಈ ಪುಟವು ನಿಮಗಾಗಿ ಸಂಕಷ್ಟ ಸಂದೇಶವನ್ನು ಸಿದ್ಧಪಡಿಸುತ್ತದೆ, ಅದನ್ನು ನೀವೇ ಕಳುಹಿಸಬೇಕು (ಕರೆ, ರೇಡಿಯೊ, SMS ಅಥವಾ WhatsApp ಮೂಲಕ). ಇದು ತಾನಾಗಿಯೇ ಯಾರನ್ನೂ ಸಂಪರ್ಕಿಸುವುದಿಲ್ಲ ಮತ್ತು ನಿಜವಾದ ತುರ್ತು ಪರಿಸ್ಥಿತಿಯಲ್ಲಿ VHF ಚಾನೆಲ್ 16 ಅಥವಾ ನೇರ ಕರಾವಳಿ ರಕ್ಷಣಾ ಕರೆಗೆ ಬದಲಿಯಲ್ಲ.",
+  "sos.step1.title": "1. ತುರ್ತು ಪರಿಸ್ಥಿತಿ ಏನು?",
+  "sos.category.flooding": "ದೋಣಿಯಲ್ಲಿ ನೀರು ತುಂಬುತ್ತಿದೆ",
+  "sos.category.fire": "ದೋಣಿಯಲ್ಲಿ ಬೆಂಕಿ",
+  "sos.category.collision": "ಡಿಕ್ಕಿ",
+  "sos.category.manOverboard": "ವ್ಯಕ್ತಿ ಸಮುದ್ರಕ್ಕೆ ಬಿದ್ದಿದ್ದಾರೆ",
+  "sos.category.disabled": "ದೋಣಿ ಕೆಟ್ಟಿದೆ / ತೇಲುತ್ತಿದೆ",
+  "sos.category.medical": "ವೈದ್ಯಕೀಯ ತುರ್ತುಸ್ಥಿತಿ",
+  "sos.category.severeWeather": "ತೀವ್ರ ಹವಾಮಾನ",
+  "sos.category.security": "ಕಡಲ್ಗಳ್ಳತನ / ಭದ್ರತಾ ಬೆದರಿಕೆ",
+  "sos.step2.title": "2. ನಿಮ್ಮ ವಿವರಗಳು",
+  "sos.vesselName": "ದೋಣಿಯ ಹೆಸರು",
+  "sos.vesselNamePlaceholder": "ಉದಾ. ಮತ್ಸ್ಯ ರಾಣಿ",
+  "sos.personsAboard": "ದೋಣಿಯಲ್ಲಿರುವ ಜನರ ಸಂಖ್ಯೆ",
+  "sos.boatClassHint": "ದಾಖಲಾದ ದೋಣಿ ವರ್ಗ: {cls}",
+  "sos.gps.get": "ನನ್ನ ಸ್ಥಳ ಪಡೆಯಿರಿ",
+  "sos.gps.requesting": "ಸ್ಥಳ ಪಡೆಯಲಾಗುತ್ತಿದೆ...",
+  "sos.gps.denied": "ಸ್ಥಳ ಅನುಮತಿ ನಿರಾಕರಿಸಲಾಗಿದೆ - ಸಾಧ್ಯವಾದರೆ ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ನೆನಪಿನಿಂದ ರೇಡಿಯೊದಲ್ಲಿ ತಿಳಿಸಿ.",
+  "sos.gps.unavailable": "ಈ ಸಾಧನದಲ್ಲಿ ಸ್ಥಳ ಲಭ್ಯವಿಲ್ಲ.",
+  "sos.gps.notYet": "ಸ್ಥಳ ಇನ್ನೂ ಪಡೆದಿಲ್ಲ.",
+  "sos.step3.title": "3. ಸಹಾಯಕ್ಕಾಗಿ ಕಳುಹಿಸಿ",
+  "sos.step3.selectFirst": "ನಿಮ್ಮ ಸಂಕಷ್ಟ ಸಂದೇಶ ರಚಿಸಲು ಮೇಲೆ ತುರ್ತು ಪ್ರಕಾರ ಆಯ್ಕೆಮಾಡಿ.",
+  "sos.action.speak": "ಗಟ್ಟಿಯಾಗಿ ಓದಿ",
+  "sos.action.copy": "ಪಠ್ಯ ನಕಲಿಸಿ",
+  "sos.action.copied": "ನಕಲಿಸಲಾಗಿದೆ",
+  "sos.action.copyUnsupported": "ಈ ಸಾಧನದಲ್ಲಿ ನಕಲಿಸುವಿಕೆ ಲಭ್ಯವಿಲ್ಲ - ದಯವಿಟ್ಟು ಮೇಲಿನ ಸಂದೇಶವನ್ನು ಓದಿ ಅಥವಾ ಫೋಟೋ ತೆಗೆಯಿರಿ.",
+  "sos.action.call": "ಕರಾವಳಿ ರಕ್ಷಣಾ ಪಡೆಗೆ ಕರೆ ಮಾಡಿ ({number})",
+  "sos.action.sms": "SMS ಮೂಲಕ ಹಂಚಿಕೊಳ್ಳಿ",
+  "sos.action.whatsapp": "WhatsApp ಮೂಲಕ ಹಂಚಿಕೊಳ್ಳಿ",
+  "sos.checklist.title": "ಪ್ರಯಾಣ-ಪೂರ್ವ ಸುರಕ್ಷತಾ ಪರಿಶೀಲನಾ ಪಟ್ಟಿ",
+  "sos.checklist.lead": "ಈ ಸಾಧನದಲ್ಲಿ ಮಾತ್ರ ಉಳಿಸಲಾಗಿದೆ. ಪ್ರತಿ ಪ್ರಯಾಣದ ಮೊದಲು ಪರಿಶೀಲಿಸಿ.",
+  "sos.checklist.epirb": "EPIRB (ತುರ್ತು ಬೀಕನ್) ದೋಣಿಯಲ್ಲಿದೆ ಮತ್ತು ಪರೀಕ್ಷಿಸಲಾಗಿದೆ",
+  "sos.checklist.sart": "SART / ರಾಡಾರ್ ಟ್ರಾನ್ಸ್‌ಪಾಂಡರ್ ದೋಣಿಯಲ್ಲಿದೆ",
+  "sos.checklist.liferaft": "ಲೈಫ್ ರಾಫ್ಟ್ ದೋಣಿಯಲ್ಲಿದೆ ಮತ್ತು ಮಾನ್ಯವಾಗಿದೆ",
+  "sos.checklist.pfd": "ಪ್ರತಿಯೊಬ್ಬರಿಗೂ ಲೈಫ್ ಜಾಕೆಟ್ (PFD) ಇದೆ",
+  "sos.checklist.grabbag": "ಗ್ರ್ಯಾಬ್-ಬ್ಯಾಗ್ ಸಿದ್ಧವಾಗಿದೆ (ಟಾರ್ಚ್, ಸೀಟಿ, ಫ್ಲೇರ್, ನೀರು)",
+  "sos.checklist.fireExtinguisher": "ಅಗ್ನಿಶಾಮಕ ದೋಣಿಯಲ್ಲಿದೆ ಮತ್ತು ಪರೀಕ್ಷಿಸಲಾಗಿದೆ",
+  "sos.checklist.firstAid": "ಪ್ರಥಮ ಚಿಕಿತ್ಸಾ ಕಿಟ್ ದೋಣಿಯಲ್ಲಿದೆ",
+  "sos.checklist.radioCharged": "VHF ರೇಡಿಯೊ / ಫೋನ್ ಪೂರ್ಣ ಚಾರ್ಜ್ ಆಗಿದೆ",
   "panel.engineRoom": "ORCA ಎಂಜಿನ್ ಕೊಠಡಿ",
   "phase.understanding": "ಗ್ರಹಿಕೆ",
   "phase.collection": "ಸಮಾನಾಂತರ ಡೇಟಾ ಸಂಗ್ರಹಣೆ",
@@ -2378,6 +2581,7 @@ const kn: Table = {
   "kind.data": "ಡೇಟಾ ಬುದ್ಧಿಮತ್ತೆ",
   "stage.understand": "ಪ್ರಶ್ನೆ ಗ್ರಹಿಕೆ ಏಜೆಂಟ್",
   "stage.normalize": "ಸ್ಥಳ ಸಾಮಾನ್ಯೀಕರಣ/ಪರಿಹಾರ",
+  "stage.plan": "ಕಾರ್ಯಗತಗೊಳಿಸುವಿಕೆ ಯೋಜನಾ ಏಜೆಂಟ್",
   "stage.weather": "ಹವಾಮಾನ ಬುದ್ಧಿಮತ್ತೆ",
   "stage.ocean": "ಸಮುದ್ರಶಾಸ್ತ್ರ ಬುದ್ಧಿಮತ್ತೆ",
   "stage.gis": "GIS ಮತ್ತು ಜಿಯೋಫೆನ್ಸಿಂಗ್",

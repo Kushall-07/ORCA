@@ -3,11 +3,14 @@ missing-data handling."""
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.models.decision import DecisionStatus
 from app.orchestration.deps import build_default_deps
 from app.orchestration.graph import build_orca_graph
+from app.services.llm import StubLlmClient
 from tests.orchestration_fakes import (
     NOW,
     FakeGisAgent,
@@ -102,3 +105,42 @@ async def test_high_wave_query_is_not_allowed() -> None:
     )
     assert r.decision.status != DecisionStatus.PROCEED.value
     assert r.risk.level in ("high", "severe")
+
+
+# ---- execution planner (third LLM touch-point) --------------------------
+_ENV_MESSAGE = "What is the chlorophyll-a concentration near Mangalore right now?"
+
+
+async def test_no_planner_llm_runs_productivity_as_before() -> None:
+    """Default deps (no planner LLM configured) use the fixed plan - every
+    plannable node stays eligible, i.e. today's behaviour is unchanged."""
+    pipe = make_pipeline()
+    r = await pipe.run(message=_ENV_MESSAGE, session_id="p1", now=NOW)
+    assert "plan" in r.agent_trace
+    assert "productivity" in r.agent_trace
+    assert r.decision is not None
+    assert r.risk is not None
+
+
+async def test_planner_can_skip_an_irrelevant_downstream_node() -> None:
+    """A plan that excludes "productivity" causes ONLY that node to skip; the
+    safety-critical backbone (risk/decision) is completely unaffected."""
+    stub = StubLlmClient(json_response=json.dumps({"nodes": []}))
+    pipe = make_pipeline(planner_llm=stub)
+    r = await pipe.run(message=_ENV_MESSAGE, session_id="p2", now=NOW)
+    assert "plan" in r.agent_trace
+    assert "productivity" not in r.agent_trace
+    assert "productivity:skip" in r.agent_trace
+    assert r.decision is not None
+    assert r.risk is not None
+
+
+async def test_planner_cannot_force_a_node_its_own_gate_would_skip() -> None:
+    """The plan is subtractive-only: naming "research" for a plain fishing
+    query never forces the research node to run, because its own
+    intent == RESEARCH_QUERY gate is untouched by the plan."""
+    stub = StubLlmClient(json_response=json.dumps({"nodes": ["research"]}))
+    pipe = make_pipeline(planner_llm=stub)
+    r = await pipe.run(message="Is it safe to go fishing from Mangalore now?", session_id="p3", now=NOW)
+    assert "research" not in r.agent_trace
+    assert "research:skip" in r.agent_trace

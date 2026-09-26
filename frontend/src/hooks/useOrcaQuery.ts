@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ApiError, postQuery } from "../services/apiClient";
 import type { LanguageCode, QueryResponse } from "../types/api";
 import type { StakeholderId } from "../stakeholders";
+import type { BoatClassId } from "../boatClasses";
 
 export interface ChatMessage {
   id: string;
@@ -48,6 +49,7 @@ export interface UseOrcaQuery {
 export function useOrcaQuery(opts: {
   stakeholder: StakeholderId;
   language: LanguageCode;
+  boatClass?: BoatClassId | null;
 }): UseOrcaQuery {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,6 +81,7 @@ export function useOrcaQuery(opts: {
             message: text,
             stakeholder: optsRef.current.stakeholder,
             language: optsRef.current.language,
+            boat_class: optsRef.current.boatClass ?? undefined,
             latitude: coords?.latitude,
             longitude: coords?.longitude,
             destination_latitude: coords?.destinationLatitude,

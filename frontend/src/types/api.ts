@@ -538,6 +538,10 @@ export interface PfzZoneInfo {
   // built before this distinction existed keep compiling.
   geometry_source?: "MATCHED_LINE" | "PROJECTED_FROM_LANDING_CENTRE" | string;
   derived_from?: string | null;
+  // Phase 11: set only when the request declared a `boat_class` - whether
+  // this zone's `distance_km` is within that class's approximate operating
+  // range. `null`/absent = unknown (no boat class declared), never a guess.
+  within_safe_range?: boolean | null;
 }
 
 export interface PfzZoneRankingInfo {
@@ -644,6 +648,11 @@ export interface NodeTraceItem {
   record_count?: number | null;
 }
 
+export interface ExecutionPlanInfo {
+  nodes: string[];
+  planned_via: "groq" | "fixed";
+}
+
 export interface QueryResponse {
   session_id: string;
   request_id?: string;
@@ -652,6 +661,7 @@ export interface QueryResponse {
   language: LanguageCode | string;
   intent: string;
   stakeholder: string | null;
+  boat_class?: string | null;   // echoed from the request; does not affect reasoning
   answer: string;
   needs_clarification: boolean;
   clarification_question: string | null;
@@ -667,6 +677,10 @@ export interface QueryResponse {
   advisory?: AdvisoryInfo | null;
   pfz_reference?: PfzReferenceInfo | null;
   pfz_zones?: PfzZoneRankingInfo | null;
+  // Third and last LLM touch-point (see app.agents.planner) - which
+  // downstream research/reference nodes were judged relevant. Never affects
+  // safety/risk/decision/route.
+  execution_plan?: ExecutionPlanInfo | null;
   alerts: AlertItem[];
   conflicts: ConflictItem[];
   evidence: EvidenceItem[];
@@ -831,6 +845,9 @@ export interface QueryRequestBody {
   date_hint?: string;
   stakeholder?: string;
   language?: LanguageCode;
+  // Phase 11: user-declared boat class (see ../stakeholders/boatClasses) -
+  // UX context only, echoed back, never changes reasoning.
+  boat_class?: string;
 }
 
 // ---- static GIS layer manifest -----------------------------------------

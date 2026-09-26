@@ -46,14 +46,20 @@ that supports it; and the human always makes the final call.
 This is not a tagline — it is an architectural boundary enforced in code and
 tested continuously.
 
-The LLM (Groq, the sole provider) touches exactly two points in the pipeline:
-turning a natural-language question into a structured query, and phrasing the
-final explanation of a decision that has already been computed. It never
-touches risk scoring, geofence checks, route legality, distances, polygon
-intersections, or the safety status itself — those are pure, deterministic
-Python functions with no network access and no randomness. If the LLM is
-unavailable, ORCA still runs end-to-end on rule-based fallbacks; the answer's
-*wording* may change, the *numbers and safety verdict* never do.
+The LLM (Groq, the sole provider) touches exactly three points in the
+pipeline: turning a natural-language question into a structured query,
+choosing which of a fixed set of already safety-isolated downstream
+research/reference analyses (Phase 10 — the Execution Planner) are worth
+computing for that query, and phrasing the final explanation of a decision
+that has already been computed. It never touches risk scoring, geofence
+checks, route legality, distances, polygon intersections, or the safety
+status itself — those are pure, deterministic Python functions with no
+network access and no randomness. The Execution Planner is strictly
+SUBTRACTIVE: it can only skip a downstream node that would otherwise have
+run; it can never force one to run that its own deterministic gate would
+have skipped, and it has no path into the safety-critical backbone at all. If
+the LLM is unavailable, ORCA still runs end-to-end on rule-based fallbacks;
+the answer's *wording* may change, the *numbers and safety verdict* never do.
 
 Evidence is never silent. Every observation ORCA uses carries its source, the
 tier of trust it was assigned, its timestamp, and its validity window. When two

@@ -29,6 +29,7 @@ from app.models.api import (
     EnvironmentalStabilityInfo,
     EnvironmentalStabilityVariableInfo,
     EvidenceItem,
+    ExecutionPlanInfo,
     GisSummary,
     LocationInfo,
     NodeTraceItem,
@@ -78,6 +79,7 @@ class OrcaPipeline:
         date_hint: str | None = None,
         stakeholder: str | None = None,
         language: str | None = None,
+        boat_class: str | None = None,
         now: datetime | None = None,
     ) -> QueryResponse:
         session_id = session_id or f"sess-{uuid.uuid4().hex[:12]}"
@@ -87,6 +89,7 @@ class OrcaPipeline:
             "request_id": request_id,
             "message": message,
             "now": now or datetime.now(timezone.utc),
+            "boat_class": boat_class,
             "coordinate_override": coordinate,
             "destination_override": destination,
             "destination_overrides": tuple(destinations) if destinations else None,
@@ -240,6 +243,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                 forecast_day=pz.forecast_day, restricted=pz.restricted,
                 nearest_hard_geofence_m=pz.nearest_hard_geofence_m,
                 geometry_source=pz.geometry_source, derived_from=pz.derived_from,
+                within_safe_range=pz.within_safe_range,
             )
         pfz_info = PfzReferenceInfo(
             source=pfz.source,
@@ -270,6 +274,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
                     forecast_day=z.forecast_day, restricted=z.restricted,
                     nearest_hard_geofence_m=z.nearest_hard_geofence_m,
                     geometry_source=z.geometry_source, derived_from=z.derived_from,
+                    within_safe_range=z.within_safe_range,
                 )
                 for z in pfz_zones.zones
             ],
@@ -761,6 +766,13 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         )
     ]
 
+    plan = state.get("execution_plan")
+    plan_info = (
+        ExecutionPlanInfo(nodes=list(plan.nodes), planned_via=plan.planned_via)
+        if plan is not None
+        else None
+    )
+
     return QueryResponse(
         session_id=session_id,
         request_id=request_id,
@@ -769,6 +781,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         language=language,
         intent=intent,
         stakeholder=state.get("stakeholder"),
+        boat_class=state.get("boat_class"),
         answer=answer,
         needs_clarification=needs_clarification,
         clarification_question=clarification_question,
@@ -785,6 +798,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         pfz_reference=pfz_info,
         pfz_zones=pfz_zones_info,
         whatif=whatif_info,
+        execution_plan=plan_info,
         alerts=alerts,
         conflicts=conflicts,
         evidence=evidence,

@@ -159,6 +159,19 @@ export function PfzRankedPanel({
                       {t("pfz.ranked.projected")}
                     </span>
                   )}
+                  {/* Phase 11: only rendered when a boat class was declared -
+                      `within_safe_range` stays null/undefined otherwise, so
+                      this is silent for every query as before this existed. */}
+                  {z.within_safe_range === false && (
+                    <span className="pfz-ranked-card__restricted">
+                      {t("pfz.outOfRange")}
+                    </span>
+                  )}
+                  {z.within_safe_range === true && (
+                    <span className="pfz-ranked-card__projected">
+                      {t("pfz.withinRange")}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

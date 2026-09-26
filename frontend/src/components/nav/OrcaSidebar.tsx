@@ -1,5 +1,5 @@
 import { useI18n } from "../../i18n";
-import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, type AssessmentSection } from "./navItems";
+import { ASSESSMENT_NAV_ITEMS, ENGINE_ROOM_ITEM, SOS_ITEM, type AssessmentSection } from "./navItems";
 
 export type { AssessmentSection } from "./navItems";
 
@@ -54,6 +54,16 @@ export function OrcaSidebar({
             onClick={() => onNavigate(ENGINE_ROOM_ITEM.id)}
           >
             {t(ENGINE_ROOM_ITEM.key)}
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            className={`sidebar__item sidebar__item--sos ${page === SOS_ITEM.id ? "is-active" : ""}`}
+            aria-current={page === SOS_ITEM.id ? "page" : undefined}
+            onClick={() => onNavigate(SOS_ITEM.id)}
+          >
+            {t(SOS_ITEM.key)}
           </button>
         </li>
         {ASSESSMENT_NAV_ITEMS.map((item) => {

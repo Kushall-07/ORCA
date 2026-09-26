@@ -1,18 +1,26 @@
 import { LANGUAGES, useI18n } from "../../i18n";
 import type { LanguageCode, QueryResponse } from "../../types/api";
 import { STAKEHOLDERS, type StakeholderId } from "../../stakeholders";
+import { BOAT_CLASSES, type BoatClassId } from "../../boatClasses";
 import type { HealthResult } from "../../services/apiClient";
 import { DataTierBadge } from "../common";
 
 export function OrcaHeader({
   stakeholder,
   onStakeholder,
+  boatClass,
+  onBoatClass,
   health,
   latest,
   onStartTour,
 }: {
   stakeholder: StakeholderId;
   onStakeholder: (id: StakeholderId) => void;
+  // Phase 11 - UX context only (see ../../boatClasses); `null` = "not
+  // declared", the same "no filter" default every existing query had before
+  // this selector existed.
+  boatClass: BoatClassId | null;
+  onBoatClass: (id: BoatClassId | null) => void;
   health: HealthResult & { loading: boolean };
   latest: QueryResponse | null;
   onStartTour: () => void;
@@ -65,6 +73,22 @@ export function OrcaHeader({
             {LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span className="field__label">{t("header.boatClass")}</span>
+          <select
+            className="field__select"
+            value={boatClass ?? ""}
+            onChange={(e) => onBoatClass((e.target.value || null) as BoatClassId | null)}
+          >
+            <option value="">{t("header.boatClassNotSet")}</option>
+            {BOAT_CLASSES.map((b) => (
+              <option key={b.id} value={b.id}>
+                {t(b.labelKey)}
               </option>
             ))}
           </select>

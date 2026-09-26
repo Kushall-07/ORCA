@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.agents.base import AgentResult
 from app.agents.evidence_explanation import ExplanationAgent
+from app.agents.planner import PlannerAgent
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
 from app.core.config import get_settings
@@ -379,6 +380,7 @@ def make_pipeline(
     historical_environment_agent=None,
     qu_llm=None,
     explain_llm=None,
+    planner_llm=None,
     hard_geofences=(),
     references=(),
 ) -> OrcaPipeline:
@@ -391,6 +393,7 @@ def make_pipeline(
         gis_agent=gis or FakeGisAgent(),
         explanation_agent=ExplanationAgent(explain_llm),
         route_agent=RouteAgent(settings),
+        planner_agent=PlannerAgent(planner_llm),
         risk_engine=RiskEngine(),
         suitability_engine=SuitabilityEngine(),
         arbitrator=HierarchyArbitrator(),

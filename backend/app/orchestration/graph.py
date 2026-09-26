@@ -6,7 +6,7 @@
       -> normalize
       -> (needs clarification) -------------------> explain
       -> [collect_weather | collect_ocean | collect_gis | collect_environment |
-          collect_advisory]  (parallel)
+          collect_advisory | plan | cyclone | regulations]  (parallel)
       -> fabric -> temporal -> fusion -> arbitration -> conflicts
       -> suitability (conditional) -> risk -> policy -> decision
       -> (route requested & allowed) -> route
@@ -33,6 +33,19 @@ skips with 0 HTTP calls.
 
 Conditional edges skip unnecessary work: a weather-only query never computes a
 route; a failed / clarification query jumps straight to the explanation.
+
+The `plan` node (see app.agents.planner / app.models.planning) is the THIRD
+and last LLM touch-point in ORCA. It runs in the SAME parallel layer as the
+collect_* fan-out (it only needs `understanding`, so it never waits on
+collected data) and produces an `execution_plan` that PFZ, productivity,
+environmental_comparison, environmental_stability, environmental_anomaly,
+environmental_neighbourhood, environmental_evidence and research each
+additionally, SUBTRACTIVELY consult on top of their own existing
+deterministic gating (see each node's own docstring / `_plan_excludes` in
+app.orchestration.nodes) - it can only skip a plannable node that would
+otherwise have run, never force one to run that its own gating would have
+skipped, and it has no edge into (and cannot alter) the fixed safety-critical
+backbone above.
 """
 
 from __future__ import annotations
@@ -60,7 +73,7 @@ def _after_normalize(state: OrcaGraphState):  # type: ignore[no-untyped-def]
         return "explain"
     return [
         "collect_weather", "collect_ocean", "collect_gis",
-        "collect_environment", "collect_advisory",
+        "collect_environment", "collect_advisory", "plan", "cyclone", "regulations",
     ]
 
 
@@ -96,6 +109,9 @@ def build_orca_graph(deps: OrcaDeps):
     add("collect_gis", nodes.collect_gis)
     add("collect_environment", nodes.collect_environment)
     add("collect_advisory", nodes.collect_advisory)
+    add("plan", nodes.plan_node)
+    add("cyclone", nodes.cyclone_node)
+    add("regulations", nodes.regulations_node)
     add("fabric", nodes.fabric_node)
     add("temporal", nodes.temporal_node)
     add("fusion", nodes.fusion_node)
@@ -127,12 +143,13 @@ def build_orca_graph(deps: OrcaDeps):
         _after_normalize,
         [
             "collect_weather", "collect_ocean", "collect_gis",
-            "collect_environment", "collect_advisory", "explain",
+            "collect_environment", "collect_advisory", "plan", "cyclone",
+            "regulations", "explain",
         ],
     )
     for src in (
         "collect_weather", "collect_ocean", "collect_gis",
-        "collect_environment", "collect_advisory",
+        "collect_environment", "collect_advisory", "plan", "cyclone", "regulations",
     ):
         g.add_edge(src, "fabric")
     g.add_edge("fabric", "temporal")

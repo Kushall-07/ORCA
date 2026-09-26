@@ -10,7 +10,7 @@ from app.agents.evidence_explanation import ExplanationAgent
 from app.decision.engine import decide
 from app.models.common import Coordinate
 from app.models.decision import DecisionStatus
-from app.models.query import Language, QueryIntent, QueryUnderstanding
+from app.models.query import GeoRef, Language, QueryIntent, QueryUnderstanding
 from app.models.safety import SafetyGuardInput
 from app.policy.safety_guard import evaluate_safety
 from app.risk.engine import RiskEngine, RiskEngineInput
@@ -520,3 +520,66 @@ async def test_clean_llm_evidence_text_is_used_and_grounded() -> None:
     e = await _explain_ev(ExplanationAgent(StubLlmClient(text_response=clean)), _evidence())
     assert e.generated_via == "groq"
     assert e.grounded is True
+
+
+# ---- language-match + place-hallucination guards --------------------------
+async def test_llm_wrong_script_falls_back_to_template() -> None:
+    decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
+    all_english = ["Conditions are fine, risk is low.", "Conditions are fine, risk is low."]
+    agent = ExplanationAgent(StubLlmClient(text_response=all_english), max_retries=1)
+    e = await _explain(agent, language=Language.HI, decision=decision, risk=risk)
+    assert e.generated_via == "template"     # regenerate failed -> deterministic template
+    assert any("ऀ" <= ch <= "ॿ" for ch in e.text)   # the template IS in Devanagari
+
+
+async def test_llm_hallucinated_place_falls_back_to_template() -> None:
+    decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
+    understanding = QueryUnderstanding(
+        language=Language.EN, intent=QueryIntent.FISHING_SAFETY,
+        origin=GeoRef(name="mangalore", coordinate=Q),
+    )
+    # "Chennai" is a real gazetteer place but was never part of this query.
+    hallucinated = ["Conditions near Chennai are fine, risk is low.",
+                     "Conditions near Chennai are fine, risk is low."]
+    agent = ExplanationAgent(StubLlmClient(text_response=hallucinated), max_retries=1)
+    e = await agent.explain(
+        language=Language.EN, understanding=understanding, decision=decision, risk=risk,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None, provenance=None,
+    )
+    assert e.generated_via == "template"
+
+
+async def test_llm_restating_the_actual_origin_is_not_a_hallucination() -> None:
+    decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
+    understanding = QueryUnderstanding(
+        language=Language.EN, intent=QueryIntent.FISHING_SAFETY,
+        origin=GeoRef(name="mangalore", coordinate=Q),
+    )
+    clean = (
+        f"Conditions near Mangalore are within limits. The deterministic marine "
+        f"risk is low at {risk.overall_score:.0f} out of 100."
+    )
+    agent = ExplanationAgent(StubLlmClient(text_response=clean))
+    e = await agent.explain(
+        language=Language.EN, understanding=understanding, decision=decision, risk=risk,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None, provenance=None,
+    )
+    assert e.generated_via == "groq"
+
+
+async def test_llm_mentioning_a_broad_water_body_is_not_a_hallucination() -> None:
+    decision, risk = _decision(wave_height_m=0.3, wind_speed_ms=2.0)
+    understanding = QueryUnderstanding(
+        language=Language.EN, intent=QueryIntent.FISHING_SAFETY,
+        origin=GeoRef(name="mangalore", coordinate=Q),
+    )
+    clean = (
+        f"Conditions in the Arabian Sea near this location are within limits. "
+        f"The deterministic marine risk is low at {risk.overall_score:.0f} out of 100."
+    )
+    agent = ExplanationAgent(StubLlmClient(text_response=clean))
+    e = await agent.explain(
+        language=Language.EN, understanding=understanding, decision=decision, risk=risk,
+        suitability=None, conflicts=(), route=None, alerts=(), fabric=None, provenance=None,
+    )
+    assert e.generated_via == "groq"

@@ -30,9 +30,12 @@ from app.models.fabric import MarineDataFabric
 from app.models.geo import GeofenceResult
 from app.gis.pfz_reference import MaritimeOriginResolution, PfzRouteDestination
 from app.models.gis_agent import GisQueryResult
+from app.models.hazard import CycloneHazardResult
 from app.models.pfz import PfzReferenceResult, PfzZoneRankingResult
+from app.models.planning import ExecutionPlan
 from app.models.provenance import ProvenanceGraph
 from app.models.query import QueryUnderstanding
+from app.models.regulations import RegulationsCheckResult
 from app.models.research import ResearchResult
 from app.models.risk import RiskResult
 from app.models.routing import RouteResult
@@ -96,6 +99,9 @@ class OrcaGraphState(TypedDict, total=False):
     date_hint_override: str | None
     stakeholder: str | None
     language_hint: str | None
+    # Phase 11: user-declared boat class (see app.models.vessel.BoatClass) -
+    # UX context only, never NL-detected, never affects risk/safety/decision.
+    boat_class: str | None
 
     # ---- understanding / normalisation ----
     session: SessionContext
@@ -104,6 +110,14 @@ class OrcaGraphState(TypedDict, total=False):
     resolved_destination: Coordinate | None
     decision_time: datetime
     pipeline_status: str
+    # Third and last LLM touch-point (see app.agents.planner /
+    # app.models.planning) - which of the fixed, safety-isolated downstream
+    # research/reference nodes are relevant to this query. Read-only,
+    # SUBTRACTIVE filter consulted by those nodes' own existing deterministic
+    # gating; never widens what an already-gated node would compute, never
+    # touches the safety-critical backbone above. `None` only when the
+    # pipeline short-circuited before `plan` ran.
+    execution_plan: ExecutionPlan | None
 
     # ---- data collection ----
     weather_result: AgentResult | None
@@ -200,6 +214,18 @@ class OrcaGraphState(TypedDict, total=False):
     # POST /whatif already uses, perturbing a COPY of THIS turn's own realised
     # risk_input - only ever populated for intent == WHAT_IF.
     whatif_result: ScenarioSimResult | None
+
+    # Phase 11: GDACS global tropical-cyclone reference. Parallel to the
+    # collect_* fan-out (needs only `resolved_origin`); a reference hazard
+    # signal that feeds ONLY the Alert Engine - never risk / safety / decision
+    # / routing. See app.hazard.cyclone / app.orchestration.nodes.cyclone_node.
+    cyclone_result: CycloneHazardResult | None
+    # Phase 11: deterministic seasonal fishing-ban calendar (see
+    # app.regulations.seasonal_bans). Pure local computation, parallel to the
+    # collect_* fan-out. A legal/regulatory reference signal - separate from
+    # physical operating risk, same posture as Suitability vs Safety - feeds
+    # ONLY the Alert Engine, never risk / safety / decision / routing.
+    regulations_result: RegulationsCheckResult | None
 
     # ---- output ----
     provenance: ProvenanceGraph | None

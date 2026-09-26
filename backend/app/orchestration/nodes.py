@@ -61,6 +61,18 @@ def _now(state: OrcaGraphState) -> datetime:
     return state.get("now") or datetime.now(timezone.utc)
 
 
+def _plan_excludes(state: OrcaGraphState, node: str) -> bool:
+    """True only when a real execution plan was produced AND it deliberately
+    left `node` out - see app.models.planning.ExecutionPlan. SUBTRACTIVE
+    only: `execution_plan is None` (planner never ran, e.g. a short-circuited
+    pipeline) always returns False here, so a node's own pre-existing
+    deterministic gating is the only thing deciding it in that case - the
+    plan can never be the REASON a node that would otherwise run is skipped
+    unless the planner actually ran and said so."""
+    plan = state.get("execution_plan")
+    return plan is not None and node not in plan.nodes
+
+
 # ---------------------------------------------------------------------------
 def _apply_explicit_destination_override(u, state: OrcaGraphState):  # type: ignore[no-untyped-def]
     """An explicit destination coordinate supplied by the application (e.g. a
@@ -299,6 +311,70 @@ def _resolve_decision_time(now: datetime, date_hint: str | None, time_window: st
     if hour is not None:
         base = base.replace(hour=hour, minute=0, second=0, microsecond=0)
     return base
+
+
+async def plan_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Third and last LLM touch-point (see app.agents.planner /
+    app.models.planning). Runs in parallel with the collect_* fan-out - it
+    only needs `understanding`, never collected data - and completes long
+    before any of the downstream nodes it can subtractively gate. Never
+    raises: any planner failure resolves to the fixed default plan (every
+    plannable node stays eligible), never a graph failure."""
+    if state.get("pipeline_status") in _SHORT_CIRCUIT:
+        return {"execution_plan": None, "agent_trace": ["plan:skip"]}
+    try:
+        plan = await deps.planner_agent.plan(state["understanding"])
+    except Exception as exc:  # noqa: BLE001 - the planner must never raise
+        logger.warning("execution planner node error: %s", type(exc).__name__)
+        from app.models.planning import fixed_plan
+
+        plan = fixed_plan("execution planner node raised an exception")
+    return {"execution_plan": plan, "agent_trace": ["plan"]}
+
+
+async def cyclone_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 11: GDACS global tropical-cyclone reference (see
+    app.hazard.cyclone). Runs in the same parallel layer as the collect_*
+    fan-out - it only needs `resolved_origin`. A reference hazard signal only:
+    feeds ONLY the Alert Engine (app.orchestration.nodes.alerts_node), never
+    the Marine Data Fabric, fusion, arbitration, RiskEngineInput, the Safety
+    Guard or the Decision Engine. Non-blocking: any failure resolves to a
+    skipped/unavailable result, never a graph failure."""
+    coord = state.get("resolved_origin")
+    probe = getattr(deps, "cyclone_probe", None)
+    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None or probe is None:
+        return {"cyclone_result": None, "agent_trace": ["cyclone:skip"]}
+    try:
+        result = await probe(coord, settings=deps.settings, cache=deps.pfz_cache, now=_now(state))
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("cyclone node error: %s", type(exc).__name__)
+        return {"cyclone_result": None, "agent_trace": ["cyclone:skip"]}
+    token = "cyclone" if result.events else "cyclone:skip"
+    return {"cyclone_result": result, "agent_trace": [token]}
+
+
+async def regulations_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Phase 11: deterministic seasonal fishing-ban calendar (see
+    app.regulations.seasonal_bans). Runs in the same parallel layer as the
+    collect_* fan-out - pure local computation, no network call. A legal /
+    regulatory reference signal, separate from physical operating risk (same
+    posture as Suitability vs Safety): feeds ONLY the Alert Engine, never
+    risk / safety / decision / routing."""
+    coord = state.get("resolved_origin")
+    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None:
+        return {"regulations_result": None, "agent_trace": ["regulations:skip"]}
+    try:
+        from app.regulations.seasonal_bans import check as check_seasonal_bans
+
+        decision_time = state.get("decision_time")
+        result = check_seasonal_bans(
+            coord, today=decision_time.date() if decision_time is not None else None
+        )
+    except Exception as exc:  # noqa: BLE001 - the node must never raise
+        logger.warning("regulations node error: %s", type(exc).__name__)
+        return {"regulations_result": None, "agent_trace": ["regulations:skip"]}
+    token = "regulations" if result.status == "active_ban" else "regulations:skip"
+    return {"regulations_result": result, "agent_trace": [token]}
 
 
 # ---- parallel data collection --------------------------------------------
@@ -815,6 +891,8 @@ async def alerts_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-u
         gis=state.get("gis_result"),
         route=state.get("route_result"),
         conflicts=tuple(state.get("conflicts", ())),
+        cyclone=state.get("cyclone_result"),
+        regulations=state.get("regulations_result"),
     )
     return {"alerts": alerts, "agent_trace": ["alerts"]}
 
@@ -919,7 +997,11 @@ async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unty
     no coordinate) resolves to a skipped/unavailable result, never a graph
     failure."""
     coord = state.get("resolved_origin")
-    if state.get("pipeline_status") in _SHORT_CIRCUIT or coord is None:
+    if (
+        state.get("pipeline_status") in _SHORT_CIRCUIT
+        or coord is None
+        or _plan_excludes(state, "pfz")
+    ):
         return {"pfz_result": None, "pfz_zones_result": None, "agent_trace": ["pfz:skip"]}
     try:
         from app.gis.pfz_reference import build_pfz_reference
@@ -945,8 +1027,30 @@ async def pfz_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-unty
     except Exception as exc:  # noqa: BLE001 - the node must never raise
         logger.warning("pfz zone ranking error: %s", type(exc).__name__)
 
+    if zones_result is not None:
+        zones_result = _annotate_zone_ranges(zones_result, state.get("boat_class"))
+
     token = "pfz" if result.zone_count > 0 or result.nearest_landing_centre else "pfz:skip"
     return {"pfz_result": result, "pfz_zones_result": zones_result, "agent_trace": [token]}
+
+
+def _annotate_zone_ranges(zones_result, boat_class: str | None):  # type: ignore[no-untyped-def]
+    """Phase 11: annotate each ranked PFZ zone with whether it is within the
+    declared boat class's approximate operating range (see
+    app.models.vessel). A pure display annotation - never affects ranking,
+    restriction, or any safety/risk field. No boat class declared -> every
+    zone's `within_safe_range` stays `None` ("unknown"), i.e. byte-identical
+    to before this phase existed."""
+    from app.models.vessel import profile as boat_profile
+
+    bp = boat_profile(boat_class)
+    if bp is None:
+        return zones_result
+    zones = tuple(
+        z.model_copy(update={"within_safe_range": z.distance_km <= bp.max_range_km})
+        for z in zones_result.zones
+    )
+    return zones_result.model_copy(update={"zones": zones})
 
 
 _ENV_VARS = ("sea_surface_temperature", "chlorophyll_a")
@@ -1030,7 +1134,11 @@ async def productivity_node(deps, state: OrcaGraphState) -> dict:  # type: ignor
         QueryIntent.ENVIRONMENTAL_CONDITIONS, QueryIntent.RESEARCH_QUERY,
     )
 
-    if engine is None or (not is_env_intent and not _has_usable_env_record(fabric)):
+    if (
+        engine is None
+        or (not is_env_intent and not _has_usable_env_record(fabric))
+        or _plan_excludes(state, "productivity")
+    ):
         return {"productivity_result": None, "agent_trace": ["productivity:skip"]}
 
     try:
@@ -1081,6 +1189,7 @@ async def environmental_comparison_node(deps, state: OrcaGraphState) -> dict:  #
         or hist_agent is None
         or coord is None
         or not (is_env_intent and wants)
+        or _plan_excludes(state, "environmental_comparison")
     ):
         return {
             "environmental_comparison": None,
@@ -1155,7 +1264,7 @@ async def environmental_stability_node(deps, state: OrcaGraphState) -> dict:  # 
     engine = getattr(deps, "stability_engine", None)
     series = state.get("environmental_reference_series")
 
-    if engine is None or series is None:
+    if engine is None or series is None or _plan_excludes(state, "environmental_stability"):
         return {
             "environmental_stability": None,
             "agent_trace": ["environmental_stability:skip"],
@@ -1204,7 +1313,7 @@ async def environmental_anomaly_node(deps, state: OrcaGraphState) -> dict:  # ty
     engine = getattr(deps, "anomaly_engine", None)
     series = state.get("environmental_reference_series")
 
-    if engine is None or series is None:
+    if engine is None or series is None or _plan_excludes(state, "environmental_anomaly"):
         return {
             "environmental_anomaly": None,
             "agent_trace": ["environmental_anomaly:skip"],
@@ -1279,6 +1388,7 @@ async def environmental_neighbourhood_node(deps, state: OrcaGraphState) -> dict:
         or probe is None
         or coord is None
         or not (is_env_intent and usable)
+        or _plan_excludes(state, "environmental_neighbourhood")
     ):
         # No usable current chlorophyll-a observation -> do NOT spend the fetch.
         return {
@@ -1373,7 +1483,11 @@ async def environmental_evidence_node(deps, state: OrcaGraphState) -> dict:  # t
     fabric = state.get("fabric")
 
     # Only describe evidence when environmental intelligence exists for this query.
-    if engine is None or (productivity is None and comparison is None):
+    if (
+        engine is None
+        or (productivity is None and comparison is None)
+        or _plan_excludes(state, "environmental_evidence")
+    ):
         return {
             "environmental_evidence": None,
             "agent_trace": ["environmental_evidence:skip"],
@@ -1563,6 +1677,7 @@ async def research_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no
         state.get("pipeline_status") in _SHORT_CIRCUIT
         or u is None
         or u.intent is not QueryIntent.RESEARCH_QUERY
+        or _plan_excludes(state, "research")
     ):
         return {"research_result": None, "agent_trace": ["research:skip"]}
 

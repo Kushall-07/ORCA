@@ -118,6 +118,7 @@ async def query(request: QueryRequest, http_request: Request) -> QueryResponse:
             date_hint=request.date_hint,
             stakeholder=request.stakeholder,
             language=request.language,
+            boat_class=request.boat_class,
         )
     except Exception as exc:  # noqa: BLE001 - defence in depth
         logger.exception("query endpoint error", extra={"request_id": request_id})

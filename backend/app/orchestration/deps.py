@@ -16,6 +16,7 @@ from app.agents.historical_environment import HistoricalEnvironmentalAgent
 from app.agents.gis_geofencing import GisGeofencingAgent
 from app.agents.marine_advisory import MarineAdvisoryAgent
 from app.agents.oceanographic import OceanographicAgent
+from app.agents.planner import PlannerAgent
 from app.agents.query_understanding import QueryUnderstandingAgent
 from app.agents.route import RouteAgent
 from app.agents.weather import WeatherAgent
@@ -26,6 +27,7 @@ from app.environmental.engine import EnvironmentalProductivityEngine
 from app.environmental.evidence import EnvironmentalEvidenceEngine
 from app.environmental.neighbourhood import EnvironmentalNeighbourhoodEngine
 from app.environmental.stability import EnvironmentalStabilityEngine
+from app.hazard import cyclone
 from app.services import oceancolor
 from app.fabric.reference import load_reference_registry
 from app.models.geo import Geofence
@@ -59,6 +61,12 @@ class OrcaDeps:
     hard_geofences: tuple[Geofence, ...] = ()
     soft_geofences: tuple[Geofence, ...] = ()
     protected_area_hard_ids: tuple[str, ...] = ()
+    # Third and last LLM touch-point (see app.agents.planner). Optional; when
+    # absent `plan_node` always returns the fixed/default plan - i.e. every
+    # downstream research/reference node stays eligible to run exactly as it
+    # did before this agent existed. Never feeds risk / safety / decision /
+    # routing.
+    planner_agent: PlannerAgent = field(default_factory=lambda: PlannerAgent(None))
     # Phase 9: environmental (chlorophyll-a) agent. Optional / non-blocking; when
     # absent the collect_environment node simply skips.
     environment_agent: object = None  # EnvironmentalAgent-like: async fetch(coord, when)
@@ -99,6 +107,13 @@ class OrcaDeps:
     # suitability.
     anomaly_engine: EnvironmentalAnomalyEngine | None = None
 
+    # Phase 11: GDACS global tropical-cyclone reference (app.hazard.cyclone).
+    # Optional; when absent `cyclone_node` simply skips (non-blocking) - same
+    # injectable-probe pattern as `neighbourhood_probe` above, so tests never
+    # hit the live GDACS feed unless a fake explicitly wires one in. Feeds
+    # ONLY the Alert Engine, never risk / safety / decision / routing.
+    cyclone_probe: object = None  # async (coord, *, settings, cache, now=None) -> CycloneHazardResult
+
     # Official IMD marine advisory (A). Optional / non-blocking; when absent
     # the collect_advisory node simply skips (advisory stays "unavailable").
     advisory_agent: object = None  # MarineAdvisoryAgent-like: async fetch(coord, when) -> AgentResult
@@ -132,6 +147,7 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         # still uses Groq for intent/place parsing.
         explanation_agent=ExplanationAgent(None, max_retries=settings.llm_max_retries),
         route_agent=RouteAgent(settings),
+        planner_agent=PlannerAgent(llm, max_retries=settings.llm_max_retries),
         risk_engine=RiskEngine(),
         suitability_engine=SuitabilityEngine(),
         arbitrator=HierarchyArbitrator(),
@@ -147,6 +163,7 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         neighbourhood_probe=oceancolor.fetch_chlorophyll_neighbourhood,
         anomaly_engine=EnvironmentalAnomalyEngine(),
         advisory_agent=MarineAdvisoryAgent(settings=settings, cache=live_cache),
+        cyclone_probe=cyclone.fetch_nearby_cyclones,
         # Same Redis-backed live_cache as the other live data agents above -
         # NOT a fresh InMemoryCache. The last-known-good PFZ snapshot (see
         # app.gis.pfz_reference._save_last_good) is meant to survive up to

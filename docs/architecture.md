@@ -395,8 +395,10 @@ orchestration.
 ## 6c. Agentic reasoning pipeline — Phase 5 (implemented)
 
 The LangGraph pipeline that ties Phases 2–4 together. **The LLM (Groq only) is
-used in exactly two nodes — Query Understanding and Evidence & Explanation — and
-neither can change a safety outcome.** Everything between them is deterministic.
+used in exactly three nodes — Query Understanding, the Phase 10 Execution
+Planner, and Evidence & Explanation — and none of them can change a safety
+outcome.** Everything between them is deterministic. See §6g for the Execution
+Planner.
 
 **LLM boundary (`app/services/llm.py`)** — `LlmClient` protocol; `GroqLlmClient`
 (JSON mode for structured calls); `StubLlmClient` for tests; `build_llm_client()`
@@ -869,6 +871,154 @@ badge renders without a response.
 
 ---
 
+## 6h. Execution Planner — Phase 10 (implemented)
+
+ORCA's third and last LLM touch-point (see `app/agents/planner.py` /
+`app/models/planning.py`). Follows the exact same shape as Query
+Understanding: Groq JSON mode, schema-validated, one stricter-correction
+retry, then a deterministic fallback — here, `fixed_plan()`, which is simply
+"every plannable node stays eligible," i.e. today's behaviour unchanged.
+
+**What it decides.** A SUBTRACTIVE subset of the fixed, closed candidate set
+`app.models.planning.PLANNABLE_NODES` — `pfz`, `productivity`,
+`environmental_comparison`, `environmental_stability`,
+`environmental_anomaly`, `environmental_neighbourhood`,
+`environmental_evidence`, `research` — every one of them already documented
+elsewhere in this file as strictly downstream of `decision` and never feeding
+risk / safety / decision / suitability / geofencing / routing / conflict
+resolution. The planner cannot name anything outside this set, and it never
+sees the safety-critical backbone (`understand → normalize → collect_* →
+fabric → … → decision`), which is wired with fixed, non-planner-alterable
+edges.
+
+**How it's wired.** The `plan` node (`app.orchestration.nodes.plan_node`)
+runs in the SAME parallel layer as the `collect_*` fan-out — it only needs
+`understanding`, so it never waits on collected data, and it completes long
+before any node it can gate. Each of the eight candidate nodes ANDs its own
+pre-existing deterministic gate with `_plan_excludes(state, "<name>")`
+(`app.orchestration.nodes`): the plan can only cause a node that would
+otherwise have run to skip; it can never force a node whose own gate says
+skip to run anyway. `execution_plan is None` (the pipeline short-circuited
+before `plan` ran) is treated as "no exclusion" — a node's own gate is the
+only thing deciding it in that case.
+
+**Auditability.** Exposed additively as `execution_plan` (`nodes`,
+`planned_via: "groq" | "fixed"`) on `QueryResponse` — "evidence is never
+silent" applies to the planner's own choices too. Surfaced in the frontend's
+Engine Room / Agent Execution Trace as the `plan` stage, first in the
+intelligence phase.
+
+**Invariant.** No safety-critical file was touched. No new HTTP calls (the
+planner only classifies `understanding`, never fetches). Every existing
+scenario/regression test is unaffected because no test configures a planner
+LLM, so `deps.planner_agent` defaults to `PlannerAgent(None)` → `fixed_plan()`
+→ byte-identical behaviour to before this phase existed. See
+`backend/tests/test_planner.py` (schema/retry/fallback/name-repair) and the
+planner-gating tests in `backend/tests/test_orchestration_graph.py` (a plan
+can skip a node that would have run; a plan can never force a node whose own
+gate excludes it).
+
+---
+
+## 6i. Safety-critical additions — Phase 11 (implemented)
+
+A comparative survey of independently-built SIH26176 submissions (the
+competition concluded before this survey; every idea below was reimplemented
+from scratch in ORCA's own style, never copied) surfaced six candidate
+additions. Two (a stronger LLM-output grounding validator, and withholding
+PFZ/route data under an unsafe decision) turned out to already be met or
+exceeded by ORCA's existing design on inspection - see below. The other four
+shipped.
+
+**GDACS global tropical-cyclone reference** (`app/hazard/cyclone.py`,
+`app/models/hazard.py`). A free, keyless GeoJSON feed from GDACS (EC-JRC/UN
+OCHA) covering every ocean basin - unlike NOAA NHC (Atlantic/East Pacific
+only), it actually covers the Bay of Bengal and Arabian Sea. Strictly
+additive to the existing `cyclone_proxy` Risk Engine factor (a WMO-
+weathercode heuristic) whose own alert text already admits "no live
+authoritative RSMC cyclone feed" - this real signal feeds ONLY the Alert
+Engine (`app.alerts.engine.generate_alerts`, a new `TROPICAL_CYCLONE_ADVISORY`
+kind) in this phase, never Risk / Safety / Decision. The `cyclone` node runs
+in the same parallel layer as `plan` / the `collect_*` fan-out, via an
+injectable `deps.cyclone_probe` (same DI pattern as `neighbourhood_probe`) so
+no test ever hits the live feed.
+
+**Deterministic seasonal fishing-ban calendar** (`app/regulations/
+seasonal_bans.py`, `app/models/regulations.py`). Reuses
+`app.agents.marine_area`'s existing coordinate → Indian coastal-state
+classifier. Ban windows are hand-verified against primary sources for the
+2026 season specifically (Dept. of Fisheries / PIB's uniform 61-day EEZ ban,
+plus Tamil Nadu / Puducherry, Karnataka and Kerala state notifications - see
+each `SeasonalBan.source_url`); any other state returns `insufficient_data`
+rather than a guessed window - the same "never fabricate, report the honest
+gap" posture as every other ORCA engine. A legal/regulatory reference signal,
+deliberately separate from physical operating risk (the same "suitability is
+not safety" separation the Suitability Engine already documents) - feeds
+ONLY the Alert Engine (`SEASONAL_FISHING_BAN`), never Risk / Safety /
+Decision. Pure local computation, no network call, no caching needed.
+
+**Grounding: language-match + place-hallucination guards**
+(`app/agents/evidence_explanation.py`). On inspection, ORCA's existing
+`ground_text` (every number) and `_contradicts_decision` (no false safety
+claims) already covered most of what a rival's LLM-output validator did -
+this phase's real gap was narrower: `_language_mismatch` (a hi/kn reply must
+actually contain Devanagari/Kannada script, not silently come back in
+English) and `_contains_unresolved_place` (the explanation must not name a
+gazetteer place - `app.agents.gazetteer` - that was never this query's
+resolved origin/destination; broad water-body names like "Arabian Sea" are
+excluded so this stays a hallucination check, not a geography-vocabulary
+ban). Both slot into the existing regenerate-once-then-template-fallback
+loop exactly like `_contradicts_decision` already does.
+
+**Boat-class operating-range annotation** (`app/models/vessel.py`). A
+user-declared (never NL-detected) `boat_class` - the same "UX context,
+echoed back, never changes reasoning" posture as `stakeholder`. Threaded
+through `POST /query` → `OrcaGraphState` → `pfz_node`, which annotates each
+ranked PFZ zone's `within_safe_range` (distance vs. the declared class's
+approximate range) via `_annotate_zone_ranges`. Purely a display annotation:
+subtractive-only in spirit (no `boat_class` declared → every zone stays
+`None`/"unknown", byte-identical to before this phase existed) and never
+touches ranking, restriction, or any safety/risk field.
+
+**Not adopted - PFZ/route withholding under a "stay" verdict.** A rival
+strips PFZ findings from what it shows under a negative decision. On
+inspection this would be a regression from ORCA's own "evidence is never
+silent" principle: `_render_pfz_intent` already unconditionally appends a
+"this is not a safety statement" disclaimer, and `route` is already gated off
+`decision.routing_allowed` via `_after_decision` - actionable route
+suggestions are already withheld exactly when they should be, while
+reference PFZ data stays visible with its caveat intact rather than being
+hidden. Adopting the rival's suppression would trade transparency for a
+narrower kind of "safety", so it was deliberately not built.
+
+**Frontend: Emergency Distress (SOS) page**
+(`frontend/src/components/sos/SosView.tsx`), a third always-enabled nav
+entry point (same posture as the Engine Room - reachable with no query in
+flight, see `navItems.ts`'s `SOS_ITEM`). Composes a standard VHF Channel-16
+Mayday radio script (GMDSS distress category, live device geolocation via
+the existing `useGeolocation` hook, vessel name, persons aboard) and lets the
+user read it aloud (`SpeechSynthesis`), copy it, call the Indian Coast
+Guard's real toll-free helpline (`tel:1554`, verified against independent
+public reporting), or share it via SMS/WhatsApp deep links - plus a
+pre-departure safety checklist (EPIRB, SART, life raft, PFDs, ...) persisted
+to `localStorage`. Entirely client-side with no backend dependency for its
+core function, and deliberately does NOT simulate dispatch or fabricate an
+"alerting nearby vessels" progress flow - every send action opens the
+phone's own real call/SMS/share sheet, exactly like clicking any other
+`tel:`/`sms:` link would. The radio script itself is deliberately
+English-only (the international VHF distress-calling standard); every
+surrounding label is fully localized (en/hi/kn) via `t()`.
+
+**Invariant.** No safety-critical file was touched (`risk/`, `policy/`,
+`decision/`, `routing/`). No second LLM provider, no vector database, no new
+microservice. See `backend/tests/test_hazard_cyclone.py`,
+`backend/tests/test_seasonal_bans.py`, `backend/tests/test_boat_class_range.py`,
+the new grounding-guard tests in `backend/tests/test_explanation_agent.py`,
+the alert-generation tests in `backend/tests/test_conflicts_and_alerts.py`,
+and `frontend/src/test/sosView.test.tsx`.
+
+---
+
 ## 7. Implementation phases
 
 | Phase | Scope |
@@ -883,6 +1033,8 @@ badge renders without a response.
 | 8 | ✅ Live integration & full-stack validation |
 | 9 | ✅ Environmental intelligence — Step 1 feasibility, Step 2 SST + chlorophyll-a ingestion, Step 3 deterministic Environmental Productivity Engine + `environmental_conditions` intent + `EnvironmentalPanel`, Step 4 deterministic Environmental Comparison Engine + `HistoricalEnvironmentalAgent` + `wants_comparison` flag, Step 5 deterministic Environmental Evidence Engine + reproducibility bundle (0 extra HTTP calls, no LLM; never affects risk / safety / decision / routing) |
 | 8+ | Regional spatial risk aggregation, multi-year climatology tables, environmental trend/time-series analysis (not started) |
+| 10 | ✅ Execution Planner (`app/agents/planner.py`, `app/models/planning.py`) — ORCA's third and last LLM touch-point. Groq (schema-validated, one retry, fixed-default fallback — same shape as Query Understanding) chooses a SUBTRACTIVE subset of the fixed, already safety-isolated `pfz` / `productivity` / `environmental_comparison` / `environmental_stability` / `environmental_anomaly` / `environmental_neighbourhood` / `environmental_evidence` / `research` nodes to run for a given query. The `plan` node runs in the same parallel layer as the `collect_*` fan-out; each gated node ANDs its own existing deterministic condition with plan membership, so the planner can only skip work a node would otherwise have done, never force work its own gate would have skipped. No new HTTP calls, no change to the safety-critical backbone, additive `execution_plan` response field. |
+| 11 | ✅ Safety-critical additions (comparative survey of independent SIH26176 submissions, competition concluded): deterministic GDACS global tropical-cyclone reference (`app/hazard/cyclone.py`, Bay of Bengal/Arabian Sea coverage NOAA NHC lacks), deterministic seasonal fishing-ban calendar (`app/regulations/seasonal_bans.py`, 2026-verified national EEZ + Tamil Nadu/Karnataka/Kerala windows), both Alert-Engine-only reference signals; language-match + place-hallucination grounding guards added to the Evidence & Explanation Agent (`app/agents/evidence_explanation.py`); user-declared boat-class operating-range annotation on ranked PFZ zones (`app/models/vessel.py`, subtractive display-only, never risk/safety); frontend Emergency Distress (SOS) page — client-side GMDSS Mayday script generator, Coast Guard `tel:1554` call, SMS/WhatsApp share, pre-departure safety checklist, no simulated dispatch. |
 
 Current status: **Phase 9 Step 5 complete** (deterministic Environmental
 Evidence Engine + reproducibility bundle + researcher "Evidence & reproducibility"
@@ -893,3 +1045,8 @@ enabled, disabled, or raising; `RiskEngineInput` gains no field). Backend
 Phase 7 + 2 Step 3 + 2 Step 4 + 2 Step 5) pass through the real pipeline. Docker
 runtime E2E not executed — CLI unavailable in the dev environment; compose
 validated by inspection.
+
+(This paragraph predates Phases 10-11 and was not rewritten in full when they
+landed - see §6h/§6i above and the Phase 10/11 rows in the table below for
+what has been added since. Phase 10 + 11: backend suite green, frontend suite
+green (308 tests) at the time Phase 11 landed.)

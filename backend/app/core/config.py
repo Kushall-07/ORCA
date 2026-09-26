@@ -226,6 +226,17 @@ class Settings(BaseSettings):
     incois_pfz_match_radius_km: float = Field(default=250.0, gt=0)
     incois_pfz_max_features: int = Field(default=40, ge=1, le=500)
 
+    # ---- Phase 11: GDACS global tropical-cyclone reference (public, no auth) ----
+    # GDACS (Global Disaster Alert and Coordination System, EC-JRC/UN OCHA)
+    # publishes an active-event GeoJSON feed covering every ocean basin - unlike
+    # NOAA NHC (Atlantic/East Pacific only) it actually covers the Bay of Bengal
+    # and Arabian Sea. A reference/context signal only in this phase: it feeds
+    # Alerts, never Risk/Safety/Decision - see app.hazard.cyclone module docstring.
+    gdacs_base_url: str = Field(default="https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH")
+    gdacs_timeout_seconds: float = Field(default=10.0, gt=0)
+    gdacs_cache_ttl_seconds: int = Field(default=1800, gt=0)   # 30 min
+    gdacs_relevance_radius_km: float = Field(default=800.0, gt=0)
+
     # ---- Phase 4: data locations + GIS backend ----
     data_static_dir: str = Field(default="data/static")
     data_demo_dir: str = Field(default="data/demo")

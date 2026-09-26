@@ -9,11 +9,19 @@ import type { EmphasisTab } from "../../stakeholders";
 // "trip" (Fisher Operations Suite - Trip Planner / Route Comparison / Route
 // Analytics, Milestone 4) is appended the same way "report" is: reachable by
 // every stakeholder, not a stakeholder-specific emphasis default.
-export type AssessmentSection = EmphasisTab | "report" | "system" | "trip";
+// "sos" (Phase 11 Emergency Distress page) is a third always-enabled entry
+// point, same posture as "system" - a fisherman needs it reachable with NO
+// query in flight and no live pipeline data at all.
+export type AssessmentSection = EmphasisTab | "report" | "system" | "trip" | "sos";
 
 export const ENGINE_ROOM_ITEM: { id: AssessmentSection; key: StringKey } = {
   id: "system",
   key: "nav.engineRoom",
+};
+
+export const SOS_ITEM: { id: AssessmentSection; key: StringKey } = {
+  id: "sos",
+  key: "nav.sos",
 };
 
 // Shared between the horizontal WorkspaceNav (Workspace mode) and the vertical

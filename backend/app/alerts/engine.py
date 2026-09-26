@@ -12,8 +12,16 @@ from app.models.conflict import Conflict, ConflictSeverity
 from app.models.decision import DecisionResult, DecisionStatus
 from app.models.fabric import MarineDataFabric, ValidityState
 from app.models.gis_agent import GisQueryResult
+from app.models.hazard import CycloneAlertLevel, CycloneHazardResult
+from app.models.regulations import RegulationsCheckResult
 from app.models.risk import FactorStatus, RiskLevel, RiskResult
 from app.models.routing import RouteResult, RouteStatus
+
+_CYCLONE_ALERT_SEVERITY = {
+    CycloneAlertLevel.RED: AlertSeverity.CRITICAL,
+    CycloneAlertLevel.ORANGE: AlertSeverity.WARNING,
+    CycloneAlertLevel.GREEN: AlertSeverity.ADVISORY,
+}
 
 # ORCA engineering / MVP alert thresholds (not authoritative marine limits).
 _WAVE_WARN_M = 2.5
@@ -31,6 +39,8 @@ def generate_alerts(
     gis: GisQueryResult | None = None,
     route: RouteResult | None = None,
     conflicts: tuple[Conflict, ...] = (),
+    cyclone: CycloneHazardResult | None = None,
+    regulations: RegulationsCheckResult | None = None,
 ) -> tuple[Alert, ...]:
     alerts: list[Alert] = []
 
@@ -90,6 +100,32 @@ def generate_alerts(
             alerts.append(_a(AlertKind.HIGH_WAVE, AlertSeverity.CRITICAL,
                              f"Deterministic marine risk is SEVERE (score {risk.overall_score:.0f}/100).",
                              "model_derived"))
+
+    # ---- from GDACS cyclone reference (Phase 11) - real, not a proxy ----
+    if cyclone is not None and cyclone.available and cyclone.nearest is not None:
+        nearest = cyclone.nearest
+        alerts.append(_a(
+            AlertKind.TROPICAL_CYCLONE_ADVISORY,
+            _CYCLONE_ALERT_SEVERITY[nearest.alert_level],
+            f'Active tropical cyclone system "{nearest.name}" '
+            f"({nearest.alert_level.value.upper()} alert, GDACS) is "
+            f"{nearest.distance_km:.0f} km from this location. This is a reference "
+            "hazard signal, not a certified forecast - consult the official IMD/RSMC "
+            "bulletin before deciding.",
+            "observed",
+        ))
+
+    # ---- from the seasonal fishing-ban calendar (Phase 11) - legal, not risk ----
+    if regulations is not None and regulations.status == "active_ban":
+        for ban in regulations.active_bans:
+            alerts.append(_a(
+                AlertKind.SEASONAL_FISHING_BAN, AlertSeverity.WARNING,
+                f'{ban.name} is in effect ({ban.region}), applies to '
+                f"{ban.applies_to} ({ban.exempts} exempted). This is a legal / "
+                "regulatory restriction, separate from ORCA's physical safety "
+                f"assessment above - source: {ban.source}.",
+                "observed",
+            ))
 
     # ---- from GIS ----
     if gis is not None and gis.inside_hard_geofence:

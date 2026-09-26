@@ -46,6 +46,12 @@ class QueryRequest(BaseModel):
     # Preferred response language ("en"|"hi"|"kn"); used only when the message
     # language cannot be detected. Message-script detection still wins.
     language: str | None = None
+    # Phase 11: user-declared boat class (see app.models.vessel.BoatClass) -
+    # UX context only, never NL-detected. Used solely to annotate the ranked
+    # PFZ zone list with an operating-range hint; never affects risk, safety
+    # or the decision. Unrecognised/omitted values simply leave every zone's
+    # `within_safe_range` as `None` ("unknown").
+    boat_class: str | None = None
 
 
 class LocationInfo(BaseModel):
@@ -615,6 +621,7 @@ class PfzZoneInfo(BaseModel):
     nearest_hard_geofence_m: float | None = None
     geometry_source: str = "MATCHED_LINE"
     derived_from: str | None = None
+    within_safe_range: bool | None = None
 
 
 class PfzZoneRankingInfo(BaseModel):
@@ -682,6 +689,17 @@ class NodeTraceItem(BaseModel):
     record_count: int | None = None
 
 
+class ExecutionPlanInfo(BaseModel):
+    """The third and last LLM touch-point's output (see app.agents.planner /
+    app.models.planning) - which downstream research/reference nodes were
+    judged relevant to this query. Never affects safety/risk/decision/route;
+    exposed purely for auditability ("evidence is never silent" - see
+    docs/architecture.md's "The ORCA Principle")."""
+
+    nodes: list[str] = Field(default_factory=list)
+    planned_via: str = "fixed"   # "groq" | "fixed"
+
+
 class QueryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -692,6 +710,7 @@ class QueryResponse(BaseModel):
     language: str
     intent: str
     stakeholder: str | None = None   # echoed from the request; does not affect reasoning
+    boat_class: str | None = None    # echoed from the request; does not affect reasoning
     answer: str
     needs_clarification: bool = False
     clarification_question: str | None = None
@@ -718,6 +737,9 @@ class QueryResponse(BaseModel):
     pfz_zones: PfzZoneRankingInfo | None = None
     # Deterministic hypothetical/"what-if" scenario - only for intent == what_if.
     whatif: WhatIfInfo | None = None
+    # Third and last LLM touch-point (see app.agents.planner). Null when the
+    # pipeline short-circuited before `plan` ran.
+    execution_plan: ExecutionPlanInfo | None = None
 
     alerts: list[AlertItem] = Field(default_factory=list)
     conflicts: list[ConflictItem] = Field(default_factory=list)

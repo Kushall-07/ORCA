@@ -24,6 +24,15 @@ class AlertKind(str, Enum):
     HIGH_WIND = "high_wind"
     THUNDERSTORM_PROXY = "thunderstorm_lightning_proxy"
     CYCLONE_PROXY = "cyclone_proxy"
+    # Phase 11: a REAL active-system reference from GDACS (app.hazard.cyclone) -
+    # distinct from CYCLONE_PROXY above (a WMO-weathercode heuristic). Still a
+    # reference/context signal, not a certified forecast - see
+    # app.alerts.engine.generate_alerts.
+    TROPICAL_CYCLONE_ADVISORY = "tropical_cyclone_advisory"
+    # Phase 11: a legal/regulatory reference signal (app.regulations.seasonal_bans)
+    # - separate from physical operating risk, same "suitability is not safety"
+    # posture. Never affects the Safety Guard / Decision Engine.
+    SEASONAL_FISHING_BAN = "seasonal_fishing_ban"
     HARD_GEOFENCE = "hard_geofence"
     MISSING_CRITICAL_DATA = "missing_critical_data"
     STALE_DATA = "stale_data"

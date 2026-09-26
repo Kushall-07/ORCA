@@ -79,6 +79,13 @@ class PfzZoneRef(BaseModel):
     nearest_hard_geofence_m: float | None = None
     geometry_source: str = "MATCHED_LINE"
     derived_from: str | None = None
+    # Phase 11: set only when the request declared a `boat_class` (see
+    # app.models.vessel) - whether THIS zone's `distance_km` is within that
+    # class's approximate operating range. `None` ("unknown") whenever no boat
+    # class was declared - never guessed as true or false. Purely a display
+    # annotation computed in app.orchestration.nodes.pfz_node; never affects
+    # ranking, restriction, or any safety/risk field above.
+    within_safe_range: bool | None = None
 
 
 class PfzZoneRankingResult(BaseModel):

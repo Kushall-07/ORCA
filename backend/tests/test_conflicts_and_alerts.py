@@ -114,3 +114,55 @@ def test_alerts_are_deterministic() -> None:
     first = generate_alerts(risk=None, decision=None, fabric=fabric)
     for _ in range(10):
         assert generate_alerts(risk=None, decision=None, fabric=fabric) == first
+
+
+# ---- Phase 11: GDACS cyclone reference + seasonal fishing-ban calendar ----
+from app.models.hazard import CycloneAlertLevel, CycloneEvent, CycloneHazardResult  # noqa: E402
+from app.models.regulations import BanCoverage, RegulationsCheckResult, SeasonalBan  # noqa: E402
+
+
+def test_cyclone_alert_is_labelled_a_reference_not_a_proxy() -> None:
+    cyclone = CycloneHazardResult(
+        events=(CycloneEvent(event_id="1", name="Test Storm", alert_level=CycloneAlertLevel.RED,
+                             latitude=13.0, longitude=75.0, distance_km=120.0),),
+        checked_radius_km=800.0, available=True,
+    )
+    alerts = generate_alerts(risk=None, decision=None, cyclone=cyclone)
+    a = next(a for a in alerts if a.kind is AlertKind.TROPICAL_CYCLONE_ADVISORY)
+    assert a.severity is AlertSeverity.CRITICAL
+    assert a.signal_kind == "observed"
+    assert "Test Storm" in a.message and "120 km" in a.message
+    assert "not a certified forecast" in a.message.lower()
+
+
+def test_no_cyclone_alert_when_feed_unavailable_or_empty() -> None:
+    unavailable = CycloneHazardResult(checked_radius_km=800.0, available=False)
+    empty = CycloneHazardResult(checked_radius_km=800.0, available=True)
+    for cyclone in (unavailable, empty, None):
+        alerts = generate_alerts(risk=None, decision=None, cyclone=cyclone)
+        assert not any(a.kind is AlertKind.TROPICAL_CYCLONE_ADVISORY for a in alerts)
+
+
+def test_seasonal_ban_alert_names_the_ban_and_source() -> None:
+    ban = SeasonalBan(
+        name="Karnataka annual monsoon trawling ban", region="Karnataka",
+        coverage=BanCoverage.STATE_TERRITORIAL, start_month_day=(6, 1), end_month_day=(7, 31),
+        applies_to="mechanised boats", exempts="traditional craft", year=2026,
+        source="Karnataka Department of Fisheries", source_url="https://example.org",
+    )
+    regulations = RegulationsCheckResult(
+        status="active_ban", active_bans=(ban,), checked_region="Karnataka Coast",
+        disclaimer="Confirm with your State Fisheries Department.",
+    )
+    alerts = generate_alerts(risk=None, decision=None, regulations=regulations)
+    a = next(a for a in alerts if a.kind is AlertKind.SEASONAL_FISHING_BAN)
+    assert a.severity is AlertSeverity.WARNING
+    assert "Karnataka annual monsoon trawling ban" in a.message
+    assert "Karnataka Department of Fisheries" in a.message
+
+
+def test_no_seasonal_ban_alert_when_clear_or_insufficient() -> None:
+    for status in ("clear", "insufficient_data"):
+        regulations = RegulationsCheckResult(status=status, disclaimer="n/a")
+        alerts = generate_alerts(risk=None, decision=None, regulations=regulations)
+        assert not any(a.kind is AlertKind.SEASONAL_FISHING_BAN for a in alerts)

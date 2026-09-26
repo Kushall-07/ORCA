@@ -81,7 +81,13 @@ export const PHASE_STAGES: Record<StagePhase, StageDef[]> = {
   // "alerts" (below, unconditional per nodes.py - no ":skip" token is ever
   // emitted for it) every one of these is genuinely query-intent-gated, so a
   // plain safety query collapses this whole phase to one honest line.
+  // "plan" (app.agents.planner) is ORCA's third and last LLM touch-point: it
+  // runs in parallel with the collect_* fan-out, and every stage below it
+  // additionally, SUBTRACTIVELY consults its execution_plan on top of that
+  // stage's own existing gate - it can only skip a stage that would
+  // otherwise have run, never force one its own gate would have skipped.
   intelligence: [
+    { token: "plan", labelKey: "stage.plan", kind: "llm" },
     { token: "whatif", labelKey: "stage.whatif", kind: "deterministic" },
     { token: "pfz", labelKey: "stage.pfz", kind: "data" },
     { token: "productivity", labelKey: "stage.productivity", kind: "deterministic" },
@@ -164,6 +170,10 @@ export function stageDetail(stage: StageDef, resp: QueryResponse): string | null
     case "normalize":
       return resp.location
         ? resp.location.name ?? `${resp.location.latitude.toFixed(2)}, ${resp.location.longitude.toFixed(2)}`
+        : null;
+    case "plan":
+      return resp.execution_plan
+        ? `${resp.execution_plan.planned_via} · ${resp.execution_plan.nodes.length} node${resp.execution_plan.nodes.length === 1 ? "" : "s"} eligible`
         : null;
     case "weather":
     case "ocean": {
