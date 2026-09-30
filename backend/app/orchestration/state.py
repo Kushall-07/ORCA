@@ -27,6 +27,7 @@ from app.models.environmental import (
 )
 from app.models.explanation import Explanation
 from app.models.fabric import MarineDataFabric
+from app.models.followups import FollowUpSuggestions
 from app.models.geo import GeofenceResult
 from app.gis.pfz_reference import MaritimeOriginResolution, PfzRouteDestination
 from app.models.gis_agent import GisQueryResult
@@ -230,6 +231,13 @@ class OrcaGraphState(TypedDict, total=False):
     # ---- output ----
     provenance: ProvenanceGraph | None
     explanation: Explanation | None
+    # A fourth, additive, non-authoritative LLM touch-point (see
+    # app.models.followups / app.agents.followups) - runs strictly AFTER
+    # `explanation` exists, so it only ever sees an already-finalised,
+    # grounded answer. Purely a UI affordance (candidate next questions for
+    # the user to tap/type); never re-enters the pipeline, never influences
+    # risk / safety / decision.
+    follow_up_suggestions: FollowUpSuggestions | None
     alerts: tuple
 
     # ---- diagnostics (additive) ----

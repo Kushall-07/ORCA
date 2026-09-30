@@ -66,49 +66,61 @@ def _err(response: Response, code: str, message: str, session_id: str, status: i
 
 @router.post("/whatif", response_model=WhatIfResponse)
 async def whatif(request: WhatIfRequest, response: Response) -> WhatIfResponse:
-    deps = get_pipeline().deps
-    ctx = deps.session_store.get(request.session_id)
-    baseline = ctx.last_whatif_baseline
-    if baseline is None or baseline.risk_input is None:
-        return _err(response, *_BASELINE_UNAVAILABLE, request.session_id)
-
-    created = baseline.created_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    age_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60.0
-    max_age = deps.settings.whatif_baseline_max_age_minutes
-    if age_minutes > max_age:
-        out = _err(response, *_BASELINE_STALE, request.session_id)
-        return out.model_copy(update={"baseline_age_minutes": round(age_minutes, 1)})
-
     try:
-        perturbation = ScenarioPerturbation(
-            wave_height_delta_m=request.wave_height_delta_m,
-            wind_speed_delta_ms=request.wind_speed_delta_ms,
+        deps = get_pipeline().deps
+        ctx = deps.session_store.get(request.session_id)
+        baseline = ctx.last_whatif_baseline
+        if baseline is None or baseline.risk_input is None:
+            return _err(response, *_BASELINE_UNAVAILABLE, request.session_id)
+
+        created = baseline.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60.0
+        max_age = deps.settings.whatif_baseline_max_age_minutes
+        if age_minutes > max_age:
+            out = _err(response, *_BASELINE_STALE, request.session_id)
+            return out.model_copy(update={"baseline_age_minutes": round(age_minutes, 1)})
+
+        try:
+            perturbation = ScenarioPerturbation(
+                wave_height_delta_m=request.wave_height_delta_m,
+                wind_speed_delta_ms=request.wind_speed_delta_ms,
+            )
+        except ValidationError as exc:
+            first = exc.errors()[0]
+            return _err(
+                response,
+                "INVALID_PERTURBATION",
+                first.get("msg", "invalid perturbation"),
+                request.session_id,
+            )
+
+        result = run_what_if(
+            baseline_input=baseline.risk_input,
+            perturbation=perturbation,
+            risk_engine=deps.risk_engine,
+            required_evidence_present=(
+                baseline.required_evidence_present
+                if baseline.required_evidence_present is not None
+                else True
+            ),
         )
-    except ValidationError as exc:
-        first = exc.errors()[0]
+        return WhatIfResponse(
+            session_id=request.session_id,
+            label=SIMULATION_LABEL,
+            baseline_message=baseline.message,
+            baseline_age_minutes=round(age_minutes, 1),
+            data=result.model_dump(mode="json"),
+        )
+    except Exception as exc:  # noqa: BLE001 - this router's own docstring promises
+        # structured {code, message} errors, never an opaque 500 (same invariant
+        # /query enforces around OrcaPipeline.run).
+        logger.exception("whatif endpoint error", extra={"session_id": request.session_id})
         return _err(
             response,
-            "INVALID_PERTURBATION",
-            first.get("msg", "invalid perturbation"),
+            "WHATIF_INTERNAL_ERROR",
+            f"ORCA could not run this what-if simulation ({type(exc).__name__}).",
             request.session_id,
+            status=500,
         )
-
-    result = run_what_if(
-        baseline_input=baseline.risk_input,
-        perturbation=perturbation,
-        risk_engine=deps.risk_engine,
-        required_evidence_present=(
-            baseline.required_evidence_present
-            if baseline.required_evidence_present is not None
-            else True
-        ),
-    )
-    return WhatIfResponse(
-        session_id=request.session_id,
-        label=SIMULATION_LABEL,
-        baseline_message=baseline.message,
-        baseline_age_minutes=round(age_minutes, 1),
-        data=result.model_dump(mode="json"),
-    )

@@ -145,3 +145,22 @@ def test_replay_is_additive_query_response_unchanged(client) -> None:
     body = _seed(client, "rp-additive")
     for key in ("session_id", "turn", "status", "decision", "risk", "provenance"):
         assert key in body
+
+
+def test_replay_unexpected_error_is_structured_not_a_raw_500(
+    client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The router's own docstring promises structured {code, message} errors,
+    never an opaque 500 - see app/api/replay.py's top-level try/except."""
+    import app.api.replay as replay_api
+
+    _seed(client, "rp-boom")
+
+    def _boom(**_kwargs):
+        raise RuntimeError("simulated engine failure")
+
+    monkeypatch.setattr(replay_api, "build_replay", _boom)
+    r = client.post("/replay", json={"session_id": "rp-boom"})
+    assert r.status_code == 500
+    body = r.json()
+    assert body["error"]["code"] == "REPLAY_INTERNAL_ERROR"

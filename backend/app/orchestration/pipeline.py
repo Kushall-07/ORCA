@@ -30,6 +30,7 @@ from app.models.api import (
     EnvironmentalStabilityVariableInfo,
     EvidenceItem,
     ExecutionPlanInfo,
+    FollowUpSuggestionsInfo,
     GisSummary,
     LocationInfo,
     NodeTraceItem,
@@ -773,6 +774,15 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         else None
     )
 
+    followups = state.get("follow_up_suggestions")
+    followups_info = (
+        FollowUpSuggestionsInfo(
+            questions=list(followups.questions), generated_via=followups.generated_via
+        )
+        if followups is not None
+        else None
+    )
+
     return QueryResponse(
         session_id=session_id,
         request_id=request_id,
@@ -799,6 +809,7 @@ def _project(session_id: str, request_id: str, state: dict, deps: OrcaDeps) -> Q
         pfz_zones=pfz_zones_info,
         whatif=whatif_info,
         execution_plan=plan_info,
+        suggested_followups=followups_info,
         alerts=alerts,
         conflicts=conflicts,
         evidence=evidence,

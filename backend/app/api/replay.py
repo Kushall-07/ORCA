@@ -72,49 +72,61 @@ def _err(response: Response, code: str, message: str, session_id: str, status: i
 
 @router.post("/replay", response_model=ReplayResponse)
 async def replay(request: ReplayRequest, response: Response) -> ReplayResponse:
-    deps = get_pipeline().deps
-    ctx = deps.session_store.get(request.session_id)
-    # Same baseline-selection rule as POST /whatif: the most recent turn that
-    # ran the deterministic Risk Engine chain (see SessionContext.last_whatif_baseline
-    # / app.orchestration.nodes.assemble_node). Replay reuses it rather than
-    # introducing a second "last completed turn" concept.
-    baseline = ctx.last_whatif_baseline
-    if baseline is None or baseline.risk_input is None:
-        return _err(response, *_BASELINE_UNAVAILABLE, request.session_id)
+    try:
+        deps = get_pipeline().deps
+        ctx = deps.session_store.get(request.session_id)
+        # Same baseline-selection rule as POST /whatif: the most recent turn that
+        # ran the deterministic Risk Engine chain (see SessionContext.last_whatif_baseline
+        # / app.orchestration.nodes.assemble_node). Replay reuses it rather than
+        # introducing a second "last completed turn" concept.
+        baseline = ctx.last_whatif_baseline
+        if baseline is None or baseline.risk_input is None:
+            return _err(response, *_BASELINE_UNAVAILABLE, request.session_id)
 
-    created = baseline.created_at
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    age_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60.0
-    max_age = deps.settings.whatif_baseline_max_age_minutes
-    if age_minutes > max_age:
-        out = _err(response, *_BASELINE_STALE, request.session_id)
-        return out.model_copy(update={"baseline_age_minutes": round(age_minutes, 1)})
+        created = baseline.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        age_minutes = (datetime.now(timezone.utc) - created).total_seconds() / 60.0
+        max_age = deps.settings.whatif_baseline_max_age_minutes
+        if age_minutes > max_age:
+            out = _err(response, *_BASELINE_STALE, request.session_id)
+            return out.model_copy(update={"baseline_age_minutes": round(age_minutes, 1)})
 
-    window_hours = request.window_hours or DEFAULT_WINDOW_HOURS
-    result = build_replay(
-        weather=baseline.weather_result,
-        ocean=baseline.ocean_result,
-        baseline_risk_input=baseline.risk_input,
-        risk_engine=deps.risk_engine,
-        required_evidence_present=(
-            baseline.required_evidence_present
-            if baseline.required_evidence_present is not None
-            else True
-        ),
-        advisory_severity=baseline.advisory_severity,
-        advisory_availability=baseline.advisory_availability,
-        advisory_applicable=baseline.advisory_applicable,
-        advisory_area=baseline.advisory_area,
-        window_hours=window_hours,
-    )
-    if result is None:
-        return _err(response, *_INSUFFICIENT_FORECAST_DATA, request.session_id)
+        window_hours = request.window_hours or DEFAULT_WINDOW_HOURS
+        result = build_replay(
+            weather=baseline.weather_result,
+            ocean=baseline.ocean_result,
+            baseline_risk_input=baseline.risk_input,
+            risk_engine=deps.risk_engine,
+            required_evidence_present=(
+                baseline.required_evidence_present
+                if baseline.required_evidence_present is not None
+                else True
+            ),
+            advisory_severity=baseline.advisory_severity,
+            advisory_availability=baseline.advisory_availability,
+            advisory_applicable=baseline.advisory_applicable,
+            advisory_area=baseline.advisory_area,
+            window_hours=window_hours,
+        )
+        if result is None:
+            return _err(response, *_INSUFFICIENT_FORECAST_DATA, request.session_id)
 
-    return ReplayResponse(
-        session_id=request.session_id,
-        label=REPLAY_LABEL,
-        baseline_message=baseline.message,
-        baseline_age_minutes=round(age_minutes, 1),
-        data=result.model_dump(mode="json"),
-    )
+        return ReplayResponse(
+            session_id=request.session_id,
+            label=REPLAY_LABEL,
+            baseline_message=baseline.message,
+            baseline_age_minutes=round(age_minutes, 1),
+            data=result.model_dump(mode="json"),
+        )
+    except Exception as exc:  # noqa: BLE001 - this router's own docstring promises
+        # structured {code, message} errors, never an opaque 500 (same invariant
+        # /query enforces around OrcaPipeline.run).
+        logger.exception("replay endpoint error", extra={"session_id": request.session_id})
+        return _err(
+            response,
+            "REPLAY_INTERNAL_ERROR",
+            f"ORCA could not build this replay ({type(exc).__name__}).",
+            request.session_id,
+            status=500,
+        )

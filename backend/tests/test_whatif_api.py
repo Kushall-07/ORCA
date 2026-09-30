@@ -108,3 +108,22 @@ def test_whatif_is_additive_query_response_unchanged(client) -> None:
     # app.orchestration.nodes.whatif_node for the explicit what_if-intent
     # pathway) but must stay null here; nothing leaked into this query.
     assert body["whatif"] is None
+
+
+def test_whatif_unexpected_error_is_structured_not_a_raw_500(
+    client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The router's own docstring promises structured {code, message} errors,
+    never an opaque 500 - see app/api/whatif.py's top-level try/except."""
+    import app.api.whatif as whatif_api
+
+    _seed(client, "wf-boom")
+
+    def _boom(**_kwargs):
+        raise RuntimeError("simulated engine failure")
+
+    monkeypatch.setattr(whatif_api, "run_what_if", _boom)
+    r = client.post("/whatif", json={"session_id": "wf-boom", "wave_height_delta_m": 1.0})
+    assert r.status_code == 500
+    body = r.json()
+    assert body["error"]["code"] == "WHATIF_INTERNAL_ERROR"

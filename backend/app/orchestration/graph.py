@@ -134,6 +134,7 @@ def build_orca_graph(deps: OrcaDeps):
     add("research", nodes.research_node)
     add("provenance", nodes.provenance_node)
     add("explain", nodes.explain_node)
+    add("followups", nodes.followups_node)
     add("assemble", nodes.assemble_node)
 
     g.add_edge(START, "understand")
@@ -173,7 +174,8 @@ def build_orca_graph(deps: OrcaDeps):
     g.add_edge("environmental_evidence", "research")
     g.add_edge("research", "provenance")
     g.add_edge("provenance", "explain")
-    g.add_edge("explain", "assemble")
+    g.add_edge("explain", "followups")
+    g.add_edge("followups", "assemble")
     g.add_edge("assemble", END)
 
     return g.compile()

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from app.agents.environmental import EnvironmentalAgent
 from app.agents.evidence_explanation import ExplanationAgent
+from app.agents.followups import FollowUpAgent
 from app.agents.historical_environment import HistoricalEnvironmentalAgent
 from app.agents.gis_geofencing import GisGeofencingAgent
 from app.agents.marine_advisory import MarineAdvisoryAgent
@@ -67,6 +68,11 @@ class OrcaDeps:
     # did before this agent existed. Never feeds risk / safety / decision /
     # routing.
     planner_agent: PlannerAgent = field(default_factory=lambda: PlannerAgent(None))
+    # Fourth, additive LLM touch-point (see app.agents.followups). Optional;
+    # when absent `followups_node` always returns the fixed/default
+    # suggestions. Runs strictly after `explanation` exists - never feeds
+    # risk / safety / decision / routing, and cannot alter the explanation.
+    followup_agent: FollowUpAgent = field(default_factory=lambda: FollowUpAgent(None))
     # Phase 9: environmental (chlorophyll-a) agent. Optional / non-blocking; when
     # absent the collect_environment node simply skips.
     environment_agent: object = None  # EnvironmentalAgent-like: async fetch(coord, when)
@@ -148,6 +154,12 @@ def build_default_deps(settings: Settings | None = None) -> OrcaDeps:
         explanation_agent=ExplanationAgent(None, max_retries=settings.llm_max_retries),
         route_agent=RouteAgent(settings),
         planner_agent=PlannerAgent(llm, max_retries=settings.llm_max_retries),
+        # Unlike explanation_agent above, this one DOES use the real LLM when
+        # configured (like qu_agent/planner_agent) - it never writes the
+        # user-facing answer, only optional candidate next-questions, so
+        # Fix 1's "the answer itself is always the deterministic template"
+        # hardening does not apply here.
+        followup_agent=FollowUpAgent(llm, max_retries=settings.llm_max_retries),
         risk_engine=RiskEngine(),
         suitability_engine=SuitabilityEngine(),
         arbitrator=HierarchyArbitrator(),

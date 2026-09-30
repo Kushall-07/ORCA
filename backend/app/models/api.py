@@ -700,6 +700,17 @@ class ExecutionPlanInfo(BaseModel):
     planned_via: str = "fixed"   # "groq" | "fixed"
 
 
+class FollowUpSuggestionsInfo(BaseModel):
+    """A fourth, additive LLM touch-point's output (see app.agents.followups
+    / app.models.followups) - candidate next questions for the user, computed
+    strictly AFTER the answer above was already finalised. Never affects
+    safety/risk/decision/route; purely a UI affordance the user may tap or
+    ignore."""
+
+    questions: list[str] = Field(default_factory=list)
+    generated_via: str = "fixed"   # "groq" | "fixed"
+
+
 class QueryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -740,6 +751,9 @@ class QueryResponse(BaseModel):
     # Third and last LLM touch-point (see app.agents.planner). Null when the
     # pipeline short-circuited before `plan` ran.
     execution_plan: ExecutionPlanInfo | None = None
+    # Fourth, additive LLM touch-point (see app.agents.followups). Null only
+    # when the pipeline short-circuited before an explanation existed.
+    suggested_followups: FollowUpSuggestionsInfo | None = None
 
     alerts: list[AlertItem] = Field(default_factory=list)
     conflicts: list[ConflictItem] = Field(default_factory=list)

@@ -1977,6 +1977,34 @@ def _append_multi_route_note(state: OrcaGraphState, expl, language):  # type: ig
     return expl.model_copy(update={"text": f"{note} {expl.text}".strip()})
 
 
+async def followups_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
+    """Fourth, additive LLM touch-point (see app.agents.followups /
+    app.models.followups). Runs strictly after `explain`, so it only ever
+    sees an already-finalised, grounded `Explanation` - it cannot influence
+    risk, safety, decision or the explanation text itself. Never raises: any
+    failure resolves to the deterministic fixed suggestions, never a graph
+    failure, exactly like `plan_node`."""
+    expl = state.get("explanation")
+    u = state.get("understanding")
+    if expl is None or u is None:
+        return {"follow_up_suggestions": None, "agent_trace": ["followups:skip"]}
+    decision = state.get("decision")
+    language = u.language if u.language is not Language.UNKNOWN else Language.EN
+    try:
+        suggestions = await deps.followup_agent.suggest(
+            intent=u.intent,
+            language=language,
+            decision_status=decision.status if decision is not None else None,
+            explanation_text=expl.text,
+        )
+    except Exception as exc:  # noqa: BLE001 - this agent must never raise
+        logger.warning("follow-up suggestion node error: %s", type(exc).__name__)
+        from app.agents.followups import _fixed_suggestions
+
+        suggestions = _fixed_suggestions(u.intent, decision.status if decision is not None else None)
+    return {"follow_up_suggestions": suggestions, "agent_trace": ["followups"]}
+
+
 async def assemble_node(deps, state: OrcaGraphState) -> dict:  # type: ignore[no-untyped-def]
     u = state.get("understanding")
     decision = state.get("decision")
