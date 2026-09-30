@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SignIn, SignUp } from "@clerk/react";
 import { useI18n } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { ThemeToggle } from "../theme/ThemeToggle";
+import { useScrollCraft } from "../scrollcraft/useScrollCraft";
+import { OrcaMark } from "../scrollcraft/OrcaMark";
 
 // Mirrors index.css's --orca-* token values for each theme (see that file's
 // :root / [data-theme="light"] blocks) - Clerk's <SignIn>/<SignUp> render
@@ -43,6 +45,13 @@ export function LoginPage() {
   const { t } = useI18n();
   const { theme } = useTheme();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Restrained pointer-driven depth on the art panel only (BRIEF.md's login
+  // scope) - not a scroll narrative, so this is the engine's spotlight
+  // device (publishes --sc-mx/--sc-my), not an act. Gated to
+  // (hover: hover) and (pointer: fine) and off under reduced motion by the
+  // engine itself; Clerk's <SignIn>/<SignUp> markup is untouched.
+  useScrollCraft(rootRef);
 
   const appearance = {
     variables: { ...CLERK_APPEARANCE_VARS[theme], borderRadius: "10px" },
@@ -50,7 +59,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-gate">
+    <div className="auth-gate" ref={rootRef}>
       <div className="auth-gate__form-side">
         <ThemeToggle className="auth-gate__theme-toggle" />
         <div className="auth-card">
@@ -90,7 +99,14 @@ export function LoginPage() {
           )}
         </div>
       </div>
-      <div className="auth-gate__art" aria-hidden>
+      <div className="auth-gate__art" data-sc-spotlight aria-hidden>
+        <div className="auth-gate__art-plane auth-gate__art-plane--far" />
+        <div className="auth-gate__art-plane auth-gate__art-plane--near" />
+        <div className="auth-gate__orca-wrap">
+          <div className="auth-gate__orca">
+            <OrcaMark />
+          </div>
+        </div>
         <span className="auth-gate__art-badge">ISRO × INCOIS</span>
       </div>
     </div>

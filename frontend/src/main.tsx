@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import "leaflet/dist/leaflet.css";
 import "./index.css";
 import App from "./App";
-import { I18nProvider } from "./i18n";
+import { I18nProvider, useI18n } from "./i18n";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ClerkProvider, useAuth, useClerk } from "@clerk/react";
 import { CLERK_PUBLISHABLE_KEY } from "./services/config";
+import { fetchMe } from "./services/apiClient";
 import { ThemeProvider } from "./theme/ThemeContext";
 
 const container = document.getElementById("root");
@@ -40,6 +41,82 @@ if (!CLERK_PUBLISHABLE_KEY) {
 // existing tests (via `render(<App />)`, with no <ClerkProvider> ancestor),
 // and a Clerk hook throws outside one (unlike useTheme(), which was given a
 // graceful fallback - Clerk's hooks are not ours to change).
+//
+// Clerk confirming `isSignedIn` only means the FRONTEND thinks there's a
+// session - it says nothing about whether the backend can actually verify
+// that token (a misconfigured CLERK_SECRET_KEY, or a Supabase outage on the
+// profile lookup, would otherwise surface as every query mysteriously
+// failing once inside the workspace). `BackendSessionCheck` calls the
+// backend's own `GET /auth/me` once per sign-in as a real end-to-end check
+// before handing control to the workspace at all.
+type BackendSessionState = "checking" | "ok" | "error";
+
+function BackendSessionCheck({ onLogout }: { onLogout: () => void }) {
+  const [state, setState] = useState<BackendSessionState>("checking");
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState("checking");
+    fetchMe()
+      .then(() => {
+        if (!cancelled) setState("ok");
+      })
+      .catch(() => {
+        if (!cancelled) setState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
+
+  if (state === "checking") {
+    return null;
+  }
+  if (state === "error") {
+    return (
+      <I18nProvider>
+        <BackendAuthErrorView onRetry={() => setAttempt((n) => n + 1)} onSignOut={onLogout} />
+      </I18nProvider>
+    );
+  }
+  return <App onLogout={onLogout} />;
+}
+
+function BackendAuthErrorView({
+  onRetry,
+  onSignOut,
+}: {
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="auth-gate">
+      <div className="auth-gate__form-side">
+        <div className="auth-card">
+          <div className="auth-card__brand">
+            <span className="auth-card__brand-mark" aria-hidden>◊</span>
+            <span className="auth-card__brand-name">ORCA</span>
+          </div>
+          <h1 className="auth-card__title">{t("auth.backendError.title")}</h1>
+          <p className="auth-form__error" role="alert">
+            {t("auth.backendError.message")}
+          </p>
+          <div className="landing__cta-row landing__cta-row--center">
+            <button type="button" className="btn btn--primary" onClick={onRetry}>
+              {t("auth.backendError.retry")}
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={onSignOut}>
+              {t("auth.backendError.signOut")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Gate({ entered, onEnter }: { entered: boolean; onEnter: () => void }) {
   const { isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
@@ -60,7 +137,7 @@ function Gate({ entered, onEnter }: { entered: boolean; onEnter: () => void }) {
       </I18nProvider>
     );
   }
-  return <App onLogout={() => signOut()} />;
+  return <BackendSessionCheck onLogout={() => signOut()} />;
 }
 
 function Root() {

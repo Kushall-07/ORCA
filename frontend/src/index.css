@@ -2671,72 +2671,213 @@ summary:focus-visible {
    in-app workspace theme above (see competition palette tokens at the top of
    this file). Judge-facing first screen; kept self-contained under .landing
    so it never leaks into the workspace's dark styling. ---- */
+/* ============================================================
+   Landing page - chaptered editorial (scrollcraft)
+   See frontend/src/scrollcraft/ and scrollcraft/builds/orca-landing/BRIEF.md.
+   Colour roles are the same --orca-* tokens as the rest of the app (mapped
+   into scrollcraft's own --sc-* tokens via scrollcraft/theme.css) so this
+   page follows the light/dark toggle instead of carrying its own palette.
+   Hard cuts between chapters (opaque background per section), never a
+   continuous drift gradient - see devices.md §10's chaptered-page guidance.
+   ============================================================ */
 .landing {
   min-height: 100%;
-  background:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(31, 182, 182, 0.16), transparent),
-    radial-gradient(ellipse 700px 500px at 100% 20%, rgba(11, 61, 74, 0.5), transparent),
-    var(--orca-cream);
-  color: var(--orca-ink);
-  color-scheme: dark;
+  color: var(--orca-text);
   display: flex;
   flex-direction: column;
-  font-family: "Inter", system-ui, sans-serif;
 }
 
-.landing__topbar {
+.landing__chapter {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+}
+
+/* ---- OceanScene: the shared layered SVG ocean visual (Step A of the
+   cinematic redesign, see scrollcraft/builds/orca-landing-v2/BRIEF.md).
+   Purely decorative positioning here - all layer colour/geometry lives in
+   OceanScene.tsx itself. */
+.ocean-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ocean-scene svg { width: 100%; height: 100%; display: block; }
+/* Darker, higher-tension tone for the Hazard/Safety movement only. */
+.ocean-scene--hazard { filter: saturate(1.1) brightness(0.82); }
+/* Alternating hard-cut grounds - 3 stops, not an interpolation. */
+.landing__chapter--title,
+.landing__chapter--agents,
+.landing__chapter--pfz,
+.landing__chapter--sources,
+.landing__chapter--preview { background: var(--orca-bg); }
+.landing__chapter--fusion,
+.landing__chapter--signal,
+.landing__chapter--pipeline,
+.landing__chapter--why { background: var(--orca-surface); }
+.landing__chapter--hazard,
+.landing__chapter--route,
+.landing__chapter--evidence-tiers { background: var(--orca-bg); }
+.landing__chapter--provenance { background: var(--orca-surface); }
+
+/* ---- folio nav: chapter number + title in the margin, never a fixed bar */
+.landing__folio {
+  position: fixed;
+  top: clamp(1rem, 3vw, 2rem);
+  left: clamp(1rem, 4vw, 3rem);
+  z-index: var(--sc-z-chrome, 60);
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  pointer-events: none;
+}
+.landing__folio-index {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--orca-accent-2);
+}
+.landing__folio-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--orca-text-muted);
+}
+
+/* Transparent while at the very top, a soft solid pill once scrolled past
+   the opening screen - kept minimal (no border, no shadow stack) per the
+   "no huge navbar" brief. */
+.landing__folio.is-solid,
+.landing__utility.is-solid {
+  background: color-mix(in srgb, var(--orca-bg) 78%, transparent);
+  backdrop-filter: blur(10px);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  transition: background 240ms ease;
+}
+
+.landing__utility {
+  position: fixed;
+  top: clamp(1rem, 3vw, 2rem);
+  right: clamp(1rem, 4vw, 3rem);
+  z-index: var(--sc-z-chrome, 60);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem clamp(1rem, 4vw, 3rem);
-  gap: 1rem;
+  gap: 0.7rem;
 }
-
-.landing__brand { display: flex; align-items: center; gap: 0.5rem; }
-.landing__brand-mark { color: var(--orca-teal); font-size: 1.4rem; }
-.landing__brand-name {
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--orca-ink);
-}
-
-.landing__topbar-right { display: flex; align-items: center; gap: 0.9rem; }
-
 .landing__signin {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   background: transparent;
-  border: 1px solid rgba(31, 182, 182, 0.4);
-  color: var(--orca-ink);
+  border: 1px solid var(--orca-border);
+  color: var(--orca-text);
   border-radius: 999px;
   padding: 0.4rem 0.9rem;
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
 }
-.landing__signin:hover { border-color: var(--orca-teal); background: rgba(31, 182, 182, 0.1); }
-
+.landing__signin:hover { border-color: var(--orca-accent-2); background: var(--orca-hover); }
 .landing__lang-select {
-  background: var(--orca-sand);
-  border: 1px solid rgba(31, 182, 182, 0.25);
-  color: var(--orca-ink);
+  background: var(--orca-surface-2);
+  border: 1px solid var(--orca-border);
+  color: var(--orca-text);
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-size: 0.85rem;
 }
 
-.landing__hero {
-  padding: clamp(2.5rem, 9vw, 6rem) clamp(1rem, 6vw, 3rem) clamp(2rem, 6vw, 3rem);
-  max-width: 880px;
-  margin: 0 auto;
-  text-align: center;
+/* ---- Chapter 1: Mission / hero scroll-transformation ------------------- */
+/* .landing__chapter's shared justify-content:center works for the Pipeline
+   chapter (already scrolled-into by the time it's reached), but for this
+   FIRST section it delays the sticky stage's initial catch until the reader
+   has scrolled roughly halfway through the pin span's dead space - the
+   opening screen would render blank. Anchor this one chapter's pinned stage
+   to the top instead, so it's stuck (and the headline visible) from load. */
+/* Same dead-zone fix as the hero (see that comment above) - any pinned
+   chapter needs its stage anchored to the top, not centred in the tall
+   pinned container, or scrolling into it passes through a blank gap before
+   the sticky content catches. Applied per-chapter (not to the shared
+   .landing__chapter rule) so the short flow chapters keep their vertical
+   centering. */
+.landing__chapter--title,
+.landing__chapter--agents,
+.landing__chapter--signal,
+.landing__chapter--hazard,
+.landing__chapter--route { justify-content: flex-start; }
+.landing__hero-stage { width: 100%; }
+.landing__chapter--title .sc-wrap { max-width: 46rem; text-align: left; position: relative; z-index: 1; }
+
+/* The engine's own scrim (scrollcraft.css) darkens top-to-bottom by default,
+   which already covers the band the headline/subtext/disclaimer sit in -
+   z-index:1 here matches .sc-wrap so DOM order (scrim first) keeps text on
+   top rather than being painted under it. */
+.landing__hero-scrim { z-index: 1; }
+
+.landing__hero-phase {
+  position: absolute;
+  z-index: 1;
+  top: calc(clamp(1rem, 3vw, 2rem) + 3rem);
+  right: clamp(1rem, 4vw, 3rem);
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orca-text-muted);
 }
 
+.landing__hero-demo-tag {
+  position: absolute;
+  z-index: 1;
+  bottom: 1.5rem;
+  right: clamp(1rem, 4vw, 3rem);
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--orca-text-faint);
+}
+
+/* Scroll cue: a slim progress tick, not a bouncing arrow. */
+.landing__hero-scrollcue {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: clamp(1rem, 4vw, 3rem);
+  transform: translateY(-50%);
+  height: 130px;
+  display: flex;
+  pointer-events: none;
+}
+.landing__hero-scrollcue-track {
+  position: relative;
+  width: 1px;
+  height: 100%;
+  background: var(--orca-border-strong);
+}
+.landing__hero-scrollcue-dot {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orca-accent-2);
+  transform: translate(-50%, -50%);
+  transition: top 120ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing__hero-scrollcue-dot { transition: none; }
+}
+@media (max-width: 720px) {
+  .landing__hero-scrollcue { display: none; }
+}
 .landing__eyebrow {
-  color: var(--orca-teal);
+  color: var(--orca-accent-2);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -2744,34 +2885,23 @@ summary:focus-visible {
   font-weight: 500;
   margin: 0 0 1rem;
 }
-
 .landing__headline {
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  font-weight: 800;
-  font-size: clamp(2.2rem, 7vw, 4rem);
-  line-height: 1.08;
-  letter-spacing: -0.01em;
+  line-height: var(--sc-leading-tight, 1.06);
+  letter-spacing: var(--sc-track-tight, -0.02em);
   margin: 0 0 1.25rem;
-  color: var(--orca-ink);
 }
-
 .landing__subtext {
-  font-size: 1.05rem;
-  line-height: 1.6;
-  color: #9fc2c1;
-  max-width: 640px;
-  margin: 0 auto 1.75rem;
+  color: var(--orca-text-muted);
+  max-width: 42rem;
+  margin: 0 0 1.5rem;
 }
-
-.landing__cta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
-  margin-bottom: 1.25rem;
+.landing__disclaimer {
+  font-size: 0.82rem;
+  color: var(--orca-text-faint);
+  max-width: 38rem;
+  margin: 0 0 2rem;
 }
-.landing__cta-row--center { margin-bottom: 0; }
-
+.landing__cta-row { display: flex; gap: 0.75rem; }
 .landing__cta {
   border-radius: 999px;
   padding: 0.8rem 1.75rem;
@@ -2781,112 +2911,359 @@ summary:focus-visible {
   border: 1px solid transparent;
 }
 .landing__cta--primary {
-  background: var(--orca-teal);
-  color: #001616;
-  box-shadow: 0 8px 24px -6px rgba(31, 182, 182, 0.55);
+  background: var(--orca-accent-2);
+  color: #fff;
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--orca-accent-2) 55%, transparent);
 }
-.landing__cta--primary:hover { background: #3bf4e4; }
-.landing__cta--secondary {
-  background: transparent;
-  border-color: rgba(31, 182, 182, 0.4);
-  color: var(--orca-ink);
-}
-.landing__cta--secondary:hover { background: rgba(31, 182, 182, 0.12); border-color: var(--orca-teal); }
+.landing__cta--primary:hover { background: var(--orca-primary-dark); }
 
-.landing__disclaimer {
-  font-size: 0.78rem;
-  color: #6f8f8e;
-  max-width: 620px;
-  margin: 0 auto;
+/* ---- Orca motif: a few silhouettes that drift past at different rates as
+   each chapter scrolls (data-sc-parallax, see engine devices.md §6) - the
+   scrollable imagery the plain build was missing. Kept as a low-opacity ink
+   mark, same "technical drawing" world as the pipeline schematic, so it
+   reads as texture rather than competing with the copy for attention. */
+.landing__orca {
+  position: absolute;
+  color: var(--orca-accent-2);
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: 0;
+}
+.landing__orca svg { width: 100%; height: 100%; display: block; }
+
+.landing__orca--mission {
+  width: clamp(220px, 34vw, 420px);
+  aspect-ratio: 2 / 1;
+  right: -2vw;
+  bottom: 8%;
+  /* This chapter now also has a .sc-scrim (z-index:1) - match it so the
+     orca motif isn't painted underneath. */
+  z-index: 1;
+}
+.landing__orca--sources { width: clamp(140px, 20vw, 240px); aspect-ratio: 2 / 1; right: 6%; top: 10%; transform: scaleX(-1); }
+.landing__orca--why { width: clamp(160px, 24vw, 280px); aspect-ratio: 2 / 1; left: -1vw; bottom: 6%; }
+.landing__orca--close { width: clamp(200px, 30vw, 360px); aspect-ratio: 2 / 1; right: 2vw; top: 12%; transform: scaleX(-1); }
+
+.landing__chapter--title .sc-wrap,
+.landing__chapter--fusion .sc-wrap,
+.landing__chapter--pfz .sc-wrap,
+.landing__chapter--hazard .sc-wrap,
+.landing__chapter--sources .sc-wrap,
+.landing__chapter--why .sc-wrap,
+.landing__colophon .sc-wrap {
+  position: relative;
+  z-index: 1;
 }
 
-.landing__section {
-  padding: clamp(2rem, 6vw, 3.5rem) clamp(1rem, 6vw, 3rem);
-  max-width: 1040px;
-  margin: 0 auto;
+@media (max-width: 720px) {
+  .landing__orca { display: none; }
+}
+
+/* ---- Chapter 2: Pipeline (the peak - self-drawing schematic) ----------- */
+.landing__chapter--pipeline { padding-block: var(--sc-9, 6rem); }
+.landing__pipeline-stage {
   width: 100%;
-}
-.landing__section--alt {
-  background: var(--orca-sand);
-  border: 1px solid rgba(31, 182, 182, 0.18);
-  border-radius: 24px;
-}
-
-.landing__section-title {
-  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  font-size: 1.4rem;
-  font-weight: 700;
+  max-width: 62rem;
+  margin: 0 auto;
+  padding-inline: var(--sc-gutter, clamp(1.25rem, 5vw, 3rem));
   text-align: center;
-  margin: 0 0 1.75rem;
-  color: var(--orca-ink);
 }
+.landing__folio-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orca-text-muted);
+  margin: 0 0 1.5rem;
+}
+.sc-schematic { width: 100%; height: auto; margin: 1.5rem 0; overflow: visible; }
+.sc-schematic__line {
+  stroke: var(--orca-accent-2);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sc-schematic__node circle {
+  fill: var(--orca-bg);
+  stroke: var(--orca-accent-2);
+  stroke-width: 2;
+}
+.sc-schematic__node text {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  fill: var(--orca-text-muted);
+  font-size: 11px;
+}
+.sc-schematic__node .sc-schematic__label,
+.sc-schematic__node text.sc-schematic__label { fill: var(--orca-text); font-weight: 600; }
+.sc-schematic__node { transition: opacity 260ms var(--sc-ease-out, ease-out); }
+.landing__chapter--pipeline .landing__note { max-width: 40rem; margin-inline: auto; color: var(--orca-text-muted); }
 
-.landing__pipeline {
+/* ---- Chapter 2: Data fusion ("the ocean is not one dataset") ----------- */
+.landing__fusion-ocean { opacity: 0.8; }
+.landing__fusion-scrim { z-index: 1; }
+.landing__fusion-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin: 1.75rem 0;
+}
+.landing__fusion-group-title {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orca-accent-2);
+  margin: 0 0 0.6rem;
+}
+.landing__fusion-group ul {
   list-style: none;
-  margin: 0 0 1.25rem;
+  margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.4rem;
 }
-.landing__pipeline-step {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--orca-sand);
-  border: 1px solid rgba(31, 182, 182, 0.25);
-  border-radius: 999px;
-  padding: 0.4rem 0.9rem 0.4rem 0.4rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--orca-ink);
+.landing__fusion-group li {
+  font-size: 0.92rem;
+  color: var(--orca-text-muted);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--orca-border);
 }
-.landing__pipeline-step:not(:last-child)::after {
-  content: "→";
-  color: var(--orca-teal);
-  margin-left: 0.5rem;
+
+/* ---- Chapter 3: Agents (four real collection agents converge) --------- */
+.landing__agents-stage {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding-inline: var(--sc-gutter, clamp(1.25rem, 5vw, 3rem));
+  text-align: center;
+}
+.landing__chapter--agents .landing__note { max-width: 34rem; margin-inline: auto; color: var(--orca-text-muted); }
+.sc-agents { width: min(100%, 420px); height: auto; margin: 0.5rem auto 1.5rem; overflow: visible; }
+.sc-agents__line {
+  stroke: var(--orca-accent-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.7;
+  transition: stroke-dashoffset 80ms linear;
+}
+.sc-agents__center { fill: var(--orca-bg); stroke: var(--orca-accent-2); stroke-width: 2.5; }
+.sc-agents__center-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 15px;
   font-weight: 700;
+  fill: var(--orca-text);
+  text-anchor: middle;
 }
-.landing__pipeline-index {
+.sc-agents__node circle { fill: var(--orca-bg); stroke: var(--orca-accent-2); stroke-width: 2; }
+.sc-agents__node { transition: opacity 260ms var(--sc-ease-out, ease-out); }
+.sc-agents__label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  fill: var(--orca-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-agents__line { transition: none; }
+}
+
+/* ---- Chapter 4: Signal to Decision (one evolving line) ----------------- */
+.landing__signal-stage {
+  width: 100%;
+  max-width: 62rem;
+  margin: 0 auto;
+  padding-inline: var(--sc-gutter, clamp(1.25rem, 5vw, 3rem));
+  text-align: center;
+}
+.landing__chapter--signal .landing__note { max-width: 40rem; margin-inline: auto; color: var(--orca-text-muted); }
+.sc-signal__conflict path { fill: var(--orca-caution); }
+.sc-signal__conflict text {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--orca-bg);
+  text-anchor: middle;
+}
+.sc-signal__conflict { transition: opacity 320ms var(--sc-ease-out, ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .sc-signal__conflict { transition: none; }
+}
+
+/* ---- Chapter 5: Fishing suitability / PFZ ------------------------------ */
+.landing__pfz-ocean { opacity: 0.8; }
+.landing__pfz-scrim { z-index: 1; }
+.landing__pfz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+}
+.landing__pfz-swatch {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--orca-border);
+  color: var(--orca-text-muted);
+}
+/* Escalating intensity of the same accent colour, never a red/yellow/green
+   ramp - a suitability estimate is not a safety signal (see MarineMap's own
+   suitabilityFillColor, which follows the same restraint). */
+.landing__pfz-swatch--poor { opacity: 0.5; }
+.landing__pfz-swatch--marginal { opacity: 0.7; }
+.landing__pfz-swatch--moderate { opacity: 0.88; border-color: var(--orca-accent-2); color: var(--orca-text); }
+.landing__pfz-swatch--good {
+  opacity: 1;
+  border-color: var(--orca-accent-2);
+  background: var(--orca-primary-soft);
+  color: var(--orca-text);
+}
+.landing__pfz-candidate {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 50%;
-  background: var(--orca-teal);
-  color: #001616;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.landing__note {
-  text-align: center;
-  color: #83a6a5;
-  font-size: 0.85rem;
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.landing__chips {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
-  justify-content: center;
-  margin-bottom: 1.25rem;
+  font-size: 0.88rem;
+  color: var(--orca-text-muted);
+  margin: 0 0 1.25rem;
 }
-.landing__chip {
-  background: var(--orca-sand);
-  border: 1px solid var(--orca-teal);
-  color: var(--orca-ink);
-  border-radius: 999px;
-  padding: 0.35rem 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 600;
+.landing__pfz-candidate-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--orca-accent-2);
+  flex: none;
 }
 
+/* ---- Chapter 6: Hazard / Safety -> NO_SAFE_RECOMMENDATION climax ------- */
+.landing__hazard-scrim { z-index: 1; }
+/* This chapter's sc-wrap leads with a large heading rather than the small
+   folio-label/eyebrow text every other flex-start-anchored chapter opens
+   with, so it needs its own clearance under the fixed nav. */
+.landing__chapter--hazard .sc-wrap { padding-top: clamp(6rem, 14vw, 7.5rem); }
+.landing__hazard-phase {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orca-caution);
+  margin: 0 0 1rem;
+}
+/* Real decision.noSafeTitle/Body copy (see DecisionPanels.tsx), but a
+   restrained landing-specific treatment - muted, not the real alert's red
+   .decision__nsr styling, per the spec's "not aggressive red" instruction.
+   ORCA declining to recommend a route is a deliberate capability, not an
+   error, so this reads as a considered statement, not a warning klaxon. */
+.landing__hazard-nsr {
+  max-width: 34rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--orca-border-strong);
+  border-left: 3px solid var(--orca-caution);
+  border-radius: 8px;
+  background: var(--orca-surface-2);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 500ms var(--sc-ease-out, ease-out), transform 500ms var(--sc-ease-out, ease-out);
+}
+.landing__hazard-nsr.is-visible { opacity: 1; transform: translateY(0); }
+.landing__hazard-nsr strong {
+  display: block;
+  letter-spacing: 0.06em;
+  color: var(--orca-text);
+  margin-bottom: 0.4rem;
+}
+.landing__hazard-nsr p { margin: 0; font-size: 0.88rem; color: var(--orca-text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .landing__hazard-nsr { transition: none; }
+}
+
+/* ---- Chapter 7: Route Peak (shortest path vs ORCA's route) ------------- */
+.landing__chapter--route { padding-block: var(--sc-9, 6rem); }
+.landing__chapter--route .sc-wrap {
+  max-width: 44rem;
+  margin-inline: auto;
+  text-align: center;
+  padding-top: clamp(6rem, 14vw, 7.5rem);
+}
+.landing__route-illustrative {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--orca-text-faint);
+  margin: 0.5rem 0 0;
+}
+.sc-route {
+  display: block;
+  width: 100%;
+  max-width: 56rem;
+  height: auto;
+  margin: 1.5rem auto;
+  overflow: visible;
+}
+.sc-route__shortest { stroke-width: 2.5; stroke-dasharray: 9 7; transition: stroke 400ms ease; }
+.sc-route__hazard {
+  fill: var(--orca-extreme);
+  fill-opacity: 0.12;
+  stroke: var(--orca-extreme);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+.sc-route__hazard-glyph { fill: var(--orca-extreme); }
+.sc-route__hazard-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: var(--orca-text-muted);
+}
+.sc-route__orca { stroke: var(--orca-accent-2); stroke-width: 4; stroke-linecap: round; fill: none; }
+.sc-route__marker circle { fill: var(--orca-accent-2); stroke: var(--orca-bg); stroke-width: 3; }
+.sc-route__marker--dest circle { fill: var(--orca-primary); }
+.sc-route__marker text {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--orca-text);
+}
+.sc-route__label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.sc-route__label--shortest { fill: var(--orca-text-faint); }
+.sc-route__label--orca { fill: var(--orca-accent-2); font-weight: 700; }
+.landing__route-note { max-width: 34rem; margin: 0.5rem auto 0; color: var(--orca-text-muted); }
+
+/* ---- Chapter 9: Data sources (dimension-line callouts, not chips) ------ */
+.landing__dimension-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem 2rem;
+}
+.landing__dimension-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.88rem;
+  color: var(--orca-text);
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--orca-border);
+}
+.landing__dimension-tick {
+  width: 0.5rem;
+  height: 1px;
+  background: var(--orca-accent-2);
+  flex: none;
+}
+
+/* ---- Chapter 4: Why ORCA ------------------------------------------------ */
+.landing__reveal-heading { margin: 0 0 1.5rem; line-height: 1.1; padding-block: 0.1em; }
 .landing__why-grid {
   list-style: none;
   margin: 0;
@@ -2896,57 +3273,146 @@ summary:focus-visible {
   gap: 0.75rem;
 }
 .landing__why-item {
-  background: var(--orca-sand);
-  border: 1px solid rgba(31, 182, 182, 0.18);
-  border-left: 3px solid var(--orca-teal);
+  background: var(--orca-surface-2);
+  border-left: 3px solid var(--orca-accent-2);
   border-radius: 10px;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--orca-ink);
+  color: var(--orca-text);
 }
 
-.landing__preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-}
+/* ---- Chapter 5: Preview -------------------------------------------------- */
+.landing__preview { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .landing__preview-pill {
-  background: var(--orca-sand);
-  border: 1px solid rgba(31, 182, 182, 0.18);
+  background: var(--orca-surface-2);
+  border: 1px solid var(--orca-border);
   border-radius: 10px;
   padding: 0.6rem 1.1rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--orca-ink);
+  color: var(--orca-text);
 }
 .landing__preview-pill--safe {
-  border-color: var(--orca-teal);
-  color: #7bf1e6;
-  background: rgba(31, 182, 182, 0.14);
+  border-color: var(--orca-accent-2);
+  color: var(--orca-accent-2);
+  background: color-mix(in srgb, var(--orca-accent-2) 14%, transparent);
 }
 
-.landing__footer {
-  margin-top: auto;
-  padding: 1.5rem clamp(1rem, 6vw, 3rem) 2rem;
+/* ---- Chapter 12: Decision provenance (real disclosure semantics) ------- */
+.sc-provenance {
+  list-style: none;
+  margin: 1.5rem 0;
+  padding: 0;
+  border-left: 2px solid var(--orca-border);
+  max-width: 34rem;
+}
+.sc-provenance__node { position: relative; padding: 0 0 0 1.25rem; }
+.sc-provenance__node:not(:last-child) { margin-bottom: 0.9rem; }
+.sc-provenance__node details summary {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  justify-content: center;
-  color: #6f8f8e;
-  font-size: 0.78rem;
-  border-top: 1px solid rgba(31, 182, 182, 0.18);
+  align-items: baseline;
+  gap: 0.6rem;
+  cursor: pointer;
+  list-style: none;
 }
-.landing__footer-brand {
-  font-weight: 700;
-  color: var(--orca-teal);
+.sc-provenance__node summary::-webkit-details-marker { display: none; }
+.sc-provenance__index {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--orca-accent-2);
+  flex: none;
+}
+.sc-provenance__label { font-weight: 600; color: var(--orca-text); }
+.sc-provenance__detail {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  color: var(--orca-text-muted);
+  max-width: 30rem;
 }
 
-@media (max-width: 480px) {
-  .landing__topbar { padding: 0.75rem 1rem; }
-  .landing__pipeline-step:not(:last-child)::after { display: none; }
+/* ---- Chapter 13: Evidence tiers ----------------------------------------- */
+.landing__evidence-tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.landing__evidence-tier {
+  border: 1px solid var(--orca-border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: var(--orca-surface-2);
+}
+.landing__evidence-tier h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--orca-accent-2);
+}
+.landing__evidence-tier p { margin: 0; font-size: 0.86rem; color: var(--orca-text-muted); }
+
+/* ---- Chapter 6: Close (colophon - a line of running text, not a button
+   island; resolves and holds) --------------------------------------------- */
+.landing__colophon {
+  justify-content: center;
+  text-align: center;
+  background: var(--orca-surface-2);
+  border-top: 1px solid var(--orca-border);
+  position: relative;
+  overflow: hidden;
+}
+.landing__final-ocean { opacity: 0.5; }
+.landing__final-wordmark { margin: 0 0 0.5rem; }
+.landing__final-tagline {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: var(--orca-text-muted);
+  margin: 0 0 1.5rem;
+}
+.landing__cta--ghost {
+  background: transparent;
+  border: 1px solid var(--orca-border-strong);
+  color: var(--orca-text);
+}
+.landing__cta--ghost:hover { border-color: var(--orca-accent-2); background: var(--orca-hover); }
+.landing__colophon-mark {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orca-text-faint);
+  margin: 0 0 1.25rem;
+}
+.landing__colophon-line {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  color: var(--orca-text);
+  margin: 0 0 1.5rem;
+}
+.landing__colophon-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--orca-accent-2);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.landing__colophon-link:hover { color: var(--orca-primary-dark); }
+.landing__colophon-meta {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  font-size: 0.78rem;
+  color: var(--orca-text-faint);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .landing__folio-title { display: none; }
+  .landing__chapter { padding-inline: 1rem; }
 }
 
 /* ---------- auth gate (login / signup) ----------
@@ -2996,6 +3462,63 @@ summary:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-gate__art { animation: none; background-position: 15% 10%, 85% 90%, 0 0; }
+}
+
+/* Restrained pointer-driven depth (see scrollcraft/builds/orca-landing/BRIEF.md,
+   Login page section): two planes reading --sc-mx/--sc-my off the
+   [data-sc-spotlight] parent (LoginPage.tsx). The engine only writes those
+   custom properties under (hover: hover) and (pointer: fine), and never
+   under reduced motion, so touch/keyboard users simply see the static
+   fallback position (the calc()'s default operand) - no extra media query
+   needed here. Small rate difference between the two (devices.md §6: 10-30%
+   is depth, more reads as things sliding). */
+.auth-gate__art-plane {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: opacity 400ms var(--sc-ease-out, ease-out);
+}
+.auth-gate__art-plane--far {
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--orca-accent) 55%, transparent) 0%, transparent 55%);
+  transform: translate3d(calc((var(--sc-mx, 0.5) - 0.5) * -18px), calc((var(--sc-my, 0.5) - 0.5) * -18px), 0);
+  opacity: 0.8;
+}
+.auth-gate__art-plane--near {
+  background: radial-gradient(circle at 65% 68%, color-mix(in srgb, var(--orca-primary-dark) 65%, transparent) 0%, transparent 50%);
+  transform: translate3d(calc((var(--sc-mx, 0.5) - 0.5) * 30px), calc((var(--sc-my, 0.5) - 0.5) * 30px), 0);
+  opacity: 0.7;
+}
+
+/* Eye-catching centerpiece for the art panel (previously just the two
+   gradient planes above - see BRIEF.md's login scope) - the same orca motif
+   as the landing page, drifting gently with the pointer like the planes it
+   sits above, plus its own idle swim bob so the panel has life even before
+   the pointer moves. */
+.auth-gate__orca-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform: translate3d(calc((var(--sc-mx, 0.5) - 0.5) * 14px), calc((var(--sc-my, 0.5) - 0.5) * 14px), 0);
+}
+.auth-gate__orca {
+  color: rgba(255, 255, 255, 0.92);
+  animation: orca-swim 6s ease-in-out infinite;
+}
+.auth-gate__orca svg {
+  width: min(60%, 320px);
+  aspect-ratio: 2 / 1;
+  filter: drop-shadow(0 18px 32px rgba(0, 0, 0, 0.25));
+}
+@keyframes orca-swim {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-gate__orca { animation: none; }
 }
 
 .auth-gate__art-badge {
@@ -3108,48 +3631,14 @@ summary:focus-visible {
   box-shadow: none;
 }
 
-.auth-form { display: flex; flex-direction: column; gap: 1rem; }
-
-.auth-form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--orca-text-muted);
-}
-
-.auth-form__field input {
-  border: 1px solid var(--orca-border);
-  border-radius: 10px;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.95rem;
-  font-family: inherit;
-  color: var(--orca-text);
-  background: var(--orca-surface-2);
-}
-.auth-form__field input:focus {
-  outline: 2px solid var(--orca-accent-2);
-  outline-offset: 1px;
-}
-
+/* Used by main.tsx's BackendAuthErrorView - a Clerk session the backend
+   couldn't verify (misconfigured CLERK_SECRET_KEY / Supabase outage). */
 .auth-form__error {
-  margin: 0;
+  margin: 0 0 1.25rem;
   color: var(--orca-extreme);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
-
-.auth-form__submit {
-  margin-top: 0.25rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
-  border-radius: 999px;
-  background: var(--orca-accent-2);
-  border-color: var(--orca-accent-2);
-  color: #fff;
-}
-.auth-form__submit:hover:not(:disabled) { background: var(--orca-primary-dark); }
 
 /* ---- Phase 11: Emergency Distress (SOS) page ---- */
 .sos-view { display: flex; flex-direction: column; gap: 1rem; }
