@@ -1,7 +1,7 @@
 import { useI18n } from "../../i18n";
 import { humanizeRiskWarnings } from "../../i18n/warnings";
 import type { ProvNode, QueryResponse } from "../../types/api";
-import { Chips, EmptyNote, Panel } from "../common";
+import { Chips, EmptyNote, Panel, ReadAloudButton } from "../common";
 import { ExportEvidenceButton } from "../evidence/ExportEvidenceButton";
 
 function riskFactorNodes(resp: QueryResponse): ProvNode[] {
@@ -73,6 +73,10 @@ export function DecisionCard({ resp, query = "" }: { resp: QueryResponse; query?
     );
   }
 
+  // The exact same "CAUTION. <explanation>" text already shown in chat and
+  // used as ORCA's grounded explanation - never a second, TTS-specific
+  // interpretation (see ../../hooks/useSpeechOutput / ReadAloudButton).
+  const spokenText = `${decisionLabel(d.status)}. ${resp.answer}`.trim();
   const status = d.status.toLowerCase();
   const nsr = d.status === "NO_SAFE_RECOMMENDATION";
   const r = resp.risk;
@@ -93,6 +97,12 @@ export function DecisionCard({ resp, query = "" }: { resp: QueryResponse; query?
   return (
     <section className={`panel verdict verdict--${status}`}>
       <div className="verdict__toolbar">
+        <ReadAloudButton
+          id={resp.request_id ?? resp.session_id}
+          text={spokenText}
+          label={t("decision.readAloud")}
+          className="verdict__tts"
+        />
         <ExportEvidenceButton resp={resp} query={query} />
       </div>
       <div className={`verdict__body decision decision--${status}`}>

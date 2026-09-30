@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useI18n } from "../../i18n";
+import { useSpeechOutput } from "../../hooks/useSpeechOutput";
 import type { DataTier } from "../../types/api";
 
 /** Panel: a titled surface used across the intelligence rail. */
@@ -120,6 +121,58 @@ export function DataTierBadge({
       <span className="tier-badge__mark" aria-hidden />
       {label ?? key}
     </span>
+  );
+}
+
+/**
+ * ReadAloudButton: optional text-to-speech for any already-computed text
+ * (a chat reply, the final decision headline + explanation, ...). Reuses the
+ * exact same browser SpeechSynthesis wrapper as everywhere else in ORCA (see
+ * ../../hooks/useSpeechOutput / ../../services/speech.ts) - it only ever
+ * speaks text ORCA already decided and displayed, never generates its own
+ * interpretation. Gracefully disables itself when speech synthesis is
+ * unavailable rather than hiding (so its absence is never mistaken for a
+ * missing feature vs. an unsupported browser).
+ */
+export function ReadAloudButton({
+  id,
+  text,
+  label,
+  className = "",
+}: {
+  id: string;
+  text: string | null | undefined;
+  /** aria-label / title override, e.g. "Read decision aloud". */
+  label?: string;
+  className?: string;
+}) {
+  const { t, lang } = useI18n();
+  const tts = useSpeechOutput();
+  const clean = text?.trim() ?? "";
+  if (!clean) return null;
+  const speaking = tts.speakingId === id;
+
+  const buttonLabel = !tts.supported
+    ? t("voice.tts.unsupported")
+    : speaking
+      ? t("voice.tts.stop")
+      : label ?? t("voice.tts.play");
+
+  return (
+    <button
+      type="button"
+      className={`btn btn--small read-aloud ${speaking ? "is-speaking" : ""} ${className}`}
+      onClick={() => (speaking ? tts.stop() : tts.speak(id, clean, lang))}
+      disabled={!tts.supported}
+      aria-pressed={speaking}
+      aria-label={buttonLabel}
+      title={buttonLabel}
+    >
+      <span aria-hidden>{speaking ? "■" : "🔊"}</span>
+      <span className="read-aloud__label">
+        {speaking ? t("voice.speaking") : label ?? t("voice.tts.play")}
+      </span>
+    </button>
   );
 }
 
