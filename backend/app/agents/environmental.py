@@ -5,12 +5,18 @@ satellite ocean-colour client (:mod:`app.services.oceancolor`). Sea-surface
 temperature is already delivered by the Oceanographic Agent via the existing
 Open-Meteo Marine call, so it is *not* re-fetched here.
 
-Same three-tier fallback as the Weather / Oceanographic agents:
+Same tiered fallback as the Weather / Oceanographic agents, plus one more
+step before giving up:
 
-    LIVE  -> NOAA CoastWatch ERDDAP (optional INCOIS secondary)
-    CACHE -> a recent LIVE result replayed from Redis, age-checked
-    DEMO  -> data/demo/environment_demo.json, only when agent_demo_fallback=True
-    MISSING -> a structured missing-data result
+    LIVE       -> NOAA CoastWatch ERDDAP (optional INCOIS secondary)
+    CACHE      -> a recent LIVE result replayed from Redis, age-checked (today's bucket)
+    LAST-GOOD  -> the most recent LIVE success at this location, any day, still
+                  within oceancolor_chl_max_age_seconds - same pattern as the
+                  INCOIS PFZ last-known-good fallback, always surfaced stale=True
+                  with its real age so a satellite gap never silently becomes
+                  "unavailable" when a recent honest observation still exists
+    DEMO       -> data/demo/environment_demo.json, only when agent_demo_fallback=True
+    MISSING    -> a structured missing-data result
 
 This agent **never raises** an exception that could break an ORCA query - every
 failure path returns a normal ``AgentResult``. It contains no LLM call, no
@@ -33,7 +39,12 @@ from app.models.common import Coordinate, SignalKind, SourceTier
 from app.models.fabric import DataTier, SourceStatus
 from app.models.observations import MarineObservation
 from app.services import oceancolor
-from app.services.cache import JsonCache, NullCache, oceancolor_cache_key
+from app.services.cache import (
+    JsonCache,
+    NullCache,
+    oceancolor_cache_key,
+    oceancolor_last_good_cache_key,
+)
 
 logger = get_logger(__name__)
 
@@ -74,6 +85,11 @@ class EnvironmentalAgent:
             when,
             decimals=self.settings.cache_coord_decimals,
         )
+        last_good_key = oceancolor_last_good_cache_key(
+            coordinate.latitude,
+            coordinate.longitude,
+            decimals=self.settings.cache_coord_decimals,
+        )
 
         # ---- Tier 1: LIVE ----------------------------------------------
         live_error: str | None = None
@@ -98,6 +114,14 @@ class EnvironmentalAgent:
             }
             await self.cache.set_json(
                 key, payload, self.settings.oceancolor_cache_ttl_seconds
+            )
+            # Also snapshot as the last-known-good for this location (separate,
+            # non-day-bucketed key - see oceancolor_last_good_cache_key), so a
+            # later day's live+today's-cache miss still has a real, honestly-aged
+            # fallback instead of going straight to MISSING. Best-effort: never
+            # let a last-good write failure affect the live result just fetched.
+            await self.cache.set_json(
+                last_good_key, payload, self.settings.oceancolor_chl_max_age_seconds
             )
             return self._result(
                 coordinate,
@@ -145,13 +169,42 @@ class EnvironmentalAgent:
                     source_tier=SourceTier.CACHED,
                 )
 
-        # ---- Tier 3: DEMO (opt-in) --------------------------------------
+        # ---- Tier 3: LAST-KNOWN-GOOD (any prior day, still within the
+        # Temporal Validity Gate's own chlorophyll staleness tolerance) ------
+        last_good = await self.cache.get_json(last_good_key)
+        if last_good and last_good.get("value") is not None and "fetched_at" in last_good:
+            fetched_at = _parse_dt(last_good["fetched_at"])
+            age = (utcnow() - fetched_at).total_seconds() if fetched_at else None
+            if age is not None and age <= self.settings.oceancolor_chl_max_age_seconds:
+                return self._result(
+                    coordinate,
+                    when,
+                    value=float(last_good["value"]),
+                    unit=str(last_good.get("unit", oceancolor.CHL_UNIT)),
+                    observed_at=_parse_dt(last_good.get("observed_at")),
+                    retrieved_at=fetched_at,
+                    status=SourceStatus(
+                        tier=DataTier.CACHE,
+                        source="redis-last-good",
+                        cached_at=fetched_at,
+                        stale=True,
+                        note=(
+                            f"{live_error} - serving the last successful ocean-colour "
+                            f"fetch for this location ({age / 86400:.1f} d old)"
+                            if live_error
+                            else f"last-known-good ocean-colour snapshot ({age / 86400:.1f} d old)"
+                        ),
+                    ),
+                    source_tier=SourceTier.CACHED,
+                )
+
+        # ---- Tier 4: DEMO (opt-in) --------------------------------------
         if self.demo_fallback:
             demo = self._load_demo(coordinate, when)
             if demo is not None:
                 return demo
 
-        # ---- Tier 4: structured MISSING -------------------------------
+        # ---- Tier 5: structured MISSING -------------------------------
         return missing_result(
             _KIND,
             coordinate,

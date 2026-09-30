@@ -162,6 +162,25 @@ def oceancolor_cache_key(
     return f"oceancolor:{_round(lat, decimals)}:{_round(lon, decimals)}:{time_bucket(day, 'day')}"
 
 
+def oceancolor_last_good_cache_key(lat: float, lon: float, *, decimals: int = 2) -> str:
+    """Location-only key (no day bucket) for the last successfully-fetched
+    chlorophyll observation at this location, regardless of which day it was
+    fetched on.
+
+    ``oceancolor_cache_key`` above is scoped to *today's* bucket, so once the
+    live fetch fails for today - a real satellite gap (cloud cover, orbit
+    timing) or just a transient NOAA outage - there is nothing left to fall
+    back to until a live fetch succeeds again, even though a perfectly
+    servable, honestly-aged observation from a few days ago sits in a
+    different (older) bucket this lookup never checks. This key mirrors the
+    same last-known-good pattern already used for INCOIS PFZ reference data
+    (see app.gis.pfz_reference._LAST_GOOD_CACHE_KEY) - overwritten on every
+    live success, read only as the final fallback before MISSING, and always
+    surfaced with its real age so staleness is never hidden.
+    """
+    return f"oceancolor-last-good:{_round(lat, decimals)}:{_round(lon, decimals)}"
+
+
 def suitability_grid_cache_key(
     lat: float, lon: float, day: datetime, *, decimals: int = 2
 ) -> str:

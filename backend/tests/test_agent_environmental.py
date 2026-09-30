@@ -87,6 +87,76 @@ async def test_cache_tier_replays_a_recent_live_result(monkeypatch) -> None:
     assert second.observations[0].source_tier is SourceTier.CACHED
 
 
+async def test_live_success_also_snapshots_last_known_good(monkeypatch) -> None:
+    """A live success writes BOTH the day-bucketed cache entry and the
+    location-only last-good entry - the fix for chlorophyll going straight to
+    MISSING on the first query of a new day/after a transient NOAA blip, even
+    though a perfectly servable recent observation exists from a prior day.
+
+    Cache freshness is judged against real wall-clock time (see
+    app.agents.environmental's use of `utcnow()`, matching the pre-existing
+    Tier 2 CACHE check's own convention) - not the simulated `when` decision
+    time - so aging is tested here by seeding the cache directly with a
+    controlled `fetched_at`, rather than advancing `when`.
+    """
+    from app.services.cache import oceancolor_last_good_cache_key
+
+    cache = JsonCache(InMemoryCache())
+    monkeypatch.setattr(oceancolor, "fetch_chlorophyll",
+                        lambda *a, **k: _async(_chl_result(0.6)))
+    first = await _agent(cache).fetch(COORD, WHEN)
+    assert first.source_status.tier is DataTier.LIVE
+
+    last_good_key = oceancolor_last_good_cache_key(COORD_LAT, COORD_LON, decimals=2)
+    snapshot = await cache.get_json(last_good_key)
+    assert snapshot is not None and snapshot["value"] == pytest.approx(0.6)
+
+    # A different day's query: the day-bucketed cache key changes (a fresh,
+    # empty bucket), live now fails (a real satellite gap), but the last-good
+    # snapshot just written is still there (same real-time instant, so
+    # trivially within any max-age).
+    monkeypatch.setattr(
+        oceancolor, "fetch_chlorophyll",
+        lambda *a, **k: _async_raise(oceancolor.OceanColorNoData("cloud gap")),
+    )
+    second = await _agent(cache).fetch(COORD, WHEN + timedelta(days=1))
+    assert second.source_status.tier is DataTier.CACHE
+    assert second.source_status.stale is True
+    assert second.source_status.source == "redis-last-good"
+    assert second.observations[0].value == pytest.approx(0.6)
+    assert "d old)" in (second.source_status.note or "")
+
+
+async def test_last_known_good_is_not_served_once_too_old(monkeypatch) -> None:
+    """A last-good snapshot older than oceancolor_chl_max_age_seconds must not
+    be served - it falls through to DEMO/MISSING exactly like before this
+    fallback existed, never silently stretching staleness past the Temporal
+    Validity Gate's own tolerance for a chlorophyll observation. The snapshot
+    is seeded directly with an old `fetched_at` so the test controls age
+    precisely, rather than depending on real elapsed wall-clock time."""
+    from app.services.cache import oceancolor_last_good_cache_key
+
+    cache = JsonCache(InMemoryCache())
+    last_good_key = oceancolor_last_good_cache_key(COORD_LAT, COORD_LON, decimals=2)
+    stale_fetched_at = datetime.now(timezone.utc) - timedelta(days=30)
+    await cache.set_json(
+        last_good_key,
+        {
+            "value": 0.6,
+            "unit": oceancolor.CHL_UNIT,
+            "observed_at": (stale_fetched_at - timedelta(days=1)).isoformat(),
+            "fetched_at": stale_fetched_at.isoformat(),
+        },
+        ttl_s=10_000_000,  # the JsonCache/backend TTL itself is not under test here
+    )
+    monkeypatch.setattr(
+        oceancolor, "fetch_chlorophyll",
+        lambda *a, **k: _async_raise(oceancolor.OceanColorNoData("cloud gap")),
+    )
+    result = await _agent(cache, oceancolor_chl_max_age_seconds=864000).fetch(COORD, WHEN)  # 10 d
+    assert result.source_status.tier is DataTier.MISSING
+
+
 async def test_demo_tier_only_when_enabled(monkeypatch) -> None:
     monkeypatch.setattr(
         oceancolor, "fetch_chlorophyll",
