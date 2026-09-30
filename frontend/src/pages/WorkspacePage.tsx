@@ -64,7 +64,7 @@ import { TourOverlay } from "../components/tour/TourOverlay";
 
 const STATIC_LAYER_IDS = new Set<LayerId>(["coastline", "eez", "protected_areas"]);
 
-export default function WorkspacePage() {
+export default function WorkspacePage({ onLogout }: { onLogout?: () => void }) {
   const { t, lang } = useI18n();
   const health = useHealth();
   const gis = useGisLayers();
@@ -433,6 +433,7 @@ export default function WorkspacePage() {
         health={health}
         latest={latest}
         onStartTour={tour.start}
+        onLogout={onLogout}
       />
       <TourOverlay tour={tour} />
 

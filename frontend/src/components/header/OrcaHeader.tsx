@@ -1,9 +1,11 @@
+import { useAccessibility } from "../../accessibility";
 import { LANGUAGES, useI18n } from "../../i18n";
 import type { LanguageCode, QueryResponse } from "../../types/api";
 import { STAKEHOLDERS, type StakeholderId } from "../../stakeholders";
 import { BOAT_CLASSES, type BoatClassId } from "../../boatClasses";
 import type { HealthResult } from "../../services/apiClient";
 import { DataTierBadge } from "../common";
+import { ThemeToggle } from "../../theme/ThemeToggle";
 
 export function OrcaHeader({
   stakeholder,
@@ -13,6 +15,7 @@ export function OrcaHeader({
   health,
   latest,
   onStartTour,
+  onLogout,
 }: {
   stakeholder: StakeholderId;
   onStakeholder: (id: StakeholderId) => void;
@@ -24,8 +27,10 @@ export function OrcaHeader({
   health: HealthResult & { loading: boolean };
   latest: QueryResponse | null;
   onStartTour: () => void;
+  onLogout?: () => void;
 }) {
   const { t, lang, setLang } = useI18n();
+  const { largeText, highContrast, setLargeText, setHighContrast } = useAccessibility();
 
   const connLabel = health.loading
     ? t("conn.checking")
@@ -94,6 +99,28 @@ export function OrcaHeader({
           </select>
         </label>
 
+        <div className="field field--accessibility" role="group" aria-label={t("accessibility.title")}>
+          <span className="field__label">{t("accessibility.title")}</span>
+          <div className="a11y-toggles">
+            <button
+              type="button"
+              className={`btn btn--small a11y-toggle ${largeText ? "is-active" : ""}`}
+              aria-pressed={largeText}
+              onClick={() => setLargeText(!largeText)}
+            >
+              <span aria-hidden>{"A+"}</span> {t("accessibility.largeText")}
+            </button>
+            <button
+              type="button"
+              className={`btn btn--small a11y-toggle ${highContrast ? "is-active" : ""}`}
+              aria-pressed={highContrast}
+              onClick={() => setHighContrast(!highContrast)}
+            >
+              <span aria-hidden>{"◐"}</span> {t("accessibility.highContrast")}
+            </button>
+          </div>
+        </div>
+
         <div className="conn" title={health.detail ?? connLabel}>
           <span className="field__label">{t("header.connection")}</span>
           <span className={`conn__pill conn__pill--${health.loading ? "checking" : health.state}`}>
@@ -119,6 +146,14 @@ export function OrcaHeader({
             )}
           </span>
         </div>
+
+        <ThemeToggle className="orca-topbar__theme" />
+
+        {onLogout && (
+          <button type="button" className="btn btn--ghost btn--small orca-topbar__logout" onClick={onLogout}>
+            {t("auth.logout")}
+          </button>
+        )}
       </div>
     </header>
   );

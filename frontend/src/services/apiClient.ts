@@ -28,6 +28,24 @@ export class ApiError extends Error {
   }
 }
 
+// Clerk injects itself onto `window` once loaded (see ClerkProvider in
+// main.tsx). This is the documented way to fetch a fresh session token from
+// plain (non-hook) code like this module - `useAuth().getToken()` is the
+// hook equivalent, but this file is a plain fetch wrapper, not a component.
+declare global {
+  interface Window {
+    Clerk?: {
+      session?: { getToken: () => Promise<string | null> } | null;
+    };
+  }
+}
+
+/** Bearer header for the current Clerk session, or {} when signed out. */
+async function authHeader(): Promise<Record<string, string>> {
+  const token = await window.Clerk?.session?.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -45,7 +63,11 @@ async function request<T>(
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(await authHeader()),
+        ...(init.headers ?? {}),
+      },
     });
   } catch (err) {
     window.clearTimeout(timer);
@@ -137,7 +159,7 @@ export async function postWhatIf(
       method: "POST",
       body: JSON.stringify(body),
       signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
     });
   } catch (err) {
     window.clearTimeout(timer);
@@ -183,7 +205,7 @@ export async function postReplay(
       method: "POST",
       body: JSON.stringify(body),
       signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
     });
   } catch (err) {
     window.clearTimeout(timer);
@@ -331,4 +353,19 @@ export function pfzSnapshotUrl(): string {
 
 export function rsmcSnapshotUrl(): string {
   return `${API_BASE_URL}/reference/rsmc`;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+/**
+ * GET /auth/me - who the current Clerk session belongs to, per the backend's
+ * own verification (see backend/app/auth/dependencies.py). Signup/login/
+ * sign-out all happen on the frontend directly against Clerk - this backend
+ * has no endpoints for them.
+ */
+export async function fetchMe(signal?: AbortSignal): Promise<AuthUser> {
+  return request<AuthUser>("/auth/me", { signal }, 15000);
 }

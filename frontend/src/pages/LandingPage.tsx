@@ -53,20 +53,25 @@ export function LandingPage({ onEnter }: { onEnter: () => void }) {
           <span className="landing__brand-mark" aria-hidden>◊</span>
           <span className="landing__brand-name">ORCA</span>
         </div>
-        <label className="landing__lang">
-          <span className="sr-only">{t("header.language")}</span>
-          <select
-            className="landing__lang-select"
-            value={lang}
-            onChange={(e) => setLang(e.target.value as LanguageCode)}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="landing__topbar-right">
+          <label className="landing__lang">
+            <span className="sr-only">{t("header.language")}</span>
+            <select
+              className="landing__lang-select"
+              value={lang}
+              onChange={(e) => setLang(e.target.value as LanguageCode)}
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="landing__signin" onClick={onEnter}>
+            {t("auth.submit.login")}
+          </button>
+        </div>
       </header>
 
       <section className="landing__hero">
