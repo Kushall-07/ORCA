@@ -103,7 +103,21 @@ export function ChatPanel({
   const [draft, setDraft] = useState("");
   const [longWait, setLongWait] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const suggestions = getStakeholder(stakeholder).suggestions[lang];
+  const stakeholderSuggestions = getStakeholder(stakeholder).suggestions[lang];
+
+  // A fourth, additive LLM touch-point (see backend app.agents.followups) -
+  // candidate next questions computed strictly AFTER the last answer was
+  // already finalised, from the most recently answered turn. Once a response
+  // exists these replace the generic per-stakeholder starters above with
+  // something contextual to what was just discussed; before any response
+  // (or when the backend produced none) the stakeholder list is the fallback.
+  // Same click-to-send interaction as the static list - these are already
+  // schema-validated, length-capped, non-numeric suggestions (see
+  // FollowUpAgent._clean), never auto-sent without this explicit click.
+  const lastOrcaResponse = [...messages].reverse().find((m) => m.role !== "user")?.response;
+  const dynamicFollowups = lastOrcaResponse?.suggested_followups?.questions ?? [];
+  const suggestions = dynamicFollowups.length > 0 ? dynamicFollowups : stakeholderSuggestions;
+  const suggestLabel = dynamicFollowups.length > 0 ? t("chat.followups") : t("chat.suggested");
 
   useEffect(() => {
     if (!loading) {
@@ -177,7 +191,7 @@ export function ChatPanel({
       </div>
 
       <div className="chat__suggest">
-        <span className="chat__suggest-label">{t("chat.suggested")}</span>
+        <span className="chat__suggest-label">{suggestLabel}</span>
         <div className="chat__suggest-list">
           {suggestions.map((s, i) => (
             <button

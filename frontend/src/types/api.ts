@@ -653,6 +653,11 @@ export interface ExecutionPlanInfo {
   planned_via: "groq" | "fixed";
 }
 
+export interface FollowUpSuggestionsInfo {
+  questions: string[];
+  generated_via: "groq" | "fixed";
+}
+
 export interface QueryResponse {
   session_id: string;
   request_id?: string;
@@ -681,6 +686,10 @@ export interface QueryResponse {
   // downstream research/reference nodes were judged relevant. Never affects
   // safety/risk/decision/route.
   execution_plan?: ExecutionPlanInfo | null;
+  // Fourth, additive LLM touch-point (see app.agents.followups) - candidate
+  // next questions computed strictly after the answer above was finalised.
+  // Never affects safety/risk/decision/route; purely a UI affordance.
+  suggested_followups?: FollowUpSuggestionsInfo | null;
   alerts: AlertItem[];
   conflicts: ConflictItem[];
   evidence: EvidenceItem[];

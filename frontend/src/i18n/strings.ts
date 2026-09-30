@@ -8,25 +8,95 @@ export type StringKey =
   | "app.subtitle"
   | "auth.login.title"
   | "auth.signup.title"
-  | "auth.email"
-  | "auth.password"
   | "auth.submit.login"
-  | "auth.submit.signup"
-  | "auth.submit.loading"
   | "auth.tab.signup"
-  | "auth.switch.toSignup"
-  | "auth.switch.toLogin"
   | "auth.logout"
-  | "auth.error.invalidCredentials"
-  | "auth.error.emailTaken"
-  | "auth.error.validation"
-  | "auth.error.generic"
+  | "auth.backendError.title"
+  | "auth.backendError.message"
+  | "auth.backendError.retry"
+  | "auth.backendError.signOut"
   | "landing.brand.tagline"
+  | "landing.chapter.mission"
+  | "landing.chapter.close"
   | "landing.hero.headline"
   | "landing.hero.subtext"
   | "landing.hero.ctaPrimary"
   | "landing.hero.ctaSecondary"
   | "landing.hero.disclaimer"
+  | "landing.hero.phase.global"
+  | "landing.hero.phase.indian"
+  | "landing.hero.phase.data"
+  | "landing.hero.phase.reasoning"
+  | "landing.hero.demoTag"
+  | "landing.fusion.title"
+  | "landing.fusion.note"
+  | "landing.fusion.group.ocean"
+  | "landing.fusion.group.weather"
+  | "landing.fusion.group.fisheries"
+  | "landing.fusion.group.geosafety"
+  | "landing.fusion.item.waves"
+  | "landing.fusion.item.currents"
+  | "landing.fusion.item.wind"
+  | "landing.fusion.item.storms"
+  | "landing.fusion.item.visibility"
+  | "landing.fusion.item.productivity"
+  | "landing.fusion.item.boundaries"
+  | "landing.fusion.item.restrictedZones"
+  | "landing.fusion.item.hazards"
+  | "landing.agents.title"
+  | "landing.agents.weather"
+  | "landing.agents.ocean"
+  | "landing.agents.gis"
+  | "landing.agents.suitability"
+  | "landing.agents.caption"
+  | "landing.signal.title"
+  | "landing.signal.note"
+  | "landing.signal.step.raw"
+  | "landing.signal.step.normalize"
+  | "landing.signal.step.fuse"
+  | "landing.signal.step.conflicts"
+  | "landing.signal.step.route"
+  | "landing.pfz.title"
+  | "landing.pfz.note"
+  | "landing.pfz.candidateZone"
+  | "landing.hazard.title"
+  | "landing.hazard.note"
+  | "landing.hazard.phase.destination"
+  | "landing.hazard.phase.analysis"
+  | "landing.hazard.phase.risk"
+  | "landing.hazard.phase.reconsidered"
+  | "landing.route.title"
+  | "landing.route.origin"
+  | "landing.route.destination"
+  | "landing.route.shortest"
+  | "landing.route.orca"
+  | "landing.route.hazardLabel"
+  | "landing.route.note"
+  | "landing.route.illustrative"
+  | "landing.provenance.title"
+  | "landing.provenance.note"
+  | "landing.provenance.label.evidence"
+  | "landing.provenance.label.reasoning"
+  | "landing.provenance.label.risk"
+  | "landing.provenance.label.safety"
+  | "landing.provenance.detail.query"
+  | "landing.provenance.detail.agents"
+  | "landing.provenance.detail.evidence"
+  | "landing.provenance.detail.reasoning"
+  | "landing.provenance.detail.risk"
+  | "landing.provenance.detail.safety"
+  | "landing.provenance.detail.decision"
+  | "landing.provenance.detail.output"
+  | "landing.evidenceTiers.title"
+  | "landing.evidenceTiers.official"
+  | "landing.evidenceTiers.officialDesc"
+  | "landing.evidenceTiers.forecast"
+  | "landing.evidenceTiers.forecastDesc"
+  | "landing.evidenceTiers.derived"
+  | "landing.evidenceTiers.derivedDesc"
+  | "landing.evidenceTiers.note"
+  | "landing.final.ctaPrimary"
+  | "landing.final.tagline"
   | "landing.pipeline.title"
   | "landing.pipeline.step.query"
   | "landing.pipeline.step.agents"
@@ -91,6 +161,7 @@ export type StringKey =
   | "chat.clear"
   | "chat.retry"
   | "chat.suggested"
+  | "chat.followups"
   | "chat.analyzing"
   | "chat.analyzingLong"
   | "chat.errorTitle"
@@ -203,6 +274,7 @@ export type StringKey =
   | "stage.research"
   | "stage.provenance"
   | "stage.explain"
+  | "stage.followups"
   | "stage.assemble"
   | "activity.parallelNote"
   | "activity.intelligenceSummary"
@@ -798,6 +870,8 @@ type Table = Record<StringKey, string>;
 const en: Table = {
   "app.subtitle": "Marine Intelligence",
   "landing.brand.tagline": "Oceanic Reasoning & Collaborative Agents",
+  "landing.chapter.mission": "Mission",
+  "landing.chapter.close": "Begin",
   "landing.hero.headline": "Ocean Intelligence. Reasoned Decisions. Safer Marine Operations.",
   "landing.hero.subtext":
     "ORCA brings weather, ocean, environmental, advisory and geospatial evidence together through collaborative AI agents and deterministic safety rules to support marine decisions.",
@@ -805,6 +879,93 @@ const en: Table = {
   "landing.hero.ctaSecondary": "How ORCA Reasons",
   "landing.hero.disclaimer":
     "A decision-support system for the human decision-maker — not a replacement for official warnings, autonomous navigation, or guaranteed catch prediction.",
+  "landing.hero.phase.global": "Global Ocean",
+  "landing.hero.phase.indian": "Indian Ocean",
+  "landing.hero.phase.data": "Marine Data",
+  "landing.hero.phase.reasoning": "ORCA Reasoning",
+  "landing.hero.demoTag": "Demo visualization — not live data",
+  "landing.fusion.title": "The Ocean Is Not One Dataset",
+  "landing.fusion.note":
+    "Each layer below is fused from a different source, agent and refresh rate before ORCA reasons over any of it.",
+  "landing.fusion.group.ocean": "Ocean",
+  "landing.fusion.group.weather": "Weather",
+  "landing.fusion.group.fisheries": "Fisheries",
+  "landing.fusion.group.geosafety": "Geo-Safety",
+  "landing.fusion.item.waves": "Waves",
+  "landing.fusion.item.currents": "Currents",
+  "landing.fusion.item.wind": "Wind",
+  "landing.fusion.item.storms": "Storms",
+  "landing.fusion.item.visibility": "Visibility",
+  "landing.fusion.item.productivity": "Productivity",
+  "landing.fusion.item.boundaries": "Boundaries",
+  "landing.fusion.item.restrictedZones": "Restricted zones",
+  "landing.fusion.item.hazards": "Hazards",
+  "landing.agents.title": "Collaborative Agents, One Decision",
+  "landing.agents.weather": "Weather Agent",
+  "landing.agents.ocean": "Oceanographic Agent",
+  "landing.agents.gis": "GIS & Geofencing Agent",
+  "landing.agents.suitability": "Risk & Suitability Agent",
+  "landing.agents.caption":
+    "Only a handful of ORCA's pipeline stages use an LLM at all — fusion, arbitration, risk and the final decision are deterministic code, not AI judgment.",
+  "landing.signal.title": "From Signal to Decision",
+  "landing.signal.note":
+    "Every signal is normalized, fused and checked for conflicts before risk, route and decision are computed - deterministically, the same way every time.",
+  "landing.signal.step.raw": "Raw Signals",
+  "landing.signal.step.normalize": "Normalize",
+  "landing.signal.step.fuse": "Fuse",
+  "landing.signal.step.conflicts": "Conflicts",
+  "landing.signal.step.route": "Route",
+  "landing.pfz.title": "Fishing Suitability",
+  "landing.pfz.note":
+    "A suitability estimate is not a safety clearance - the next step is checking the same location against ORCA's safety constraints.",
+  "landing.pfz.candidateZone": "Candidate zone",
+  "landing.hazard.title": "When the Route Isn't Safe",
+  "landing.hazard.note":
+    "Safety constraints can override optimization - ORCA will not recommend a route it cannot validate.",
+  "landing.hazard.phase.destination": "Potential Destination",
+  "landing.hazard.phase.analysis": "Safety Analysis",
+  "landing.hazard.phase.risk": "Risk Detected",
+  "landing.hazard.phase.reconsidered": "Route Reconsidered",
+  "landing.route.title": "Shortest Path vs. ORCA's Route",
+  "landing.route.origin": "Origin",
+  "landing.route.destination": "Destination",
+  "landing.route.shortest": "Shortest Path",
+  "landing.route.orca": "ORCA Route",
+  "landing.route.hazardLabel": "Hazard Zone",
+  "landing.route.note":
+    "ORCA's route may be longer than the shortest path - it will never cross a hazard the shortest path does.",
+  "landing.route.illustrative": "Illustrative route — demo visualization",
+  "landing.provenance.title": "How a Decision Traces Back",
+  "landing.provenance.note": "Demo visualization - illustrative provenance for a single decision.",
+  "landing.provenance.label.evidence": "Evidence",
+  "landing.provenance.label.reasoning": "Reasoning",
+  "landing.provenance.label.risk": "Risk Score",
+  "landing.provenance.label.safety": "Safety",
+  "landing.provenance.detail.query": "The question ORCA received: a location, an intent and a stakeholder.",
+  "landing.provenance.detail.agents":
+    "Weather, Oceanographic, GIS & Geofencing and Risk & Suitability agents each report independently.",
+  "landing.provenance.detail.evidence":
+    "Each report carries a source, a tier (Live, Cache, Reference, Demo or Missing) and a validity state.",
+  "landing.provenance.detail.reasoning": "Evidence is fused and conflicts are arbitrated by rule, not by an LLM.",
+  "landing.provenance.detail.risk": "A deterministic score is computed from the fused evidence.",
+  "landing.provenance.detail.safety":
+    "Hard geofences and safety constraints are checked - this step can override everything before it.",
+  "landing.provenance.detail.decision":
+    "Proceed, proceed with caution, do not proceed, or no safe recommendation.",
+  "landing.provenance.detail.output":
+    "The explanation, evidence and this provenance graph are assembled into the response.",
+  "landing.evidenceTiers.title": "Official, Forecast, Derived",
+  "landing.evidenceTiers.official": "Official",
+  "landing.evidenceTiers.officialDesc": "Authoritative snapshots - INCOIS PFZ advisories, RSMC cyclone bulletins.",
+  "landing.evidenceTiers.forecast": "Forecast",
+  "landing.evidenceTiers.forecastDesc":
+    "Live or recently cached model data - weather, sea surface temperature, currents.",
+  "landing.evidenceTiers.derived": "Derived",
+  "landing.evidenceTiers.derivedDesc": "Computed by ORCA from the evidence above - never a source in itself.",
+  "landing.evidenceTiers.note":
+    "In the product: Official maps to the Reference tier, Forecast to Live/Cache, Derived is ORCA's own computation - never presented as a fourth data source.",
+  "landing.final.ctaPrimary": "Explore ORCA",
+  "landing.final.tagline": "From ocean data to explainable decisions.",
   "landing.pipeline.title": "How ORCA Reasons",
   "landing.pipeline.step.query": "User Query",
   "landing.pipeline.step.agents": "Collaborative AI Agents",
@@ -841,7 +1002,7 @@ const en: Table = {
   "landing.preview.suitability": "Fishing Suitability",
   "landing.preview.route": "Route",
   "landing.preview.evidence": "Evidence",
-  "landing.preview.cta": "Enter ORCA",
+  "landing.preview.cta": "Enter the Platform",
   "landing.footer.tagline": "Marine Ecosystem Reasoning with Collaborative Agents",
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
@@ -871,6 +1032,7 @@ const en: Table = {
   "chat.clear": "Clear",
   "chat.retry": "Retry",
   "chat.suggested": "Suggested questions",
+  "chat.followups": "You might also ask",
   "chat.analyzing": "ORCA is analyzing marine conditions…",
   "chat.analyzingLong":
     "Still working — ORCA runs weather, ocean and risk reasoning before answering; some queries take a little longer.",
@@ -984,6 +1146,7 @@ const en: Table = {
   "stage.research": "Research Mode",
   "stage.provenance": "Provenance Graph",
   "stage.explain": "Evidence & Explanation",
+  "stage.followups": "Follow-Up Suggestions",
   "stage.assemble": "Assemble Response",
   "activity.parallelNote": "{ran} of {total} parallel branches ran",
   "activity.intelligenceSummary": "{ran} ran · {skipped} not applicable to this query",
@@ -1625,25 +1788,21 @@ const en: Table = {
 
   "auth.login.title": "Sign in to ORCA",
   "auth.signup.title": "Create your ORCA account",
-  "auth.email": "Email",
-  "auth.password": "Password",
   "auth.submit.login": "Sign in",
-  "auth.submit.signup": "Create account",
-  "auth.submit.loading": "Please wait…",
   "auth.tab.signup": "Sign up",
-  "auth.switch.toSignup": "Need an account? Sign up",
-  "auth.switch.toLogin": "Already have an account? Sign in",
   "auth.logout": "Sign out",
-  "auth.error.invalidCredentials": "Incorrect email or password.",
-  "auth.error.emailTaken": "An account with that email already exists.",
-  "auth.error.validation": "Enter a valid email and a password of at least 8 characters.",
-  "auth.error.generic": "Something went wrong. Please try again.",
+  "auth.backendError.title": "Couldn't verify your session",
+  "auth.backendError.message": "You're signed in, but ORCA's backend couldn't confirm it. This usually means the server isn't configured correctly - try again in a moment, or sign out and back in.",
+  "auth.backendError.retry": "Try again",
+  "auth.backendError.signOut": "Sign out",
 };
 
 const hi: Table = {
   ...en,
   "app.subtitle": "समुद्री बुद्धिमत्ता",
   "landing.brand.tagline": "महासागरीय तर्क एवं सहयोगी एजेंट",
+  "landing.chapter.mission": "मिशन",
+  "landing.chapter.close": "आरंभ करें",
   "landing.hero.headline": "समुद्री बुद्धिमत्ता। तर्कसंगत निर्णय। सुरक्षित समुद्री संचालन।",
   "landing.hero.subtext":
     "ORCA मौसम, समुद्र, पर्यावरण, परामर्श और भू-स्थानिक साक्ष्य को सहयोगी AI एजेंटों और निश्चयात्मक सुरक्षा नियमों के माध्यम से एक साथ लाकर समुद्री निर्णयों में सहायता करता है।",
@@ -1651,6 +1810,90 @@ const hi: Table = {
   "landing.hero.ctaSecondary": "ORCA कैसे तर्क करता है",
   "landing.hero.disclaimer":
     "यह मानव निर्णयकर्ता के लिए एक निर्णय-सहायता प्रणाली है — आधिकारिक चेतावनियों, स्वायत्त नेविगेशन, या गारंटीकृत मछली पकड़ने की भविष्यवाणी का विकल्प नहीं।",
+  "landing.hero.phase.global": "वैश्विक महासागर",
+  "landing.hero.phase.indian": "हिंद महासागर",
+  "landing.hero.phase.data": "समुद्री डेटा",
+  "landing.hero.phase.reasoning": "ORCA तर्कण",
+  "landing.hero.demoTag": "डेमो विज़ुअलाइज़ेशन — लाइव डेटा नहीं",
+  "landing.fusion.title": "समुद्र एक ही डेटासेट नहीं है",
+  "landing.fusion.note":
+    "नीचे दी गई हर परत को ORCA के तर्क करने से पहले एक अलग स्रोत, एजेंट और रिफ्रेश दर से जोड़ा जाता है।",
+  "landing.fusion.group.ocean": "समुद्र",
+  "landing.fusion.group.weather": "मौसम",
+  "landing.fusion.group.fisheries": "मत्स्य पालन",
+  "landing.fusion.group.geosafety": "भू-सुरक्षा",
+  "landing.fusion.item.waves": "लहरें",
+  "landing.fusion.item.currents": "धाराएं",
+  "landing.fusion.item.wind": "हवा",
+  "landing.fusion.item.storms": "तूफान",
+  "landing.fusion.item.visibility": "दृश्यता",
+  "landing.fusion.item.productivity": "उत्पादकता",
+  "landing.fusion.item.boundaries": "सीमाएं",
+  "landing.fusion.item.restrictedZones": "प्रतिबंधित क्षेत्र",
+  "landing.fusion.item.hazards": "खतरे",
+  "landing.agents.title": "सहयोगी एजेंट, एक निर्णय",
+  "landing.agents.weather": "मौसम एजेंट",
+  "landing.agents.ocean": "समुद्र विज्ञान एजेंट",
+  "landing.agents.gis": "GIS और जियोफेंसिंग एजेंट",
+  "landing.agents.suitability": "जोखिम और उपयुक्तता एजेंट",
+  "landing.agents.caption":
+    "ORCA के चरणों में से केवल कुछ ही LLM का उपयोग करते हैं — फ्यूज़न, आर्बिट्रेशन, जोखिम और अंतिम निर्णय निश्चयात्मक कोड हैं, AI निर्णय नहीं।",
+  "landing.signal.title": "संकेत से निर्णय तक",
+  "landing.signal.note":
+    "जोखिम, मार्ग और निर्णय की गणना से पहले हर संकेत को सामान्यीकृत, संयोजित और संघर्षों के लिए जांचा जाता है — हर बार उसी निश्चयात्मक तरीके से।",
+  "landing.signal.step.raw": "कच्चे संकेत",
+  "landing.signal.step.normalize": "सामान्यीकरण",
+  "landing.signal.step.fuse": "संयोजन",
+  "landing.signal.step.conflicts": "संघर्ष",
+  "landing.signal.step.route": "मार्ग",
+  "landing.pfz.title": "मछली पकड़ने की उपयुक्तता",
+  "landing.pfz.note":
+    "उपयुक्तता अनुमान सुरक्षा मंजूरी नहीं है — अगला कदम उसी स्थान को ORCA की सुरक्षा शर्तों के विरुद्ध जांचना है।",
+  "landing.pfz.candidateZone": "संभावित क्षेत्र",
+  "landing.hazard.title": "जब मार्ग सुरक्षित नहीं होता",
+  "landing.hazard.note":
+    "सुरक्षा शर्तें अनुकूलन को खारिज कर सकती हैं — ORCA ऐसा मार्ग सुझाएगा नहीं जिसे वह मान्य नहीं कर सकता।",
+  "landing.hazard.phase.destination": "संभावित गंतव्य",
+  "landing.hazard.phase.analysis": "सुरक्षा विश्लेषण",
+  "landing.hazard.phase.risk": "जोखिम का पता चला",
+  "landing.hazard.phase.reconsidered": "मार्ग पर पुनर्विचार",
+  "landing.route.title": "सबसे छोटा मार्ग बनाम ORCA का मार्ग",
+  "landing.route.origin": "प्रारंभ बिंदु",
+  "landing.route.destination": "गंतव्य",
+  "landing.route.shortest": "सबसे छोटा मार्ग",
+  "landing.route.orca": "ORCA मार्ग",
+  "landing.route.hazardLabel": "खतरा क्षेत्र",
+  "landing.route.note":
+    "ORCA का मार्ग सबसे छोटे मार्ग से लंबा हो सकता है — यह कभी भी उस खतरे को पार नहीं करेगा जिसे सबसे छोटा मार्ग करता है।",
+  "landing.route.illustrative": "उदाहरणात्मक मार्ग — डेमो विज़ुअलाइज़ेशन",
+  "landing.provenance.title": "एक निर्णय कैसे वापस खोजा जाता है",
+  "landing.provenance.note": "डेमो विज़ुअलाइज़ेशन - एक निर्णय के लिए उदाहरणात्मक उद्गम।",
+  "landing.provenance.label.evidence": "साक्ष्य",
+  "landing.provenance.label.reasoning": "तर्कण",
+  "landing.provenance.label.risk": "जोखिम स्कोर",
+  "landing.provenance.label.safety": "सुरक्षा",
+  "landing.provenance.detail.query": "ORCA को प्राप्त प्रश्न: एक स्थान, एक इरादा और एक हितधारक।",
+  "landing.provenance.detail.agents":
+    "मौसम, समुद्र विज्ञान, GIS और जियोफेंसिंग, तथा जोखिम और उपयुक्तता एजेंट स्वतंत्र रूप से रिपोर्ट करते हैं।",
+  "landing.provenance.detail.evidence":
+    "प्रत्येक रिपोर्ट में एक स्रोत, एक स्तर (लाइव, कैश, संदर्भ, डेमो या अनुपलब्ध) और एक वैधता स्थिति होती है।",
+  "landing.provenance.detail.reasoning": "साक्ष्य को संयोजित किया जाता है और संघर्षों को नियम द्वारा सुलझाया जाता है, LLM द्वारा नहीं।",
+  "landing.provenance.detail.risk": "संयोजित साक्ष्य से एक निश्चयात्मक स्कोर की गणना की जाती है।",
+  "landing.provenance.detail.safety":
+    "कठोर जियोफेंस और सुरक्षा शर्तों की जांच की जाती है — यह चरण इससे पहले की हर चीज़ को खारिज कर सकता है।",
+  "landing.provenance.detail.decision": "आगे बढ़ें, सावधानी के साथ आगे बढ़ें, आगे न बढ़ें, या कोई सुरक्षित अनुशंसा नहीं।",
+  "landing.provenance.detail.output": "व्याख्या, साक्ष्य और यह उद्गम ग्राफ प्रतिक्रिया में संयोजित किए जाते हैं।",
+  "landing.evidenceTiers.title": "आधिकारिक, पूर्वानुमान, व्युत्पन्न",
+  "landing.evidenceTiers.official": "आधिकारिक",
+  "landing.evidenceTiers.officialDesc": "आधिकारिक स्नैपशॉट — INCOIS PFZ सलाह, RSMC चक्रवात बुलेटिन।",
+  "landing.evidenceTiers.forecast": "पूर्वानुमान",
+  "landing.evidenceTiers.forecastDesc": "लाइव या हाल ही में कैश किया गया मॉडल डेटा — मौसम, समुद्र सतह तापमान, धाराएं।",
+  "landing.evidenceTiers.derived": "व्युत्पन्न",
+  "landing.evidenceTiers.derivedDesc": "ऊपर दिए गए साक्ष्य से ORCA द्वारा गणना की गई — स्वयं में कभी स्रोत नहीं।",
+  "landing.evidenceTiers.note":
+    "उत्पाद में: आधिकारिक संदर्भ स्तर से मेल खाता है, पूर्वानुमान लाइव/कैश से, व्युत्पन्न ORCA की अपनी गणना है — कभी भी चौथे डेटा स्रोत के रूप में प्रस्तुत नहीं किया जाता।",
+  "landing.final.ctaPrimary": "ORCA का अन्वेषण करें",
+  "landing.final.tagline": "समुद्री डेटा से व्याख्या योग्य निर्णयों तक।",
   "landing.pipeline.title": "ORCA कैसे तर्क करता है",
   "landing.pipeline.step.query": "उपयोगकर्ता प्रश्न",
   "landing.pipeline.step.agents": "सहयोगी AI एजेंट",
@@ -1687,7 +1930,7 @@ const hi: Table = {
   "landing.preview.suitability": "मछली पकड़ने की उपयुक्तता",
   "landing.preview.route": "मार्ग",
   "landing.preview.evidence": "साक्ष्य",
-  "landing.preview.cta": "ORCA में प्रवेश करें",
+  "landing.preview.cta": "प्लेटफ़ॉर्म में प्रवेश करें",
   "landing.footer.tagline": "सहयोगी एजेंटों के साथ समुद्री पारिस्थितिकी तंत्र तर्क",
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
@@ -1717,6 +1960,7 @@ const hi: Table = {
   "chat.clear": "साफ़ करें",
   "chat.retry": "फिर कोशिश करें",
   "chat.suggested": "सुझाए गए प्रश्न",
+  "chat.followups": "आप यह भी पूछ सकते हैं",
   "chat.analyzing": "ORCA समुद्री परिस्थितियों का विश्लेषण कर रहा है…",
   "chat.analyzingLong":
     "अभी भी काम जारी है — उत्तर देने से पहले ORCA मौसम, समुद्र और जोखिम विश्लेषण करता है; कुछ प्रश्नों में थोड़ा अधिक समय लग सकता है।",
@@ -1830,6 +2074,7 @@ const hi: Table = {
   "stage.research": "अनुसंधान मोड",
   "stage.provenance": "उत्पत्ति ग्राफ",
   "stage.explain": "साक्ष्य एवं व्याख्या",
+  "stage.followups": "अगले प्रश्न सुझाव",
   "stage.assemble": "प्रतिक्रिया संयोजन",
   "activity.parallelNote": "{total} में से {ran} समानांतर शाखाएँ चलीं",
   "activity.intelligenceSummary": "{ran} चलीं · {skipped} इस प्रश्न पर लागू नहीं",
@@ -2469,25 +2714,21 @@ const hi: Table = {
 
   "auth.login.title": "ORCA में साइन इन करें",
   "auth.signup.title": "अपना ORCA खाता बनाएं",
-  "auth.email": "ईमेल",
-  "auth.password": "पासवर्ड",
   "auth.submit.login": "साइन इन करें",
-  "auth.submit.signup": "खाता बनाएं",
-  "auth.submit.loading": "कृपया प्रतीक्षा करें…",
   "auth.tab.signup": "साइन अप करें",
-  "auth.switch.toSignup": "खाता नहीं है? साइन अप करें",
-  "auth.switch.toLogin": "पहले से खाता है? साइन इन करें",
   "auth.logout": "साइन आउट करें",
-  "auth.error.invalidCredentials": "गलत ईमेल या पासवर्ड।",
-  "auth.error.emailTaken": "इस ईमेल से पहले से एक खाता मौजूद है।",
-  "auth.error.validation": "एक वैध ईमेल और कम से कम 8 अक्षरों का पासवर्ड दर्ज करें।",
-  "auth.error.generic": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
+  "auth.backendError.title": "सत्र सत्यापित नहीं हो सका",
+  "auth.backendError.message": "आप साइन इन हैं, लेकिन ORCA का बैकएंड इसकी पुष्टि नहीं कर सका। आमतौर पर इसका मतलब है कि सर्वर सही तरीके से कॉन्फ़िगर नहीं है - कुछ देर बाद पुनः प्रयास करें, या साइन आउट करके फिर से साइन इन करें।",
+  "auth.backendError.retry": "पुनः प्रयास करें",
+  "auth.backendError.signOut": "साइन आउट करें",
 };
 
 const kn: Table = {
   ...en,
   "app.subtitle": "ಸಮುದ್ರ ಗುಪ್ತಚರ್ಯೆ",
   "landing.brand.tagline": "ಸಾಗರ ತಾರ್ಕಿಕತೆ ಮತ್ತು ಸಹಯೋಗಿ ಏಜೆಂಟ್‌ಗಳು",
+  "landing.chapter.mission": "ಧ್ಯೇಯ",
+  "landing.chapter.close": "ಪ್ರಾರಂಭಿಸಿ",
   "landing.hero.headline": "ಸಾಗರ ಬುದ್ಧಿಮತ್ತೆ. ತಾರ್ಕಿಕ ನಿರ್ಧಾರಗಳು. ಸುರಕ್ಷಿತ ಸಮುದ್ರ ಕಾರ್ಯಾಚರಣೆಗಳು.",
   "landing.hero.subtext":
     "ORCA ಹವಾಮಾನ, ಸಾಗರ, ಪರಿಸರ, ಸಲಹಾ ಮತ್ತು ಭೂ-ಪ್ರಾದೇಶಿಕ ಸಾಕ್ಷ್ಯಗಳನ್ನು ಸಹಯೋಗಿ AI ಏಜೆಂಟ್‌ಗಳು ಮತ್ತು ನಿಶ್ಚಿತ ಸುರಕ್ಷತಾ ನಿಯಮಗಳ ಮೂಲಕ ಒಟ್ಟುಗೂಡಿಸಿ ಸಮುದ್ರ ನಿರ್ಧಾರಗಳಿಗೆ ಸಹಾಯ ಮಾಡುತ್ತದೆ.",
@@ -2495,6 +2736,90 @@ const kn: Table = {
   "landing.hero.ctaSecondary": "ORCA ಹೇಗೆ ತರ್ಕಿಸುತ್ತದೆ",
   "landing.hero.disclaimer":
     "ಇದು ಮಾನವ ನಿರ್ಧಾರ ತೆಗೆದುಕೊಳ್ಳುವವರಿಗಾಗಿ ಒಂದು ನಿರ್ಧಾರ-ಬೆಂಬಲ ವ್ಯವಸ್ಥೆ — ಅಧಿಕೃತ ಎಚ್ಚರಿಕೆಗಳು, ಸ್ವಾಯತ್ತ ಸಂಚರಣೆ, ಅಥವಾ ಖಾತರಿಪಡಿಸಿದ ಮೀನುಗಾರಿಕೆ ಮುನ್ಸೂಚನೆಗೆ ಪರ್ಯಾಯವಲ್ಲ.",
+  "landing.hero.phase.global": "ಜಾಗತಿಕ ಸಾಗರ",
+  "landing.hero.phase.indian": "ಹಿಂದೂ ಮಹಾಸಾಗರ",
+  "landing.hero.phase.data": "ಸಮುದ್ರ ದತ್ತಾಂಶ",
+  "landing.hero.phase.reasoning": "ORCA ತರ್ಕಣೆ",
+  "landing.hero.demoTag": "ಡೆಮೊ ದೃಶ್ಯೀಕರಣ — ನೇರ ದತ್ತಾಂಶವಲ್ಲ",
+  "landing.fusion.title": "ಸಾಗರ ಒಂದೇ ದತ್ತಾಂಶವಲ್ಲ",
+  "landing.fusion.note":
+    "ಕೆಳಗಿನ ಪ್ರತಿ ಪದರವನ್ನು ORCA ತರ್ಕಿಸುವ ಮೊದಲು ಬೇರೆ ಬೇರೆ ಮೂಲ, ಏಜೆಂಟ್ ಮತ್ತು ರಿಫ್ರೆಶ್ ದರದಿಂದ ಸಂಯೋಜಿಸಲಾಗುತ್ತದೆ.",
+  "landing.fusion.group.ocean": "ಸಾಗರ",
+  "landing.fusion.group.weather": "ಹವಾಮಾನ",
+  "landing.fusion.group.fisheries": "ಮೀನುಗಾರಿಕೆ",
+  "landing.fusion.group.geosafety": "ಭೂ-ಸುರಕ್ಷತೆ",
+  "landing.fusion.item.waves": "ಅಲೆಗಳು",
+  "landing.fusion.item.currents": "ಪ್ರವಾಹಗಳು",
+  "landing.fusion.item.wind": "ಗಾಳಿ",
+  "landing.fusion.item.storms": "ಬಿರುಗಾಳಿಗಳು",
+  "landing.fusion.item.visibility": "ಗೋಚರತೆ",
+  "landing.fusion.item.productivity": "ಉತ್ಪಾದಕತೆ",
+  "landing.fusion.item.boundaries": "ಗಡಿಗಳು",
+  "landing.fusion.item.restrictedZones": "ನಿರ್ಬಂಧಿತ ವಲಯಗಳು",
+  "landing.fusion.item.hazards": "ಅಪಾಯಗಳು",
+  "landing.agents.title": "ಸಹಯೋಗಿ ಏಜೆಂಟ್‌ಗಳು, ಒಂದು ನಿರ್ಧಾರ",
+  "landing.agents.weather": "ಹವಾಮಾನ ಏಜೆಂಟ್",
+  "landing.agents.ocean": "ಸಾಗರಶಾಸ್ತ್ರ ಏಜೆಂಟ್",
+  "landing.agents.gis": "GIS ಮತ್ತು ಜಿಯೋಫೆನ್ಸಿಂಗ್ ಏಜೆಂಟ್",
+  "landing.agents.suitability": "ಅಪಾಯ ಮತ್ತು ಸೂಕ್ತತೆ ಏಜೆಂಟ್",
+  "landing.agents.caption":
+    "ORCA ಯ ಹಂತಗಳಲ್ಲಿ ಕೆಲವು ಮಾತ್ರ LLM ಅನ್ನು ಬಳಸುತ್ತವೆ — ಸಂಯೋಜನೆ, ಮಧ್ಯಸ್ಥಿಕೆ, ಅಪಾಯ ಮತ್ತು ಅಂತಿಮ ನಿರ್ಧಾರ ನಿಶ್ಚಿತ ಕೋಡ್ ಆಗಿದ್ದು, AI ತೀರ್ಪು ಅಲ್ಲ.",
+  "landing.signal.title": "ಸಂಕೇತದಿಂದ ನಿರ್ಧಾರದವರೆಗೆ",
+  "landing.signal.note":
+    "ಅಪಾಯ, ಮಾರ್ಗ ಮತ್ತು ನಿರ್ಧಾರವನ್ನು ಲೆಕ್ಕಹಾಕುವ ಮೊದಲು ಪ್ರತಿ ಸಂಕೇತವನ್ನು ಸಾಮಾನ್ಯೀಕರಿಸಿ, ಸಂಯೋಜಿಸಿ ಮತ್ತು ಸಂಘರ್ಷಗಳಿಗಾಗಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತದೆ — ಪ್ರತಿ ಬಾರಿಯೂ ಅದೇ ನಿಶ್ಚಿತ ರೀತಿಯಲ್ಲಿ.",
+  "landing.signal.step.raw": "ಕಚ್ಚಾ ಸಂಕೇತಗಳು",
+  "landing.signal.step.normalize": "ಸಾಮಾನ್ಯೀಕರಣ",
+  "landing.signal.step.fuse": "ಸಂಯೋಜನೆ",
+  "landing.signal.step.conflicts": "ಸಂಘರ್ಷಗಳು",
+  "landing.signal.step.route": "ಮಾರ್ಗ",
+  "landing.pfz.title": "ಮೀನುಗಾರಿಕೆ ಸೂಕ್ತತೆ",
+  "landing.pfz.note":
+    "ಸೂಕ್ತತೆ ಅಂದಾಜು ಸುರಕ್ಷತಾ ಅನುಮೋದನೆಯಲ್ಲ — ಮುಂದಿನ ಹಂತವೆಂದರೆ ಅದೇ ಸ್ಥಳವನ್ನು ORCA ಯ ಸುರಕ್ಷತಾ ನಿಯಮಗಳ ವಿರುದ್ಧ ಪರಿಶೀಲಿಸುವುದು.",
+  "landing.pfz.candidateZone": "ಸಂಭಾವ್ಯ ವಲಯ",
+  "landing.hazard.title": "ಮಾರ್ಗ ಸುರಕ್ಷಿತವಾಗಿಲ್ಲದಾಗ",
+  "landing.hazard.note":
+    "ಸುರಕ್ಷತಾ ನಿಯಮಗಳು ಆಪ್ಟಿಮೈಸೇಶನ್ ಅನ್ನು ಅತಿಕ್ರಮಿಸಬಹುದು — ORCA ತಾನು ಮಾನ್ಯಗೊಳಿಸಲಾಗದ ಮಾರ್ಗವನ್ನು ಶಿಫಾರಸು ಮಾಡುವುದಿಲ್ಲ.",
+  "landing.hazard.phase.destination": "ಸಂಭಾವ್ಯ ಗಮ್ಯಸ್ಥಾನ",
+  "landing.hazard.phase.analysis": "ಸುರಕ್ಷತಾ ವಿಶ್ಲೇಷಣೆ",
+  "landing.hazard.phase.risk": "ಅಪಾಯ ಪತ್ತೆಯಾಗಿದೆ",
+  "landing.hazard.phase.reconsidered": "ಮಾರ್ಗ ಮರುಪರಿಶೀಲನೆ",
+  "landing.route.title": "ಅತಿ ಕಿರಿದಾದ ಮಾರ್ಗ vs. ORCA ಯ ಮಾರ್ಗ",
+  "landing.route.origin": "ಆರಂಭ",
+  "landing.route.destination": "ಗಮ್ಯಸ್ಥಾನ",
+  "landing.route.shortest": "ಅತಿ ಕಿರಿದಾದ ಮಾರ್ಗ",
+  "landing.route.orca": "ORCA ಮಾರ್ಗ",
+  "landing.route.hazardLabel": "ಅಪಾಯ ವಲಯ",
+  "landing.route.note":
+    "ORCA ಯ ಮಾರ್ಗವು ಅತಿ ಕಿರಿದಾದ ಮಾರ್ಗಕ್ಕಿಂತ ಉದ್ದವಾಗಿರಬಹುದು — ಅತಿ ಕಿರಿದಾದ ಮಾರ್ಗ ದಾಟುವ ಅಪಾಯವನ್ನು ಅದು ಎಂದಿಗೂ ದಾಟುವುದಿಲ್ಲ.",
+  "landing.route.illustrative": "ದೃಷ್ಟಾಂತ ಮಾರ್ಗ — ಡೆಮೊ ದೃಶ್ಯೀಕರಣ",
+  "landing.provenance.title": "ಒಂದು ನಿರ್ಧಾರ ಹೇಗೆ ಹಿಂದಕ್ಕೆ ಪತ್ತೆಯಾಗುತ್ತದೆ",
+  "landing.provenance.note": "ಡೆಮೊ ದೃಶ್ಯೀಕರಣ - ಒಂದು ನಿರ್ಧಾರಕ್ಕಾಗಿ ದೃಷ್ಟಾಂತ ಮೂಲ.",
+  "landing.provenance.label.evidence": "ಸಾಕ್ಷ್ಯ",
+  "landing.provenance.label.reasoning": "ತರ್ಕಣೆ",
+  "landing.provenance.label.risk": "ಅಪಾಯ ಸ್ಕೋರ್",
+  "landing.provenance.label.safety": "ಸುರಕ್ಷತೆ",
+  "landing.provenance.detail.query": "ORCA ಸ್ವೀಕರಿಸಿದ ಪ್ರಶ್ನೆ: ಒಂದು ಸ್ಥಳ, ಒಂದು ಉದ್ದೇಶ ಮತ್ತು ಒಬ್ಬ ಪಾಲುದಾರ.",
+  "landing.provenance.detail.agents":
+    "ಹವಾಮಾನ, ಸಾಗರಶಾಸ್ತ್ರ, GIS ಮತ್ತು ಜಿಯೋಫೆನ್ಸಿಂಗ್, ಮತ್ತು ಅಪಾಯ ಮತ್ತು ಸೂಕ್ತತೆ ಏಜೆಂಟ್‌ಗಳು ಪ್ರತ್ಯೇಕವಾಗಿ ವರದಿ ಮಾಡುತ್ತವೆ.",
+  "landing.provenance.detail.evidence":
+    "ಪ್ರತಿ ವರದಿಯು ಒಂದು ಮೂಲ, ಒಂದು ಹಂತ (ಲೈವ್, ಕ್ಯಾಶ್, ರೆಫರೆನ್ಸ್, ಡೆಮೊ ಅಥವಾ ಕಾಣೆಯಾಗಿದೆ) ಮತ್ತು ಒಂದು ಮಾನ್ಯತಾ ಸ್ಥಿತಿಯನ್ನು ಹೊಂದಿರುತ್ತದೆ.",
+  "landing.provenance.detail.reasoning": "ಸಾಕ್ಷ್ಯವನ್ನು ಸಂಯೋಜಿಸಲಾಗುತ್ತದೆ ಮತ್ತು ಸಂಘರ್ಷಗಳನ್ನು ನಿಯಮದ ಮೂಲಕ ಪರಿಹರಿಸಲಾಗುತ್ತದೆ, LLM ಮೂಲಕ ಅಲ್ಲ.",
+  "landing.provenance.detail.risk": "ಸಂಯೋಜಿತ ಸಾಕ್ಷ್ಯದಿಂದ ಒಂದು ನಿಶ್ಚಿತ ಸ್ಕೋರ್ ಅನ್ನು ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತದೆ.",
+  "landing.provenance.detail.safety":
+    "ಕಠಿಣ ಜಿಯೋಫೆನ್ಸ್‌ಗಳು ಮತ್ತು ಸುರಕ್ಷತಾ ನಿಯಮಗಳನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತದೆ — ಈ ಹಂತವು ಇದಕ್ಕೂ ಮೊದಲಿನ ಎಲ್ಲವನ್ನೂ ಅತಿಕ್ರಮಿಸಬಹುದು.",
+  "landing.provenance.detail.decision": "ಮುಂದುವರಿಯಿರಿ, ಎಚ್ಚರಿಕೆಯಿಂದ ಮುಂದುವರಿಯಿರಿ, ಮುಂದುವರಿಯಬೇಡಿ, ಅಥವಾ ಸುರಕ್ಷಿತ ಶಿಫಾರಸು ಇಲ್ಲ.",
+  "landing.provenance.detail.output": "ವಿವರಣೆ, ಸಾಕ್ಷ್ಯ ಮತ್ತು ಈ ಮೂಲ ಗ್ರಾಫ್ ಅನ್ನು ಪ್ರತಿಕ್ರಿಯೆಯಲ್ಲಿ ಸಂಯೋಜಿಸಲಾಗುತ್ತದೆ.",
+  "landing.evidenceTiers.title": "ಅಧಿಕೃತ, ಮುನ್ಸೂಚನೆ, ಪಡೆದ",
+  "landing.evidenceTiers.official": "ಅಧಿಕೃತ",
+  "landing.evidenceTiers.officialDesc": "ಅಧಿಕೃತ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್‌ಗಳು — INCOIS PFZ ಸಲಹೆಗಳು, RSMC ಚಂಡಮಾರುತ ಬುಲೆಟಿನ್‌ಗಳು.",
+  "landing.evidenceTiers.forecast": "ಮುನ್ಸೂಚನೆ",
+  "landing.evidenceTiers.forecastDesc": "ಲೈವ್ ಅಥವಾ ಇತ್ತೀಚೆಗೆ ಕ್ಯಾಶ್ ಮಾಡಿದ ಮಾದರಿ ದತ್ತಾಂಶ — ಹವಾಮಾನ, ಸಮುದ್ರ ಮೇಲ್ಮೈ ತಾಪಮಾನ, ಪ್ರವಾಹಗಳು.",
+  "landing.evidenceTiers.derived": "ಪಡೆದ",
+  "landing.evidenceTiers.derivedDesc": "ಮೇಲಿನ ಸಾಕ್ಷ್ಯದಿಂದ ORCA ಲೆಕ್ಕಹಾಕಿದ್ದು — ಎಂದಿಗೂ ಸ್ವತಃ ಒಂದು ಮೂಲವಲ್ಲ.",
+  "landing.evidenceTiers.note":
+    "ಉತ್ಪನ್ನದಲ್ಲಿ: ಅಧಿಕೃತ ಎಂಬುದು ರೆಫರೆನ್ಸ್ ಹಂತಕ್ಕೆ, ಮುನ್ಸೂಚನೆ ಲೈವ್/ಕ್ಯಾಶ್‌ಗೆ ಹೊಂದಿಕೆಯಾಗುತ್ತದೆ, ಪಡೆದ ಎಂಬುದು ORCA ಯ ಸ್ವಂತ ಲೆಕ್ಕಾಚಾರ — ಎಂದಿಗೂ ನಾಲ್ಕನೇ ದತ್ತಾಂಶ ಮೂಲವಾಗಿ ಪ್ರಸ್ತುತಪಡಿಸಲಾಗುವುದಿಲ್ಲ.",
+  "landing.final.ctaPrimary": "ORCA ಅನ್ನು ಅನ್ವೇಷಿಸಿ",
+  "landing.final.tagline": "ಸಾಗರ ದತ್ತಾಂಶದಿಂದ ವಿವರಿಸಬಹುದಾದ ನಿರ್ಧಾರಗಳವರೆಗೆ.",
   "landing.pipeline.title": "ORCA ಹೇಗೆ ತರ್ಕಿಸುತ್ತದೆ",
   "landing.pipeline.step.query": "ಬಳಕೆದಾರರ ಪ್ರಶ್ನೆ",
   "landing.pipeline.step.agents": "ಸಹಯೋಗಿ AI ಏಜೆಂಟ್‌ಗಳು",
@@ -2531,7 +2856,7 @@ const kn: Table = {
   "landing.preview.suitability": "ಮೀನುಗಾರಿಕೆ ಸೂಕ್ತತೆ",
   "landing.preview.route": "ಮಾರ್ಗ",
   "landing.preview.evidence": "ಸಾಕ್ಷ್ಯ",
-  "landing.preview.cta": "ORCA ಪ್ರವೇಶಿಸಿ",
+  "landing.preview.cta": "ಪ್ಲಾಟ್‌ಫಾರ್ಮ್ ಪ್ರವೇಶಿಸಿ",
   "landing.footer.tagline": "ಸಹಯೋಗಿ ಏಜೆಂಟ್‌ಗಳೊಂದಿಗೆ ಸಮುದ್ರ ಪರಿಸರ ವ್ಯವಸ್ಥೆ ತಾರ್ಕಿಕತೆ",
   "landing.footer.problem": "SIH26176",
   "landing.footer.sponsor": "ISRO",
@@ -2561,6 +2886,7 @@ const kn: Table = {
   "chat.clear": "ಅಳಿಸಿ",
   "chat.retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
   "chat.suggested": "ಸೂಚಿತ ಪ್ರಶ್ನೆಗಳು",
+  "chat.followups": "ನೀವು ಇದನ್ನೂ ಕೇಳಬಹುದು",
   "chat.analyzing": "ORCA ಸಮುದ್ರ ಪರಿಸ್ಥಿತಿಗಳನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ…",
   "chat.analyzingLong":
     "ಇನ್ನೂ ಕೆಲಸ ನಡೆಯುತ್ತಿದೆ — ಉತ್ತರಿಸುವ ಮೊದಲು ORCA ಹವಾಮಾನ, ಸಮುದ್ರ ಮತ್ತು ಅಪಾಯ ವಿಶ್ಲೇಷಣೆ ನಡೆಸುತ್ತದೆ; ಕೆಲವು ಪ್ರಶ್ನೆಗಳಿಗೆ ಸ್ವಲ್ಪ ಹೆಚ್ಚು ಸಮಯ ಬೇಕಾಗಬಹುದು.",
@@ -2674,6 +3000,7 @@ const kn: Table = {
   "stage.research": "ಸಂಶೋಧನಾ ಮೋಡ್",
   "stage.provenance": "ಮೂಲ ಗ್ರಾಫ್",
   "stage.explain": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ವಿವರಣೆ",
+  "stage.followups": "ಮುಂದಿನ ಪ್ರಶ್ನೆ ಸಲಹೆಗಳು",
   "stage.assemble": "ಪ್ರತಿಕ್ರಿಯೆ ಜೋಡಣೆ",
   "activity.parallelNote": "{total} ರಲ್ಲಿ {ran} ಸಮಾನಾಂತರ ಶಾಖೆಗಳು ಚಾಲನೆಯಾದವು",
   "activity.intelligenceSummary": "{ran} ಚಾಲನೆಯಾದವು · {skipped} ಈ ಪ್ರಶ್ನೆಗೆ ಅನ್ವಯಿಸುವುದಿಲ್ಲ",
@@ -3313,19 +3640,13 @@ const kn: Table = {
 
   "auth.login.title": "ORCA ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ",
   "auth.signup.title": "ನಿಮ್ಮ ORCA ಖಾತೆಯನ್ನು ರಚಿಸಿ",
-  "auth.email": "ಇಮೇಲ್",
-  "auth.password": "ಪಾಸ್‌ವರ್ಡ್",
   "auth.submit.login": "ಸೈನ್ ಇನ್ ಮಾಡಿ",
-  "auth.submit.signup": "ಖಾತೆ ರಚಿಸಿ",
-  "auth.submit.loading": "ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ…",
   "auth.tab.signup": "ಸೈನ್ ಅಪ್ ಮಾಡಿ",
-  "auth.switch.toSignup": "ಖಾತೆ ಇಲ್ಲವೇ? ಸೈನ್ ಅಪ್ ಮಾಡಿ",
-  "auth.switch.toLogin": "ಈಗಾಗಲೇ ಖಾತೆ ಇದೆಯೇ? ಸೈನ್ ಇನ್ ಮಾಡಿ",
   "auth.logout": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
-  "auth.error.invalidCredentials": "ತಪ್ಪಾದ ಇಮೇಲ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್.",
-  "auth.error.emailTaken": "ಈ ಇಮೇಲ್‌ನೊಂದಿಗೆ ಈಗಾಗಲೇ ಖಾತೆ ಅಸ್ತಿತ್ವದಲ್ಲಿದೆ.",
-  "auth.error.validation": "ಮಾನ್ಯ ಇಮೇಲ್ ಮತ್ತು ಕನಿಷ್ಠ 8 ಅಕ್ಷರಗಳ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
-  "auth.error.generic": "ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+  "auth.backendError.title": "ಸೆಷನ್ ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+  "auth.backendError.message": "ನೀವು ಸೈನ್ ಇನ್ ಆಗಿದ್ದೀರಿ, ಆದರೆ ORCA ನ ಬ್ಯಾಕೆಂಡ್ ಅದನ್ನು ದೃಢೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಸಾಮಾನ್ಯವಾಗಿ ಇದರ ಅರ್ಥ ಸರ್ವರ್ ಸರಿಯಾಗಿ ಕಾನ್ಫಿಗರ್ ಆಗಿಲ್ಲ ಎಂದು - ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ, ಅಥವಾ ಸೈನ್ ಔಟ್ ಮಾಡಿ ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+  "auth.backendError.retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+  "auth.backendError.signOut": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
 };
 
 export const STRINGS: Record<LanguageCode, Table> = { en, hi, kn };

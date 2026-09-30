@@ -102,6 +102,7 @@ export const PHASE_STAGES: Record<StagePhase, StageDef[]> = {
     { token: "alerts", labelKey: "stage.alerts", kind: "deterministic" },
     { token: "provenance", labelKey: "stage.provenance", kind: "deterministic" },
     { token: "explain", labelKey: "stage.explain", kind: "llm" },
+    { token: "followups", labelKey: "stage.followups", kind: "llm" },
     { token: "assemble", labelKey: "stage.assemble", kind: "deterministic" },
   ],
 };
@@ -224,6 +225,10 @@ export function stageDetail(stage: StageDef, resp: QueryResponse): string | null
       return `${resp.provenance?.nodes?.length ?? 0} provenance nodes`;
     case "explain":
       return resp.grounded ? "grounded" : "template fallback (ungrounded)";
+    case "followups":
+      return resp.suggested_followups
+        ? `${resp.suggested_followups.generated_via} · ${resp.suggested_followups.questions.length} suggestion${resp.suggested_followups.questions.length === 1 ? "" : "s"}`
+        : null;
     default:
       return null;
   }
