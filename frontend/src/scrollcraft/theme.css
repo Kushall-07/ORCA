@@ -1,0 +1,20 @@
+/* Theme bridge: maps scrollcraft's six colour-role tokens + two fonts onto
+   ORCA's own --orca-* tokens (see ../index.css) instead of inventing a
+   parallel palette. Loaded after scrollcraft.css so these values win. Because
+   it points at --orca-* rather than hard values, the light/dark toggle
+   (theme/ThemeContext.tsx) already carries through automatically - no
+   separate light-mode override needed here. Per the engine's own instruction
+   ("theme by overriding tokens, six values and two fonts"); the device
+   mechanism in scrollcraft.js/.css is never touched. */
+:root {
+  --sc-canvas: var(--orca-bg);
+  --sc-surface: var(--orca-surface);
+  --sc-ink: var(--orca-text);
+  --sc-ink-soft: var(--orca-text-muted);
+  --sc-accent: var(--orca-accent-2);
+  --sc-accent-ink: #ffffff;
+
+  --sc-font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --sc-font-text: "Inter", system-ui, sans-serif;
+  --sc-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
