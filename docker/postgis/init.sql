@@ -103,3 +103,9 @@ CREATE INDEX IF NOT EXISTS bathymetry_sample_lonlat_ix
     ON gis.bathymetry_sample (lon, lat);
 COMMENT ON TABLE gis.bathymetry_sample IS
     'GEBCO 2026 downsampled to a 0.05-degree grid. Supporting environmental layer only - not authoritative navigation data.';
+
+-- Authentication no longer lives in this database - Clerk owns login/session
+-- state and the one small app-side profile table lives in Supabase (see
+-- backend/sql/supabase_profiles.sql, app.auth.profiles). An earlier revision
+-- created an `auth.users` table here for a since-replaced bcrypt/JWT scheme;
+-- a pre-existing local volume may still have it, unused and harmless.
