@@ -3,8 +3,7 @@ import { useI18n } from "../../i18n";
 import { getStakeholder, type StakeholderId } from "../../stakeholders";
 import type { ChatMessage } from "../../hooks/useOrcaQuery";
 import { useSpeechInput, type SpeechInputError } from "../../hooks/useSpeechInput";
-import { useSpeechOutput } from "../../hooks/useSpeechOutput";
-import { Spinner } from "../common";
+import { ReadAloudButton, Spinner } from "../common";
 import type { StringKey } from "../../i18n/strings";
 
 // One message per failure category - never collapse a specific cause (permission
@@ -44,38 +43,6 @@ function StatusLine({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function ReadAloudButton({ msg }: { msg: ChatMessage }) {
-  const { t, lang } = useI18n();
-  const tts = useSpeechOutput();
-  const speaking = tts.speakingId === msg.id;
-  // Speak only the concise assistant explanation — never JSON / provenance.
-  const text = msg.text?.trim() ?? "";
-  if (!text) return null;
-
-  const label = !tts.supported
-    ? t("voice.tts.unsupported")
-    : speaking
-      ? t("voice.tts.stop")
-      : t("voice.tts.play");
-
-  return (
-    <button
-      type="button"
-      className={`msg__tts ${speaking ? "is-speaking" : ""}`}
-      onClick={() => (speaking ? tts.stop() : tts.speak(msg.id, text, lang))}
-      disabled={!tts.supported}
-      aria-pressed={speaking}
-      aria-label={label}
-      title={label}
-    >
-      <span aria-hidden>{speaking ? "■" : "🔊"}</span>
-      <span className="msg__tts-label">
-        {speaking ? t("voice.speaking") : t("voice.tts.play")}
-      </span>
-    </button>
-  );
-}
-
 function MessageBubble({ msg, onRetry }: { msg: ChatMessage; onRetry: () => void }) {
   const { t } = useI18n();
   const isUser = msg.role === "user";
@@ -99,7 +66,7 @@ function MessageBubble({ msg, onRetry }: { msg: ChatMessage; onRetry: () => void
               <p className="msg__clarify">{msg.response.clarification_question}</p>
             )}
           {!isUser && <StatusLine msg={msg} />}
-          {!isUser && msg.text && <ReadAloudButton msg={msg} />}
+          {!isUser && msg.text && <ReadAloudButton id={msg.id} text={msg.text} />}
         </div>
       )}
     </div>
