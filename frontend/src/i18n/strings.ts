@@ -6,6 +6,21 @@ import type { LanguageCode } from "../types/api";
 
 export type StringKey =
   | "app.subtitle"
+  | "auth.login.title"
+  | "auth.signup.title"
+  | "auth.email"
+  | "auth.password"
+  | "auth.submit.login"
+  | "auth.submit.signup"
+  | "auth.submit.loading"
+  | "auth.tab.signup"
+  | "auth.switch.toSignup"
+  | "auth.switch.toLogin"
+  | "auth.logout"
+  | "auth.error.invalidCredentials"
+  | "auth.error.emailTaken"
+  | "auth.error.validation"
+  | "auth.error.generic"
   | "landing.brand.tagline"
   | "landing.hero.headline"
   | "landing.hero.subtext"
@@ -60,6 +75,10 @@ export type StringKey =
   | "boatClass.largeMechanized"
   | "pfz.withinRange"
   | "pfz.outOfRange"
+  | "accessibility.title"
+  | "accessibility.largeText"
+  | "accessibility.highContrast"
+  | "decision.readAloud"
   | "header.connection"
   | "header.dataStatus"
   | "conn.online"
@@ -836,6 +855,10 @@ const en: Table = {
   "boatClass.largeMechanized": "Large mechanised vessel (over 15 m)",
   "pfz.withinRange": "Within your boat's range",
   "pfz.outOfRange": "Beyond your boat's declared range",
+  "accessibility.title": "Accessibility",
+  "accessibility.largeText": "Large Text",
+  "accessibility.highContrast": "High Contrast",
+  "decision.readAloud": "Read decision aloud",
   "header.connection": "Backend",
   "header.dataStatus": "Data",
   "conn.online": "Online",
@@ -1599,6 +1622,22 @@ const en: Table = {
   "authority.attentionCategory.geofence": "Geofence",
   "authority.attentionCategory.data_quality": "Data quality",
   "authority.attentionCategory.unavailable": "Unavailable",
+
+  "auth.login.title": "Sign in to ORCA",
+  "auth.signup.title": "Create your ORCA account",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.submit.login": "Sign in",
+  "auth.submit.signup": "Create account",
+  "auth.submit.loading": "Please wait…",
+  "auth.tab.signup": "Sign up",
+  "auth.switch.toSignup": "Need an account? Sign up",
+  "auth.switch.toLogin": "Already have an account? Sign in",
+  "auth.logout": "Sign out",
+  "auth.error.invalidCredentials": "Incorrect email or password.",
+  "auth.error.emailTaken": "An account with that email already exists.",
+  "auth.error.validation": "Enter a valid email and a password of at least 8 characters.",
+  "auth.error.generic": "Something went wrong. Please try again.",
 };
 
 const hi: Table = {
@@ -1662,6 +1701,10 @@ const hi: Table = {
   "boatClass.largeMechanized": "बड़ा यांत्रिक जहाज़ (15 मीटर से अधिक)",
   "pfz.withinRange": "आपकी नाव की सीमा के भीतर",
   "pfz.outOfRange": "आपकी नाव की घोषित सीमा से परे",
+  "accessibility.title": "सुगम्यता",
+  "accessibility.largeText": "बड़ा टेक्स्ट",
+  "accessibility.highContrast": "उच्च कंट्रास्ट",
+  "decision.readAloud": "निर्णय सुनें",
   "header.connection": "बैकएंड",
   "header.dataStatus": "डेटा",
   "conn.online": "ऑनलाइन",
@@ -2423,6 +2466,22 @@ const hi: Table = {
   "authority.attentionCategory.geofence": "जियोफेंस",
   "authority.attentionCategory.data_quality": "डेटा गुणवत्ता",
   "authority.attentionCategory.unavailable": "अनुपलब्ध",
+
+  "auth.login.title": "ORCA में साइन इन करें",
+  "auth.signup.title": "अपना ORCA खाता बनाएं",
+  "auth.email": "ईमेल",
+  "auth.password": "पासवर्ड",
+  "auth.submit.login": "साइन इन करें",
+  "auth.submit.signup": "खाता बनाएं",
+  "auth.submit.loading": "कृपया प्रतीक्षा करें…",
+  "auth.tab.signup": "साइन अप करें",
+  "auth.switch.toSignup": "खाता नहीं है? साइन अप करें",
+  "auth.switch.toLogin": "पहले से खाता है? साइन इन करें",
+  "auth.logout": "साइन आउट करें",
+  "auth.error.invalidCredentials": "गलत ईमेल या पासवर्ड।",
+  "auth.error.emailTaken": "इस ईमेल से पहले से एक खाता मौजूद है।",
+  "auth.error.validation": "एक वैध ईमेल और कम से कम 8 अक्षरों का पासवर्ड दर्ज करें।",
+  "auth.error.generic": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
 };
 
 const kn: Table = {
@@ -2486,6 +2545,10 @@ const kn: Table = {
   "boatClass.largeMechanized": "ದೊಡ್ಡ ಯಾಂತ್ರಿಕ ಹಡಗು (15 ಮೀ ಗಿಂತ ಹೆಚ್ಚು)",
   "pfz.withinRange": "ನಿಮ್ಮ ದೋಣಿಯ ವ್ಯಾಪ್ತಿಯೊಳಗೆ",
   "pfz.outOfRange": "ನಿಮ್ಮ ದೋಣಿಯ ಘೋಷಿತ ವ್ಯಾಪ್ತಿಯ ಆಚೆ",
+  "accessibility.title": "ಪ್ರವೇಶಿಸುವಿಕೆ",
+  "accessibility.largeText": "ದೊಡ್ಡ ಪಠ್ಯ",
+  "accessibility.highContrast": "ಹೆಚ್ಚಿನ ಕಾಂಟ್ರಾಸ್ಟ್",
+  "decision.readAloud": "ನಿರ್ಣಯವನ್ನು ಕೇಳಿ",
   "header.connection": "ಬ್ಯಾಕೆಂಡ್",
   "header.dataStatus": "ದತ್ತಾಂಶ",
   "conn.online": "ಆನ್‌ಲೈನ್",
@@ -3247,6 +3310,22 @@ const kn: Table = {
   "authority.attentionCategory.geofence": "ಜಿಯೋಫೆನ್ಸ್",
   "authority.attentionCategory.data_quality": "ಡೇಟಾ ಗುಣಮಟ್ಟ",
   "authority.attentionCategory.unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+
+  "auth.login.title": "ORCA ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ",
+  "auth.signup.title": "ನಿಮ್ಮ ORCA ಖಾತೆಯನ್ನು ರಚಿಸಿ",
+  "auth.email": "ಇಮೇಲ್",
+  "auth.password": "ಪಾಸ್‌ವರ್ಡ್",
+  "auth.submit.login": "ಸೈನ್ ಇನ್ ಮಾಡಿ",
+  "auth.submit.signup": "ಖಾತೆ ರಚಿಸಿ",
+  "auth.submit.loading": "ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ…",
+  "auth.tab.signup": "ಸೈನ್ ಅಪ್ ಮಾಡಿ",
+  "auth.switch.toSignup": "ಖಾತೆ ಇಲ್ಲವೇ? ಸೈನ್ ಅಪ್ ಮಾಡಿ",
+  "auth.switch.toLogin": "ಈಗಾಗಲೇ ಖಾತೆ ಇದೆಯೇ? ಸೈನ್ ಇನ್ ಮಾಡಿ",
+  "auth.logout": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
+  "auth.error.invalidCredentials": "ತಪ್ಪಾದ ಇಮೇಲ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್.",
+  "auth.error.emailTaken": "ಈ ಇಮೇಲ್‌ನೊಂದಿಗೆ ಈಗಾಗಲೇ ಖಾತೆ ಅಸ್ತಿತ್ವದಲ್ಲಿದೆ.",
+  "auth.error.validation": "ಮಾನ್ಯ ಇಮೇಲ್ ಮತ್ತು ಕನಿಷ್ಠ 8 ಅಕ್ಷರಗಳ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ.",
+  "auth.error.generic": "ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
 };
 
 export const STRINGS: Record<LanguageCode, Table> = { en, hi, kn };

@@ -1,66 +1,101 @@
 :root {
-  /* ---- Workspace palette: warm cream through pale periwinkle to muted
-     lavender/purple (replaces the earlier "Deep Ocean Instrument" dark
-     navy/teal palette below). Surfaces get progressively cooler/more
-     saturated with elevation: page bg (cream) -> secondary bg (periwinkle)
-     -> card/panel surface (light lavender) -> raised surface (soft
-     blue-lavender), so hierarchy reads from color alone, not just shadow. ---- */
-  --orca-bg: #f7f3ea;
-  --orca-bg-2: #eff0f9;
-  --orca-surface: #e9e8f5;
-  --orca-surface-2: #dedbf0;
-  --orca-border: #c9c3e3;
-  --orca-border-strong: #a79fd4;
-  --orca-hover: #e2def5;
-  --orca-text: #2b2740;
-  --orca-text-muted: #5c5780;
-  --orca-text-faint: #837fa6;
+  /* ---- Workspace palette: dark-mode-first deep teal/near-black through to
+     a bright cyan accent (replaces the earlier cream/lavender daytime
+     palette). Default (unqualified :root) is dark; `[data-theme="light"]`
+     below overrides every token for the light variant. Surfaces get
+     progressively lighter with elevation: page bg -> card surface -> nested
+     surface, so hierarchy reads from color alone, not just shadow. ---- */
+  --orca-bg: #0e1113;
+  --orca-bg-2: #16191c;
+  --orca-surface: #16191c;
+  --orca-surface-2: #1d2124;
+  --orca-border: #2a2e32;
+  --orca-border-strong: #3a3f44;
+  --orca-hover: #22262a;
+  --orca-text: #f2f3f4;
+  --orca-text-muted: #a3a9ae;
+  --orca-text-faint: #6b7075;
 
-  /* Primary brand accent - a muted lavender/purple (never saturated/neon),
-     used for links, active nav/sidebar items, buttons, focus rings and the
-     ranked-PFZ "selected"/"top" emphasis that used to be brand teal. */
-  --orca-primary: #6c63b8;
-  --orca-primary-dark: #4f4794;
-  --orca-primary-soft: #edeafb;
-  --orca-accent: #8078cc;
+  /* Primary brand accent - cyan/teal, used for links, active nav/sidebar
+     items, buttons, focus rings and the ranked-PFZ "selected"/"top"
+     emphasis. */
+  --orca-primary: #1fb6b6;
+  --orca-primary-dark: #0e8a8a;
+  --orca-primary-soft: #143433;
+  --orca-accent: #3bf4e4;
   --orca-accent-2: var(--orca-primary);
 
-  /* Severity/risk tiers - same hues as before (green/amber/orange/red/blue),
-     deepened so each still reads at a legible contrast as TEXT on the new
-     light surfaces (the old values were tuned for light-on-dark-navy and
-     nearly vanish on cream/lavender). Keep frontend/src/theme/severityColors.ts
-     equal to these - see that file's own comment. */
-  --orca-safe: #1f9d65;
-  --orca-caution: #b9790b;
-  --orca-high: #c2540c;
-  --orca-extreme: #c43b3b;
-  --orca-info: #2b72b8;
+  /* Severity/risk tiers - brightened so each still reads at a legible
+     contrast as TEXT on the near-black dark surfaces (the light-theme
+     override below deepens them back down for the cream/white surfaces).
+     Keep frontend/src/theme/severityColors.ts equal to these - see that
+     file's own comment. */
+  --orca-safe: #34d399;
+  --orca-caution: #f5a623;
+  --orca-high: #f0883e;
+  --orca-extreme: #e5484d;
+  --orca-info: #38bdf8;
 
   /* ---- Competition palette (landing page + PFZ zone-rank accents only -
      see index.css bottom section and PfzRanking; the landing page keeps its
-     own distinct warm cream/teal "front door" branding, unrelated to the
-     workspace retheme above - see the ".landing" section's own comment). ---- */
-  --orca-teal: #31aaa9;
-  --orca-teal-dark: #1f7a79;
-  --orca-cream: #f6efdd;
-  --orca-sand: #ecdcb4;
+     own distinct near-black navy/teal "front door" branding - deliberately
+     matching the dark app theme's hue family now, unrelated to the app's
+     token *values* above - see the ".landing" section's own comment). ---- */
+  --orca-teal: #1fb6b6;
+  --orca-teal-dark: #0e8a8a;
+  --orca-cream: #050b14;
+  --orca-sand: #0b3d4a;
   --orca-red: #b32024;
   --orca-burgundy: #6e1a1d;
-  --orca-ink: #1c2b2b;
+  --orca-ink: #eef6f6;
 
   /* ---- legacy aliases: keep every existing component rule below working
-     unchanged while this file is retheme, rather than rewriting ~1800 lines
-     to the canonical names above. New rules should use the canonical names
+     unchanged across the retheme, rather than rewriting ~1800 lines to the
+     canonical names above. New rules should use the canonical names
      directly instead of these. ---- */
   --orca-panel: var(--orca-surface);
   --orca-panel-2: var(--orca-surface-2);
-  --orca-border-soft: #dfdcf0;
+  --orca-border-soft: #232729;
   --orca-muted: var(--orca-text-muted);
   --orca-faint: var(--orca-text-faint);
   --ok: var(--orca-safe);
   --warn: var(--orca-caution);
   --bad: var(--orca-extreme);
   --severe: var(--orca-extreme);
+  color-scheme: dark;
+}
+
+/* ---- Light theme override - same tokens, same layout, different values.
+   Toggled by ThemeProvider (see src/theme/ThemeContext.tsx) setting
+   data-theme="light" on <html>. Kept as a simple flat light theme (not the
+   heavier neumorphic "soft UI" technique some reference designs use for
+   light mode) so every one of the ~30 components sharing these tokens stays
+   correct without a per-component pass. ---- */
+:root[data-theme="light"] {
+  --orca-bg: #faf8f4;
+  --orca-bg-2: #ffffff;
+  --orca-surface: #ffffff;
+  --orca-surface-2: #f1ece2;
+  --orca-border: #e4dfd3;
+  --orca-border-strong: #cfc8b8;
+  --orca-hover: #f1ece2;
+  --orca-text: #1a1a18;
+  --orca-text-muted: #5c5a54;
+  --orca-text-faint: #8a877e;
+
+  --orca-primary: #0e8a8a;
+  --orca-primary-dark: #0b6e6e;
+  --orca-primary-soft: #e3f3f3;
+  --orca-accent: #0ba3a3;
+  --orca-accent-2: var(--orca-primary);
+
+  --orca-safe: #1f9d65;
+  --orca-caution: #b9790b;
+  --orca-high: #c2540c;
+  --orca-extreme: #c43b3b;
+  --orca-info: #2b72b8;
+
+  --orca-border-soft: #ece6d8;
   color-scheme: light;
 }
 
@@ -69,13 +104,18 @@
 html, body, #root { height: 100%; margin: 0; }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--orca-bg);
   color: var(--orca-text);
   font-size: 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 button { font-family: inherit; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+}
 
 .sr-only {
   position: absolute;
@@ -90,14 +130,16 @@ button { font-family: inherit; }
   border: 1px solid var(--orca-border);
   background: var(--orca-panel-2);
   color: var(--orca-text);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 0.5rem 0.9rem;
   cursor: pointer;
   font-size: 0.85rem;
+  transition: border-color 0.15s ease, transform 0.1s ease;
 }
 .btn:hover { border-color: var(--orca-accent-2); }
+.btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn--primary { background: var(--orca-accent-2); border-color: var(--orca-accent-2); color: var(--orca-bg); font-weight: 600; }
+.btn--primary { background: var(--orca-accent-2); border-color: var(--orca-accent-2); color: #fff; font-weight: 600; }
 .btn--primary:hover { filter: brightness(1.08); }
 .btn--ghost { background: transparent; }
 .btn--small { padding: 0.3rem 0.6rem; font-size: 0.78rem; }
@@ -642,13 +684,35 @@ button { font-family: inherit; }
   gap: 1rem;
   padding: 0.6rem 1rem;
   background: var(--orca-bg-2);
+  background: color-mix(in srgb, var(--orca-bg-2) 85%, transparent);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--orca-border);
   flex-wrap: wrap;
 }
 .orca-brand { display: flex; align-items: baseline; gap: 0.5rem; }
 .orca-brand__mark { color: var(--orca-accent-2); font-size: 1.2rem; }
-.orca-brand__name { font-weight: 700; letter-spacing: 0.08em; }
+.orca-brand__name {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
 .orca-brand__sub { color: var(--orca-muted); font-size: 0.78rem; }
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--orca-border);
+  background: var(--orca-surface-2);
+  color: var(--orca-text);
+  cursor: pointer;
+  font-size: 1rem;
+  flex: none;
+}
+.theme-toggle:hover { border-color: var(--orca-accent-2); }
 
 .orca-topbar__controls {
   display: flex;
@@ -658,16 +722,18 @@ button { font-family: inherit; }
 }
 .field { display: flex; flex-direction: column; gap: 0.2rem; }
 .field__label {
-  font-size: 0.66rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.64rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--orca-faint);
 }
 .field__select {
   background: var(--orca-panel-2);
   color: var(--orca-text);
   border: 1px solid var(--orca-border);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 0.35rem 0.5rem;
   font-size: 0.82rem;
 }
@@ -687,12 +753,21 @@ button { font-family: inherit; }
 .conn__pill--unavailable .conn__dot { background: var(--bad); }
 .conn__pill--checking .conn__dot { background: var(--orca-faint); }
 .conn__data { display: inline-flex; gap: 0.3rem; }
+
+.a11y-toggles { display: flex; gap: 0.35rem; }
+.a11y-toggle { display: inline-flex; align-items: center; gap: 0.3rem; }
+.a11y-toggle.is-active {
+  border-color: var(--orca-accent-2);
+  background: var(--orca-primary-soft);
+  color: var(--orca-primary-dark);
+  font-weight: 600;
+}
 .conn__data-empty { color: var(--orca-faint); }
 
 /* ---------- panel ---------- */
 .panel {
   border: 1px solid var(--orca-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--orca-panel);
   overflow: hidden;
 }
@@ -935,7 +1010,9 @@ button { font-family: inherit; }
 }
 .chat__voice-status.is-error { color: var(--orca-extreme); }
 
-.msg__tts {
+/* ReadAloudButton (see components/common/index.tsx) - shared by the chat
+   bubble ("msg__tts" modifier) and the decision card ("verdict__tts"). */
+.read-aloud {
   margin-top: 0.4rem;
   display: inline-flex;
   align-items: center;
@@ -948,10 +1025,11 @@ button { font-family: inherit; }
   padding: 0.15rem 0.4rem;
   cursor: pointer;
 }
-.msg__tts:hover:not(:disabled) { border-color: var(--orca-accent-2); }
-.msg__tts:disabled { opacity: 0.45; cursor: not-allowed; }
-.msg__tts.is-speaking { border-color: var(--orca-accent-2); color: var(--orca-text); }
-.msg__tts-label { text-transform: uppercase; letter-spacing: 0.04em; }
+.read-aloud:hover:not(:disabled) { border-color: var(--orca-accent-2); }
+.read-aloud:disabled { opacity: 0.45; cursor: not-allowed; }
+.read-aloud.is-speaking { border-color: var(--orca-accent-2); color: var(--orca-text); }
+.read-aloud__label { text-transform: uppercase; letter-spacing: 0.04em; }
+.verdict__tts { margin-top: 0; }
 
 /* Visible keyboard focus for every interactive control. */
 button:focus-visible,
@@ -2595,11 +2673,15 @@ summary:focus-visible {
    so it never leaks into the workspace's dark styling. ---- */
 .landing {
   min-height: 100%;
-  background: var(--orca-cream);
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(31, 182, 182, 0.16), transparent),
+    radial-gradient(ellipse 700px 500px at 100% 20%, rgba(11, 61, 74, 0.5), transparent),
+    var(--orca-cream);
   color: var(--orca-ink);
-  color-scheme: light;
+  color-scheme: dark;
   display: flex;
   flex-direction: column;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 .landing__topbar {
@@ -2607,20 +2689,39 @@ summary:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 1rem clamp(1rem, 4vw, 3rem);
+  gap: 1rem;
 }
 
 .landing__brand { display: flex; align-items: center; gap: 0.5rem; }
 .landing__brand-mark { color: var(--orca-teal); font-size: 1.4rem; }
 .landing__brand-name {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--orca-teal-dark);
+  color: var(--orca-ink);
 }
 
+.landing__topbar-right { display: flex; align-items: center; gap: 0.9rem; }
+
+.landing__signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: 1px solid rgba(31, 182, 182, 0.4);
+  color: var(--orca-ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.landing__signin:hover { border-color: var(--orca-teal); background: rgba(31, 182, 182, 0.1); }
+
 .landing__lang-select {
-  background: #fff;
-  border: 1px solid var(--orca-sand);
+  background: var(--orca-sand);
+  border: 1px solid rgba(31, 182, 182, 0.25);
   color: var(--orca-ink);
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
@@ -2628,32 +2729,36 @@ summary:focus-visible {
 }
 
 .landing__hero {
-  padding: clamp(2rem, 8vw, 5rem) clamp(1rem, 6vw, 3rem) clamp(2rem, 6vw, 3rem);
+  padding: clamp(2.5rem, 9vw, 6rem) clamp(1rem, 6vw, 3rem) clamp(2rem, 6vw, 3rem);
   max-width: 880px;
   margin: 0 auto;
   text-align: center;
 }
 
 .landing__eyebrow {
-  color: var(--orca-teal-dark);
+  color: var(--orca-teal);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin: 0 0 0.75rem;
+  letter-spacing: 0.16em;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0 0 1rem;
 }
 
 .landing__headline {
-  font-size: clamp(1.6rem, 4.5vw, 2.6rem);
-  line-height: 1.2;
-  margin: 0 0 1rem;
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0 0 1.25rem;
   color: var(--orca-ink);
 }
 
 .landing__subtext {
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1.6;
-  color: #3d4a49;
+  color: #9fc2c1;
   max-width: 640px;
   margin: 0 auto 1.75rem;
 }
@@ -2668,29 +2773,29 @@ summary:focus-visible {
 .landing__cta-row--center { margin-bottom: 0; }
 
 .landing__cta {
-  border-radius: 8px;
-  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  padding: 0.8rem 1.75rem;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   border: 1px solid transparent;
 }
 .landing__cta--primary {
   background: var(--orca-teal);
-  color: #fff;
-  box-shadow: 0 6px 18px -6px rgba(49, 170, 169, 0.55);
+  color: #001616;
+  box-shadow: 0 8px 24px -6px rgba(31, 182, 182, 0.55);
 }
-.landing__cta--primary:hover { background: var(--orca-teal-dark); }
+.landing__cta--primary:hover { background: #3bf4e4; }
 .landing__cta--secondary {
   background: transparent;
-  border-color: var(--orca-teal-dark);
-  color: var(--orca-teal-dark);
+  border-color: rgba(31, 182, 182, 0.4);
+  color: var(--orca-ink);
 }
-.landing__cta--secondary:hover { background: rgba(49, 170, 169, 0.1); }
+.landing__cta--secondary:hover { background: rgba(31, 182, 182, 0.12); border-color: var(--orca-teal); }
 
 .landing__disclaimer {
   font-size: 0.78rem;
-  color: #5b6867;
+  color: #6f8f8e;
   max-width: 620px;
   margin: 0 auto;
 }
@@ -2701,13 +2806,19 @@ summary:focus-visible {
   margin: 0 auto;
   width: 100%;
 }
-.landing__section--alt { background: var(--orca-sand); border-radius: 18px; }
+.landing__section--alt {
+  background: var(--orca-sand);
+  border: 1px solid rgba(31, 182, 182, 0.18);
+  border-radius: 24px;
+}
 
 .landing__section-title {
-  font-size: 1.3rem;
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
   text-align: center;
   margin: 0 0 1.75rem;
-  color: var(--orca-teal-dark);
+  color: var(--orca-ink);
 }
 
 .landing__pipeline {
@@ -2724,12 +2835,13 @@ summary:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #fff;
-  border: 1px solid var(--orca-sand);
+  background: var(--orca-sand);
+  border: 1px solid rgba(31, 182, 182, 0.25);
   border-radius: 999px;
   padding: 0.4rem 0.9rem 0.4rem 0.4rem;
   font-size: 0.85rem;
   font-weight: 600;
+  color: var(--orca-ink);
 }
 .landing__pipeline-step:not(:last-child)::after {
   content: "→";
@@ -2745,13 +2857,14 @@ summary:focus-visible {
   height: 1.4rem;
   border-radius: 50%;
   background: var(--orca-teal);
-  color: #fff;
+  color: #001616;
   font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .landing__note {
   text-align: center;
-  color: #4c5958;
+  color: #83a6a5;
   font-size: 0.85rem;
   max-width: 720px;
   margin: 0 auto;
@@ -2765,9 +2878,9 @@ summary:focus-visible {
   margin-bottom: 1.25rem;
 }
 .landing__chip {
-  background: #fff;
+  background: var(--orca-sand);
   border: 1px solid var(--orca-teal);
-  color: var(--orca-teal-dark);
+  color: var(--orca-ink);
   border-radius: 999px;
   padding: 0.35rem 0.9rem;
   font-size: 0.82rem;
@@ -2783,10 +2896,10 @@ summary:focus-visible {
   gap: 0.75rem;
 }
 .landing__why-item {
-  background: #fff;
-  border: 1px solid var(--orca-sand);
-  border-left: 4px solid var(--orca-teal);
-  border-radius: 8px;
+  background: var(--orca-sand);
+  border: 1px solid rgba(31, 182, 182, 0.18);
+  border-left: 3px solid var(--orca-teal);
+  border-radius: 10px;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
   font-weight: 600;
@@ -2801,9 +2914,9 @@ summary:focus-visible {
   margin-bottom: 1.5rem;
 }
 .landing__preview-pill {
-  background: #fff;
-  border: 1px solid var(--orca-sand);
-  border-radius: 8px;
+  background: var(--orca-sand);
+  border: 1px solid rgba(31, 182, 182, 0.18);
+  border-radius: 10px;
   padding: 0.6rem 1.1rem;
   font-size: 0.85rem;
   font-weight: 600;
@@ -2811,8 +2924,8 @@ summary:focus-visible {
 }
 .landing__preview-pill--safe {
   border-color: var(--orca-teal);
-  color: var(--orca-teal-dark);
-  background: rgba(49, 170, 169, 0.08);
+  color: #7bf1e6;
+  background: rgba(31, 182, 182, 0.14);
 }
 
 .landing__footer {
@@ -2822,19 +2935,221 @@ summary:focus-visible {
   flex-wrap: wrap;
   gap: 0.4rem 1rem;
   justify-content: center;
-  color: #5b6867;
+  color: #6f8f8e;
   font-size: 0.78rem;
-  border-top: 1px solid var(--orca-sand);
+  border-top: 1px solid rgba(31, 182, 182, 0.18);
 }
 .landing__footer-brand {
   font-weight: 700;
-  color: var(--orca-teal-dark);
+  color: var(--orca-teal);
 }
 
 @media (max-width: 480px) {
   .landing__topbar { padding: 0.75rem 1rem; }
   .landing__pipeline-step:not(:last-child)::after { display: none; }
 }
+
+/* ---------- auth gate (login / signup) ----------
+   Follows the app-wide dark/light theme (--orca-* tokens, toggled by
+   ThemeProvider), not Landing's fixed cream/teal branding - the reference
+   product's own login screen is part of its app chrome, not its marketing
+   site. Split-screen: form card left, a CSS gradient "liquid" panel right
+   (a deliberately non-literal stand-in for a WebGL shader) - hidden below
+   the breakpoint where there's no room for it. */
+.auth-gate {
+  min-height: 100%;
+  background: var(--orca-bg);
+  color: var(--orca-text);
+  display: flex;
+}
+
+.auth-gate__form-side {
+  flex: 1 1 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem clamp(1.25rem, 6vw, 4rem);
+  position: relative;
+}
+
+.auth-gate__theme-toggle { position: absolute; top: 1.5rem; right: 1.5rem; }
+
+.auth-gate__art {
+  flex: 1 1 480px;
+  position: relative;
+  overflow: hidden;
+  display: none;
+  background-image:
+    radial-gradient(circle, var(--orca-accent) 0%, transparent 45%),
+    radial-gradient(circle, var(--orca-primary-dark) 0%, transparent 55%),
+    linear-gradient(160deg, var(--orca-primary) 0%, var(--orca-bg) 100%);
+  background-size: 140% 140%, 160% 160%, 100% 100%;
+  background-repeat: no-repeat;
+  /* A slow drifting glow, standing in for the reference's animated liquid
+     shader (see LoginPage.tsx's comment) - pure CSS, no image/WebGL asset. */
+  animation: orca-art-drift 18s ease-in-out infinite alternate;
+}
+@keyframes orca-art-drift {
+  0%   { background-position: 15% 10%, 85% 90%, 0 0; }
+  50%  { background-position: 45% 35%, 55% 65%, 0 0; }
+  100% { background-position: 10% 45%, 90% 55%, 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-gate__art { animation: none; background-position: 15% 10%, 85% 90%, 0 0; }
+}
+
+.auth-gate__art-badge {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  animation: orca-badge-glow 2.6s ease-in-out infinite;
+}
+/* A small "live" status dot, same idea as the workspace's DataTierBadge -
+   this badge names a live data relationship (ISRO x INCOIS), so the pulse
+   reads as "active", not just decoration. */
+.auth-gate__art-badge::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--orca-accent);
+  animation: orca-badge-dot 1.8s ease-in-out infinite;
+}
+@keyframes orca-badge-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 244, 228, 0.3); }
+  50% { box-shadow: 0 0 0 5px rgba(59, 244, 228, 0); }
+}
+@keyframes orca-badge-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-gate__art-badge,
+  .auth-gate__art-badge::before { animation: none; }
+}
+
+@media (min-width: 860px) {
+  .auth-gate__art { display: block; }
+}
+
+.auth-card { width: 100%; max-width: 380px; margin: 0 auto; }
+
+.auth-card__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.75rem;
+}
+.auth-card__brand-mark { color: var(--orca-accent-2); font-size: 1.4rem; }
+.auth-card__brand-name {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--orca-text);
+}
+
+.auth-card__title {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  font-size: 1.5rem;
+  margin: 0 0 1.5rem;
+  color: var(--orca-text);
+}
+
+.auth-card__tabs {
+  display: flex;
+  padding: 0.25rem;
+  gap: 0.25rem;
+  background: var(--orca-surface-2);
+  border: 1px solid var(--orca-border);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+.auth-card__tab {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 9px;
+  background: transparent;
+  border: none;
+  color: var(--orca-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-card__tab.is-active {
+  background: var(--orca-surface);
+  color: var(--orca-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Clerk's <SignIn>/<SignUp> render their own outer card - flatten it so it
+   sits flush inside our .auth-card instead of a card-in-a-card look. Colors
+   themselves come from the `appearance.variables` passed in LoginPage.tsx,
+   not from here (Clerk's DOM is outside this stylesheet's normal cascade). */
+.auth-clerk-root { width: 100%; }
+.auth-clerk-card {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 1rem; }
+
+.auth-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--orca-text-muted);
+}
+
+.auth-form__field input {
+  border: 1px solid var(--orca-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--orca-text);
+  background: var(--orca-surface-2);
+}
+.auth-form__field input:focus {
+  outline: 2px solid var(--orca-accent-2);
+  outline-offset: 1px;
+}
+
+.auth-form__error {
+  margin: 0;
+  color: var(--orca-extreme);
+  font-size: 0.85rem;
+}
+
+.auth-form__submit {
+  margin-top: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  border-radius: 999px;
+  background: var(--orca-accent-2);
+  border-color: var(--orca-accent-2);
+  color: #fff;
+}
+.auth-form__submit:hover:not(:disabled) { background: var(--orca-primary-dark); }
 
 /* ---- Phase 11: Emergency Distress (SOS) page ---- */
 .sos-view { display: flex; flex-direction: column; gap: 1rem; }
@@ -2892,3 +3207,72 @@ summary:focus-visible {
 .sos-checklist__item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.84rem; }
 .top-nav__item--sos { color: var(--orca-extreme); font-weight: 600; }
 .sidebar__item--sos { color: var(--orca-extreme); font-weight: 600; }
+
+/* ==========================================================================
+   Accessibility / Large Text + High Contrast mode (see ../accessibility.tsx)
+   A display mode layered over the existing design - never a redesign, never
+   changes which fields render or what data means, only how large/legible it
+   is. Applied via [data-large-text]/[data-high-contrast] on <html>, so it
+   reaches every existing component without any component needing to know
+   accessibility mode exists. Status is already communicated with text + an
+   icon/shape + color everywhere (DecisionCard, SeverityBadge, DataTierBadge)
+   - this section only amplifies that, never introduces color-only meaning.
+   ========================================================================== */
+
+[data-large-text="true"] body { font-size: 18px; }
+
+[data-large-text="true"] .btn,
+[data-large-text="true"] .field__select,
+[data-large-text="true"] .read-aloud,
+[data-large-text="true"] .a11y-toggle {
+  font-size: 1rem;
+  padding: 0.6rem 1rem;
+  min-height: 44px; /* WCAG 2.5.5 minimum touch target */
+}
+[data-large-text="true"] .field__label { font-size: 0.82rem; }
+
+/* The primary operational answer gets the largest bump - this is the one
+   thing a user must never have to squint at. */
+[data-large-text="true"] .decision__headline { font-size: 2rem; line-height: 1.2; }
+[data-large-text="true"] .verdict__risk-score,
+[data-large-text="true"] .sev-badge { font-size: 1.05rem; padding: 0.4rem 0.7rem; }
+[data-large-text="true"] .decision__headline--warn { font-size: 1.3rem; }
+
+[data-large-text="true"] .panel__title { font-size: 1.15rem; }
+[data-large-text="true"] .kv__k, [data-large-text="true"] .kv__v { font-size: 1rem; }
+[data-large-text="true"] .empty-note, [data-large-text="true"] .disclaimer { font-size: 0.95rem; }
+
+/* More breathing room between stacked cards/sections at this larger scale. */
+[data-large-text="true"] .panel__body { padding-top: 0.85rem; }
+[data-large-text="true"] .verdict__body { gap: 0.85rem; }
+
+[data-high-contrast="true"] {
+  --orca-bg: #ffffff;
+  --orca-bg-2: #ffffff;
+  --orca-surface: #ffffff;
+  --orca-surface-2: #f2f2f2;
+  --orca-border: #000000;
+  --orca-border-strong: #000000;
+  --orca-hover: #e6e6e6;
+  --orca-text: #000000;
+  --orca-text-muted: #1a1a1a;
+  --orca-text-faint: #333333;
+  --orca-primary: #1a1470;
+  --orca-primary-dark: #0d0a3d;
+  --orca-primary-soft: #dcd8ff;
+  --orca-accent: #1a1470;
+  --orca-safe: #0a6b34;
+  --orca-caution: #7a4a00;
+  --orca-high: #8a3300;
+  --orca-extreme: #7a0d0d;
+  --orca-info: #0a3d7a;
+}
+[data-high-contrast="true"] .btn,
+[data-high-contrast="true"] .field__select,
+[data-high-contrast="true"] .panel,
+[data-high-contrast="true"] .verdict,
+[data-high-contrast="true"] .sev-badge,
+[data-high-contrast="true"] .tier-badge {
+  border-width: 2px;
+}
+[data-high-contrast="true"] .decision__headline { text-decoration: underline; text-decoration-thickness: 0.08em; }
