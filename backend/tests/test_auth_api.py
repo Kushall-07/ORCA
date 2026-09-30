@@ -119,6 +119,21 @@ def test_me_falls_back_to_users_api_when_session_has_no_email_claim(
     assert response.json()["email"] == "fallback@example.com"
 
 
+def test_me_returns_503_when_clerk_sdk_raises(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Clerk SDK/network hiccup (JWKS fetch failure, transient error, ...)
+    must never surface as a raw 500 - see app/auth/dependencies.py."""
+
+    class _RaisingClerkClient:
+        def authenticate_request(self, request, options):  # noqa: ANN001, ARG002
+            raise RuntimeError("simulated Clerk outage")
+
+    monkeypatch.setattr(auth_deps, "get_clerk_client", lambda: _RaisingClerkClient())
+    response = client.get("/auth/me", headers={"Authorization": "Bearer whatever-clerk-issued"})
+    assert response.status_code == 503
+
+
 def test_me_returns_500_when_clerk_secret_is_not_configured(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

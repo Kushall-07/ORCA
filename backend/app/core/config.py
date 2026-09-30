@@ -93,10 +93,16 @@ class Settings(BaseSettings):
     # Query Understanding agent and the Evidence & Explanation agent. Override
     # with the GROQ_MODEL env var. The earlier Llama 3.3 70B "versatile" model
     # was retired by Groq for the developer/free tier and now returns
-    # 404 model_not_found.
+    # 404 model_not_found. The 120B gpt-oss sibling was slow enough to
+    # regularly blow past groq_timeout_seconds under load - query_understanding
+    # retries a failed/slow call up to llm_max_retries times, each with the
+    # FULL timeout, so 120B's worst case was timeout x (1 + retries) before
+    # falling back. 20B is the same model family (just less compute per
+    # request), which is what actually fixes "took too long", not the retry
+    # count or the timeout value alone.
     groq_api_key: str = Field(default="")
-    groq_model: str = Field(default="openai/gpt-oss-120b")
-    groq_timeout_seconds: float = Field(default=20.0, gt=0)
+    groq_model: str = Field(default="openai/gpt-oss-20b")
+    groq_timeout_seconds: float = Field(default=12.0, gt=0)
     llm_max_retries: int = Field(default=1, ge=0, le=3)
 
     # ---- Phase 5: orchestration ----

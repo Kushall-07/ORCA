@@ -2,8 +2,15 @@
 LLM-using agents through the real GroqLlmClient (Groq call mocked - no network).
 
 Groq retired ``llama-3.3-70b-versatile`` for the developer/free tier (it now
-returns HTTP 404 ``model_not_found``); the single authoritative model is
-``openai/gpt-oss-120b``.
+returns HTTP 404 ``model_not_found``). The 120B gpt-oss sibling was the
+authoritative model for a while, but was slow enough on Groq to regularly
+exceed groq_timeout_seconds under load - query_understanding retries a
+failed/slow call up to llm_max_retries times, each at the FULL timeout, so
+120B's worst case was minutes before falling back to the deterministic path.
+20B is the same model family (OpenAI's smaller gpt-oss checkpoint), just far
+less compute per request - confirmed against the real Groq API at ~1s for a
+realistic JSON-mode call, vs. 120B routinely blowing past a 20s timeout. The
+single authoritative model is now ``openai/gpt-oss-20b``.
 """
 
 from __future__ import annotations
@@ -20,8 +27,9 @@ from app.models.decision import DecisionStatus
 from app.models.query import Language, QueryIntent, QueryUnderstanding
 from app.services.llm import GroqLlmClient
 
-CURRENT_MODEL = "openai/gpt-oss-120b"
+CURRENT_MODEL = "openai/gpt-oss-20b"
 OBSOLETE_MODEL = "llama-3.3-70b-versatile"
+SUPERSEDED_MODEL = "openai/gpt-oss-120b"
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,9 +47,16 @@ def test_obsolete_model_is_not_the_runtime_default() -> None:
     assert Settings().groq_model != OBSOLETE_MODEL
 
 
+def test_superseded_120b_model_is_not_the_runtime_default() -> None:
+    """120B is still a legitimate override (via GROQ_MODEL) for anyone who
+    wants it - it's just not what a fresh checkout runs with, since it was
+    routinely slower than the timeout budget (see this file's docstring)."""
+    assert Settings().groq_model != SUPERSEDED_MODEL
+
+
 def test_env_var_still_overrides_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-20b")
-    assert Settings().groq_model == "openai/gpt-oss-20b"
+    monkeypatch.setenv("GROQ_MODEL", SUPERSEDED_MODEL)
+    assert Settings().groq_model == SUPERSEDED_MODEL
 
 
 def test_no_obsolete_model_string_in_tracked_backend_or_env_example() -> None:

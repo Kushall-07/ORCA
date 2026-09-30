@@ -17,11 +17,19 @@ from fastapi.concurrency import run_in_threadpool
 from app.auth.clerk_client import get_clerk_client
 from app.auth.profiles import Profile, get_or_create_profile
 from app.core.config import get_settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 _UNAUTHORIZED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Not authenticated.",
     headers={"WWW-Authenticate": "Bearer"},
+)
+
+_AUTH_SERVICE_UNAVAILABLE = HTTPException(
+    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    detail="Authentication service temporarily unavailable.",
 )
 
 
@@ -54,7 +62,15 @@ async def get_current_user(request: Request) -> Profile:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication is not configured on this server.",
         )
-    state = await run_in_threadpool(_authenticate_sync, request, settings.cors_origins)
+    try:
+        state = await run_in_threadpool(_authenticate_sync, request, settings.cors_origins)
+    except Exception as exc:  # noqa: BLE001 - never let a Clerk SDK/network hiccup
+        # (JWKS fetch failure, transient network error, etc.) reach the client
+        # as a raw 500 - the project-wide invariant is "no stack trace ever
+        # reaches the client" (docs/architecture.md §5). Distinct from
+        # _UNAUTHORIZED: the token may well be valid, we just couldn't check.
+        logger.warning("Clerk authenticate_request failed: %s", exc)
+        raise _AUTH_SERVICE_UNAVAILABLE from exc
     if not state.is_signed_in or state.payload is None:
         raise _UNAUTHORIZED
     user_id = state.payload.get("sub")
