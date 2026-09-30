@@ -71,6 +71,23 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://localhost:6379/0")
 
+    # ---- Authentication (Clerk) ----
+    # Clerk owns signup/login/password/session issuance entirely - the
+    # frontend (@clerk/clerk-react) talks to Clerk directly and this backend
+    # never sees a password. This secret is only used to verify a session
+    # token Clerk already issued (see app.auth.dependencies). A blank value
+    # makes every protected request fail loudly with 500, never silently
+    # accept an unverifiable token.
+    clerk_secret_key: str = Field(default="")
+
+    # ---- Supabase (app-side user profile storage only) ----
+    # The ONLY thing Supabase stores for ORCA: a small `profiles` row keyed by
+    # the Clerk user id (see app.auth.profiles / backend/sql/supabase_profiles.sql).
+    # ORCA's own self-hosted Postgres/PostGIS (GIS layers, sessions, etc. -
+    # see database_url above) is completely separate and unaffected.
+    supabase_url: str = Field(default="")
+    supabase_service_role_key: str = Field(default="")
+
     # ---- LLM provider (Groq is the sole provider; used from Phase 5) ----
     # Single authoritative model id, consumed by GroqLlmClient for BOTH the
     # Query Understanding agent and the Evidence & Explanation agent. Override

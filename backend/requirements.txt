@@ -32,6 +32,10 @@ psycopg[binary]>=3.1,<4.0
 geoalchemy2>=0.15,<1.0
 redis>=5.0,<6.0
 
+# ---- Authentication: Clerk (session verification) + Supabase (profile storage) ----
+clerk-backend-api>=7.0,<8.0
+supabase>=2.0,<3.0
+
 # ---- Serialization ----
 pyyaml>=6.0,<7.0
 
