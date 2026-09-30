@@ -59,6 +59,8 @@ services:
       COPERNICUS_USERNAME: ${COPERNICUS_USERNAME:-}
       COPERNICUS_PASSWORD: ${COPERNICUS_PASSWORD:-}
       WDPA_API_TOKEN: ${WDPA_API_TOKEN:-}
+      IMD_API_KEY: ${IMD_API_KEY:-}
+      IMD_API_BEARER_TOKEN: ${IMD_API_BEARER_TOKEN:-}
     volumes:
       # Git-tracked static GIS layers (Natural Earth coastline, Marine Regions
       # EEZ, WDPA subset, GEBCO bathymetry) + the PFZ/RSMC reference snapshots.
