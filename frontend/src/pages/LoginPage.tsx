@@ -5,6 +5,12 @@ import { useTheme } from "../theme/ThemeContext";
 import { ThemeToggle } from "../theme/ThemeToggle";
 import { useScrollCraft } from "../scrollcraft/useScrollCraft";
 import { OrcaMark } from "../scrollcraft/OrcaMark";
+import { OceanScene, type OceanLayerKey } from "../scrollcraft/OceanScene";
+
+// The same quiet state the landing page's Hero opens on and its Final
+// section returns to (Step A/G) - reused here so the login page reads as
+// part of the same product rather than a one-off gradient.
+const LOGIN_OCEAN_LAYERS: OceanLayerKey[] = ["surface", "grid", "coastline", "dataPoints"];
 
 // Mirrors index.css's --orca-* token values for each theme (see that file's
 // :root / [data-theme="light"] blocks) - Clerk's <SignIn>/<SignUp> render
@@ -100,8 +106,7 @@ export function LoginPage() {
         </div>
       </div>
       <div className="auth-gate__art" data-sc-spotlight aria-hidden>
-        <div className="auth-gate__art-plane auth-gate__art-plane--far" />
-        <div className="auth-gate__art-plane auth-gate__art-plane--near" />
+        <OceanScene layers={LOGIN_OCEAN_LAYERS} mode="quiet" className="auth-gate__ocean" />
         <div className="auth-gate__orca-wrap">
           <div className="auth-gate__orca">
             <OrcaMark />
